@@ -40,4 +40,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Build Failures**: Resolved `go.mod` version mismatch where local toolchain (Go 1.25) enforced Go 1.23+ requirements that older Docker images couldn't support.
 - **Telegram Bot**: Fixed syntax error (mismatched braces) in `index.js`.
 - **Grafana Connection**: Fixed "connection refused" and "datasource not found" errors by networking cleanup and explicit service naming.
+- **Linting Performance**: Fixed excessively slow linting by globally ignoring `node_modules` and `vendor` directories in `eslint.config.js`.
+
+### 🏗️ Refactor
+
+- **Layer 1 Ingestion**:
+  - Implemented **Vendor Adapter Pattern** to support multiple market data providers.
+  - Created `VendorFactory` to dynamically load `Kite` or `IndianApi` adapters.
+  - Added `IndianApiVendor` which integrates with external OpenAPI specs (`vendor/IndianApi/indian-api.json`) and secrets.
+  - Cleaned up root `index.js` by removing legacy `WebSocketManager`.
 - **Shutdown**: Improved `make down` to include `--profile app`, preventing "network has active endpoints" errors.

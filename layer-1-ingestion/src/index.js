@@ -9,7 +9,7 @@
 
 require('dotenv').config();
 const express = require('express');
-const { WebSocketManager } = require('./websocket/manager');
+const { VendorFactory } = require('./vendors/factory');
 const { KafkaProducer } = require('./kafka/producer');
 const { Normalizer } = require('./normalizer');
 const { logger } = require('./utils/logger');
@@ -43,7 +43,7 @@ app.use((req, res, next) => {
 });
 
 // Initialize components
-let wsManager;
+let marketDataVendor;
 let kafkaProducer;
 let normalizer;
 
@@ -66,15 +66,15 @@ async function initialize() {
     normalizer = new Normalizer();
     logger.info('✅ Normalizer initialized');
 
-    // Initialize WebSocket Manager
-    wsManager = new WebSocketManager({
+    // Initialize Market Data Vendor via Factory
+    marketDataVendor = VendorFactory.createVendor({
       apiKey: process.env.ZERODHA_API_KEY,
       accessToken: process.env.ZERODHA_ACCESS_TOKEN,
       symbols: symbols.nifty50,
       onTick: handleTick,
     });
-    await wsManager.connect();
-    logger.info('✅ WebSocket Manager connected');
+
+    await marketDataVendor.connect();
 
     logger.info(`🎯 Subscribed to ${symbols.nifty50.length} Nifty 50 symbols`);
   } catch (error) {
@@ -117,7 +117,7 @@ app.get('/health', (req, res) => {
     timestamp: new Date().toISOString(),
     connections: {
       kafka: kafkaProducer?.isConnected() || false,
-      websocket: wsManager?.isConnected() || false,
+      websocket: marketDataVendor?.isConnected() || false,
     },
   };
   res.json(health);
@@ -133,7 +133,7 @@ app.get('/metrics', async (req, res) => {
 async function shutdown() {
   logger.info('🛑 Shutting down gracefully...');
 
-  if (wsManager) await wsManager.disconnect();
+  if (marketDataVendor) await marketDataVendor.disconnect();
   if (kafkaProducer) await kafkaProducer.disconnect();
 
   process.exit(0);

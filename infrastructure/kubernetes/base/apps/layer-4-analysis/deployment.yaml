@@ -1,0 +1,23 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: layer-4-analysis
+  namespace: trading-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: layer-4-analysis
+  template:
+    metadata:
+      labels:
+        app: layer-4-analysis
+    spec:
+      containers:
+      - name: layer-4-analysis
+        image: nifty50-trading-system/layer-4-analysis:latest
+        env:
+        - name: OTEL_EXPORTER_OTLP_ENDPOINT
+          value: "http://otel-collector.monitoring.svc.cluster.local:4317"
+        ports:
+        - containerPort: 8080

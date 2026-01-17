@@ -1,0 +1,129 @@
+/**
+ * Layer 1: Data Ingestion Service
+ * 
+ * Connects to market data sources via WebSocket,
+ * normalizes data, and publishes to Kafka
+ * 
+ * @author Utkarsh Pandey
+ */
+
+require('dotenv').config();
+const express = require('express');
+const { WebSocketManager } = require('./websocket/manager');
+const { KafkaProducer } = require('./kafka/producer');
+const { Normalizer } = require('./normalizer');
+const { logger } = require('./utils/logger');
+const { metrics, register } = require('./utils/metrics');
+const symbols = require('../config/symbols.json');
+
+// Initialize Express for health checks
+const app = express();
+const PORT = process.env.INGESTION_PORT || 3001;
+
+// Initialize components
+let wsManager;
+let kafkaProducer;
+let normalizer;
+
+/**
+ * Initialize all services
+ */
+async function initialize() {
+  logger.info('🚀 Starting Layer 1: Data Ingestion Service');
+  
+  try {
+    // Initialize Kafka Producer
+    kafkaProducer = new KafkaProducer({
+      brokers: process.env.KAFKA_BROKERS?.split(',') || ['localhost:9092'],
+      topic: process.env.KAFKA_TOPIC_RAW_TICKS || 'raw-ticks'
+    });
+    await kafkaProducer.connect();
+    logger.info('✅ Kafka Producer connected');
+
+    // Initialize Normalizer
+    normalizer = new Normalizer();
+    logger.info('✅ Normalizer initialized');
+
+    // Initialize WebSocket Manager
+    wsManager = new WebSocketManager({
+      apiKey: process.env.ZERODHA_API_KEY,
+      accessToken: process.env.ZERODHA_ACCESS_TOKEN,
+      symbols: symbols.nifty50,
+      onTick: handleTick
+    });
+    await wsManager.connect();
+    logger.info('✅ WebSocket Manager connected');
+
+    logger.info(`🎯 Subscribed to ${symbols.nifty50.length} Nifty 50 symbols`);
+    
+  } catch (error) {
+    logger.error('❌ Initialization failed:', error);
+    process.exit(1);
+  }
+}
+
+/**
+ * Handle incoming tick data
+ * @param {Object} tick - Raw tick from broker
+ */
+async function handleTick(tick) {
+  try {
+    // Normalize the tick to unified schema
+    const normalizedTick = normalizer.normalize(tick);
+    
+    if (!normalizedTick) {
+      metrics.invalidTicksCounter.inc();
+      return;
+    }
+
+    // Publish to Kafka (partitioned by symbol)
+    await kafkaProducer.send(normalizedTick);
+    
+    // Update metrics
+    metrics.ticksCounter.inc({ symbol: normalizedTick.symbol });
+    metrics.ticksPerSecond.inc();
+    
+  } catch (error) {
+    logger.error('Error processing tick:', error);
+    metrics.errorCounter.inc({ type: 'tick_processing' });
+  }
+}
+
+// Health check endpoint
+app.get('/health', (req, res) => {
+  const health = {
+    status: 'healthy',
+    service: 'layer-1-ingestion',
+    timestamp: new Date().toISOString(),
+    connections: {
+      kafka: kafkaProducer?.isConnected() || false,
+      websocket: wsManager?.isConnected() || false
+    }
+  };
+  res.json(health);
+});
+
+// Metrics endpoint for Prometheus
+app.get('/metrics', async (req, res) => {
+  res.set('Content-Type', register.contentType);
+  res.end(await register.metrics());
+});
+
+// Graceful shutdown
+async function shutdown() {
+  logger.info('🛑 Shutting down gracefully...');
+  
+  if (wsManager) await wsManager.disconnect();
+  if (kafkaProducer) await kafkaProducer.disconnect();
+  
+  process.exit(0);
+}
+
+process.on('SIGTERM', shutdown);
+process.on('SIGINT', shutdown);
+
+// Start the service
+app.listen(PORT, () => {
+  logger.info(`📡 Health check server running on port ${PORT}`);
+  initialize();
+});

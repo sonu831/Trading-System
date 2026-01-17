@@ -1,0 +1,8 @@
+resources:
+- service.yaml
+- deployment.yaml
+
+configMapGenerator:
+- name: otel-collector-config
+  files:
+  - ../../../../monitoring/otel-collector-config.yaml

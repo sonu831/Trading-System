@@ -312,7 +312,8 @@ For a deeper dive into the architecture, implementation details, and viability a
 - [**Architectural Viability Assessment**](https://docs.google.com/document/d/1XR-1T1U-SA9qUh-LAa9hCxHvI068m_s4Z9Yma6H4gT8/edit?tab=t.0#heading=h.qr4tni4k56y7)
 
 - [**Interactive Architecture Diagrams (Live)**](https://lgt3y5.csb.app/)
-- [**Local Architecture Visualization**](./Nifty50_Architecture_Diagrams.html)
+- [**Architecture Diagrams (Mermaid)**](./docs/architecture/DIAGRAMS.md)
+- [**Local Architecture Visualization (HTML)**](./Nifty50_Architecture_Diagrams.html)
 - [**Infrastructure Setup Instructions**](./infrastructure/INSTRUCTIONS.md)
 
 ---

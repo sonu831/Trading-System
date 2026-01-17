@@ -21,15 +21,31 @@ help:
 # ==============================================================================
 up:
 	@echo "🐳 Building and Starting Local System..."
-	docker-compose up --build -d
-	@echo "✅ System started! Dashboard: http://localhost:3000"
+	docker-compose --profile app up --build -d
+	@echo "✅ System started!"
+	@echo ""
+	@echo "🖥️  Web Endpoints:"
+	@echo "   - 📈 Dashboard:       http://localhost:3000"
+	@echo "   - 📊 Grafana:         http://localhost:3001  (User: admin / Pass: admin123)"
+	@echo "   - 🕸️  Kafka UI:        http://localhost:8080"
+	@echo "   - 🔴 Redis UI:        http://localhost:8081"
+	@echo "   - 🔍 Prometheus:      http://localhost:9090"
+	@echo ""
+	@echo "🗄️  Database Ports:"
+	@echo "   - 🐘 TimescaleDB:     localhost:5432 (User: trading / Pass: trading123 / DB: nifty50)"
+	@echo "   - 🔴 Redis:           localhost:6379"
 
 down:
 	@echo "🛑 Stopping Local System..."
-	docker-compose down
-
+	docker-compose --profile app down
+	@echo "✅ System stopped!"
 logs:
 	docker-compose logs -f
+
+clean:
+	@echo "🧹 Removing Local System and Volumes..."
+	docker-compose --profile app down -v
+	@echo "✅ System cleaned!"
 
 status:
 	docker-compose ps
@@ -39,16 +55,16 @@ status:
 # ==============================================================================
 k8s-dry-run:
 	@echo "👀 Generating Kustomize Build Preview..."
-	kubectl kustomize infrastructure/kubernetes/overlays/dev
+	kubectl kustomize --load-restrictor LoadRestrictionsNone infrastructure/kubernetes/overlays/dev
 
 k8s-deploy:
 	@echo "🚀 Deploying to Kubernetes..."
-	kubectl apply -k infrastructure/kubernetes/overlays/dev
+	kubectl kustomize --load-restrictor LoadRestrictionsNone infrastructure/kubernetes/overlays/dev | kubectl apply -f -
 	@echo "✅ Deployment applied. Watch status with 'make k8s-status'"
 
 k8s-delete:
 	@echo "🗑️  Deleting Deployment..."
-	kubectl delete -k infrastructure/kubernetes/overlays/dev
+	kubectl kustomize --load-restrictor LoadRestrictionsNone infrastructure/kubernetes/overlays/dev | kubectl delete -f -
 
 k8s-status:
 	@echo "📊 Cluster Status:"

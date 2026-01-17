@@ -13,12 +13,33 @@ const { WebSocketManager } = require('./websocket/manager');
 const { KafkaProducer } = require('./kafka/producer');
 const { Normalizer } = require('./normalizer');
 const { logger } = require('./utils/logger');
-const { metrics, register } = require('./utils/metrics');
+const { metrics } = require('./utils/metrics'); // Modified to only import 'metrics'
 const symbols = require('../config/symbols.json');
 
 // Initialize Express for health checks
 const app = express();
 const PORT = process.env.INGESTION_PORT || 3001;
+
+// Prometheus Registry & Metrics
+const register = new client.Registry(); // New Prometheus registry
+client.collectDefaultMetrics({ register });
+
+const httpRequestDurationMicroseconds = new client.Histogram({
+  name: 'http_request_duration_seconds',
+  help: 'Duration of HTTP requests in seconds',
+  labelNames: ['method', 'route', 'code'],
+  buckets: [0.1, 0.3, 0.5, 0.7, 1, 3, 5]
+});
+register.registerMetric(httpRequestDurationMicroseconds);
+
+// Middleware for HTTP request duration
+app.use((req, res, next) => {
+  const end = httpRequestDurationMicroseconds.startTimer();
+  res.on('finish', () => {
+    end({ method: req.method, route: req.route ? req.route.path : req.path, code: res.statusCode });
+  });
+  next();
+});
 
 // Initialize components
 let wsManager;

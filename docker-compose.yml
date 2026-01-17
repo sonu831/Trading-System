@@ -69,7 +69,7 @@ services:
     networks:
       - trading-network
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: [ "CMD", "redis-cli", "ping" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -104,7 +104,7 @@ services:
     networks:
       - trading-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U trading -d nifty50"]
+      test: [ "CMD-SHELL", "pg_isready -U trading -d nifty50" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -138,19 +138,37 @@ services:
     environment:
       GF_SECURITY_ADMIN_USER: ${GRAFANA_USER:-admin}
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin123}
-      GF_USERS_ALLOW_SIGN_UP: false
+      GF_USERS_ALLOW_SIGN_UP: "false"
     volumes:
       - grafana-data:/var/lib/grafana
       - ./infrastructure/monitoring/grafana/provisioning:/etc/grafana/provisioning
+      - ./infrastructure/monitoring/grafana/dashboards:/var/lib/grafana/dashboards
     depends_on:
       - prometheus
     networks:
       - trading-network
 
   # ===========================================
+  # MONITORING - OpenTelemetry Collector
+  # ===========================================
+  otel-collector:
+    image: otel/opentelemetry-collector:latest
+    container_name: otel-collector
+    command: [ "--config=/etc/otel-collector-config.yaml" ]
+    volumes:
+      - ./infrastructure/monitoring/otel-collector-config.yaml:/etc/otel-collector-config.yaml
+    ports:
+      - "4317:4317" # OTLP gRPC
+      - "4318:4318" # OTLP HTTP
+      - "8888:8888" # Metrics
+      - "8889:8889" # Prometheus Exporter
+    networks:
+      - trading-network
+
+  # ===========================================
   # APPLICATION LAYERS
   # ===========================================
-  
+
   # Layer 1: Ingestion
   ingestion:
     build:

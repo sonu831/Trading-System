@@ -8,9 +8,12 @@ package main
 import (
 	"context"
 	"log"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
+
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	"github.com/utkarsh-pandey/nifty50-trading-system/layer-4-analysis/internal/analyzer"
 )
@@ -32,6 +35,15 @@ func main() {
 	if err := engine.Start(); err != nil {
 		log.Fatalf("❌ Failed to start engine: %v", err)
 	}
+
+	// Start Prometheus Metrics Server
+	go func() {
+		http.Handle("/metrics", promhttp.Handler())
+		log.Println("📊 Metrics server listening on :8081")
+		if err := http.ListenAndServe(":8081", nil); err != nil {
+			log.Printf("⚠️ Metrics server failed: %v", err)
+		}
+	}()
 
 	log.Println("✅ Analysis Engine started successfully")
 	log.Println("📊 Monitoring 50 Nifty stocks with parallel goroutines")

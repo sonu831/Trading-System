@@ -15,121 +15,230 @@
       }
     ]
   },
+  "description": "Nifty 50 System - Complete 7 Layer Observability",
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 1,
+  "id": null,
   "links": [],
-  "liveNow": false,
   "panels": [
     {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "P1809F7CD0C757521"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "line",
-            "fillOpacity": 0,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "auto",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 9,
-        "w": 12,
-        "x": 0,
-        "y": 0
-      },
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "id": 1,
+      "panels": [],
+      "title": "Layer 1: Data Ingestion (Node.js)",
+      "type": "row"
+    },
+    {
+      "datasource": { "uid": "prometheus-datasource" },
+      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" } } },
+      "gridPos": { "h": 6, "w": 8, "x": 0, "y": 1 },
       "id": 2,
-      "options": {
-        "legend": {
-          "calcs": [],
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "mode": "single",
-          "sort": "none"
-        }
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "P1809F7CD0C757521"
-          },
-          "editorMode": "code",
-          "expr": "rate(container_cpu_usage_seconds_total[1m])",
-          "legendFormat": "__auto",
-          "range": true,
-          "refId": "A"
-        }
-      ],
-      "title": "CPU Usage (All Layers)",
+      "targets": [{ "expr": "rate(http_request_duration_seconds_count{job='layer-1-ingestion'}[1m])", "legendFormat": "{{method}} {{route}} ({{code}})" }],
+      "title": "Ingestion Rate (RPS)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "uid": "prometheus-datasource" },
+      "gridPos": { "h": 6, "w": 8, "x": 8, "y": 1 },
+      "id": 3,
+      "targets": [{ "expr": "rate(http_request_duration_seconds_sum{job='layer-1-ingestion'}[1m]) / rate(http_request_duration_seconds_count{job='layer-1-ingestion'}[1m])", "legendFormat": "Avg Latency" }],
+      "title": "Ingestion Latency (s)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "uid": "prometheus-datasource" },
+      "gridPos": { "h": 6, "w": 8, "x": 16, "y": 1 },
+      "id": 4,
+      "targets": [{ "expr": "container_memory_usage_bytes{name='ingestion'}", "legendFormat": "Memory" }],
+      "title": "Ingestion Memory",
+      "type": "timeseries"
+    },
+
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 7 },
+      "id": 5,
+      "panels": [],
+      "title": "Layer 2: Data Processing (Node.js)",
+      "type": "row"
+    },
+    {
+      "datasource": { "uid": "prometheus-datasource" },
+      "gridPos": { "h": 6, "w": 8, "x": 0, "y": 8 },
+      "id": 6,
+      "targets": [{ "expr": "rate(http_request_duration_seconds_count{job='layer-2-processing'}[1m])", "legendFormat": "{{method}} {{route}} ({{code}})" }],
+      "title": "Processing Rate (RPS)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "uid": "prometheus-datasource" },
+      "gridPos": { "h": 6, "w": 8, "x": 8, "y": 8 },
+      "id": 7,
+      "targets": [{ "expr": "rate(http_request_duration_seconds_sum{job='layer-2-processing'}[1m]) / rate(http_request_duration_seconds_count{job='layer-2-processing'}[1m])", "legendFormat": "Avg Latency" }],
+      "title": "Processing Latency (s)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "uid": "prometheus-datasource" },
+      "gridPos": { "h": 6, "w": 8, "x": 16, "y": 8 },
+      "id": 8,
+      "targets": [{ "expr": "container_memory_usage_bytes{name='processing'}", "legendFormat": "Memory" }],
+      "title": "Processing Memory",
+      "type": "timeseries"
+    },
+
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 14 },
+      "id": 9,
+      "panels": [],
+      "title": "Layer 3: Storage (Redis & TimescaleDB)",
+      "type": "row"
+    },
+    {
+      "datasource": { "uid": "prometheus-datasource" },
+      "gridPos": { "h": 6, "w": 12, "x": 0, "y": 15 },
+      "id": 10,
+      "targets": [{ "expr": "container_cpu_usage_seconds_total{name='redis'}", "legendFormat": "Redis CPU" }, { "expr": "container_cpu_usage_seconds_total{name='timescaledb'}", "legendFormat": "TimescaleDB CPU" }],
+      "title": "DB CPU Usage",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "uid": "prometheus-datasource" },
+      "gridPos": { "h": 6, "w": 12, "x": 12, "y": 15 },
+      "id": 11,
+      "targets": [{ "expr": "container_memory_usage_bytes{name='redis'}", "legendFormat": "Redis Mem" }, { "expr": "container_memory_usage_bytes{name='timescaledb'}", "legendFormat": "TimescaleDB Mem" }],
+      "title": "DB Memory Usage",
+      "type": "timeseries"
+    },
+
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 21 },
+      "id": 12,
+      "panels": [],
+      "title": "Layer 4: Analysis Engine (Go)",
+      "type": "row"
+    },
+    {
+      "datasource": { "uid": "prometheus-datasource" },
+      "gridPos": { "h": 6, "w": 8, "x": 0, "y": 22 },
+      "id": 13,
+      "targets": [{ "expr": "go_goroutines{job='layer-4-analysis'}", "legendFormat": "Goroutines" }],
+      "title": "L4 Goroutines",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "uid": "prometheus-datasource" },
+      "gridPos": { "h": 6, "w": 8, "x": 8, "y": 22 },
+      "id": 14,
+      "targets": [{ "expr": "go_memstats_heap_alloc_bytes{job='layer-4-analysis'}", "legendFormat": "Heap Alloc" }],
+      "title": "L4 Heap Memory",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "uid": "prometheus-datasource" },
+      "gridPos": { "h": 6, "w": 8, "x": 16, "y": 22 },
+      "id": 15,
+      "targets": [{ "expr": "rate(go_gc_duration_seconds_sum{job='layer-4-analysis'}[5m])", "legendFormat": "GC Duration" }],
+      "title": "L4 GC Duration",
+      "type": "timeseries"
+    },
+
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 28 },
+      "id": 16,
+      "panels": [],
+      "title": "Layer 5: Aggregation Engine (Go)",
+      "type": "row"
+    },
+    {
+      "datasource": { "uid": "prometheus-datasource" },
+      "gridPos": { "h": 6, "w": 8, "x": 0, "y": 29 },
+      "id": 17,
+      "targets": [{ "expr": "go_goroutines{job='layer-5-aggregation'}", "legendFormat": "Goroutines" }],
+      "title": "L5 Goroutines",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "uid": "prometheus-datasource" },
+      "gridPos": { "h": 6, "w": 8, "x": 8, "y": 29 },
+      "id": 18,
+      "targets": [{ "expr": "go_memstats_heap_alloc_bytes{job='layer-5-aggregation'}", "legendFormat": "Heap Alloc" }],
+      "title": "L5 Heap Memory",
+      "type": "timeseries"
+    },
+
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 35 },
+      "id": 19,
+      "panels": [],
+      "title": "Layer 6: Signal Engine (Node.js)",
+      "type": "row"
+    },
+    {
+      "datasource": { "uid": "prometheus-datasource" },
+      "gridPos": { "h": 6, "w": 8, "x": 0, "y": 36 },
+      "id": 20,
+      "targets": [{ "expr": "rate(http_request_duration_seconds_count{job='layer-6-signal'}[1m])", "legendFormat": "Signal RPS" }],
+      "title": "Signal Generation Rate",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "uid": "prometheus-datasource" },
+      "gridPos": { "h": 6, "w": 8, "x": 8, "y": 36 },
+      "id": 21,
+      "targets": [{ "expr": "container_memory_usage_bytes{name='signal'}", "legendFormat": "Memory" }],
+      "title": "Signal Engine Memory",
+      "type": "timeseries"
+    },
+
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 42 },
+      "id": 22,
+      "panels": [],
+      "title": "Layer 7: Presentation (Dashboard, API & Bot)",
+      "type": "row"
+    },
+    {
+      "datasource": { "uid": "prometheus-datasource" },
+      "gridPos": { "h": 6, "w": 8, "x": 0, "y": 43 },
+      "id": 23,
+      "targets": [{ "expr": "rate(http_request_duration_seconds_count{job='layer-7-api'}[1m])", "legendFormat": "API RPS" }],
+      "title": "API Traffic",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "uid": "prometheus-datasource" },
+      "gridPos": { "h": 6, "w": 8, "x": 8, "y": 43 },
+      "id": 24,
+      "targets": [{ "expr": "rate(http_request_duration_seconds_count{job='telegram-bot'}[1m])", "legendFormat": "Bot Events" }],
+      "title": "Bot Activity",
+      "type": "timeseries"
+    },
+     {
+      "datasource": { "uid": "prometheus-datasource" },
+      "gridPos": { "h": 6, "w": 8, "x": 16, "y": 43 },
+      "id": 25,
+      "targets": [{ "expr": "rate(container_cpu_usage_seconds_total{name='dashboard'}[1m])", "legendFormat": "Dashboard CPU" }],
+      "title": "Next.js Dashboard CPU",
       "type": "timeseries"
     }
   ],
-  "refresh": "",
-  "schemaVersion": 38,
-  "style": "dark",
-  "tags": [],
-  "templating": {
-    "list": []
-  },
-  "time": {
-    "from": "now-6h",
-    "to": "now"
-  },
+  "refresh": "5s",
+  "schemaVersion": 39,
+  "tags": ["nifty50", "full-stack", "observability"],
+  "templating": { "list": [] },
+  "time": { "from": "now-15m", "to": "now" },
   "timepicker": {},
-  "timezone": "",
-  "title": "Nifty 50 System Overview",
-  "uid": "nifty50-overview",
+  "timezone": "browser",
+  "title": "Nifty 50 System - Control Tower",
+  "uid": "nifty50-control-tower",
   "version": 1,
   "weekStart": ""
 }

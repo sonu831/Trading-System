@@ -1,7 +1,7 @@
 // Layer 4: Analysis Engine
 // Parallel technical analysis of all 50 Nifty stocks using goroutines
 //
-// Author: Utkarsh Pandey
+// Author: Yogendra Singh
 
 package main
 

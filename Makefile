@@ -51,6 +51,22 @@ status:
 	docker-compose ps
 
 # ==============================================================================
+# CODE QUALITY
+# ==============================================================================
+lint:
+	@echo "🔍 Linting code..."
+	@npx eslint . --quiet || echo "⚠️ ESLint found issues"
+	@echo "🔍 Linting Go modules..."
+	@cd layer-4-analysis && go vet ./... || echo "⚠️ Go vet found issues in Layer 4"
+	@cd layer-5-aggregation && go vet ./... || echo "⚠️ Go vet found issues in Layer 5"
+
+format:
+	@echo "💅 Formatting code..."
+	@npx prettier --write .
+	@gofmt -w layer-4-analysis layer-5-aggregation
+	@echo "✅ Formatting complete!"
+
+# ==============================================================================
 # Kubernetes Deployment
 # ==============================================================================
 k8s-dry-run:

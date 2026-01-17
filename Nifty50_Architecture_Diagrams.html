@@ -1,50 +1,97 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nifty 50 Trading System - Architecture Diagrams | Utkarsh Pandey</title>
+    <title>Nifty 50 Trading System - Architecture Diagrams | Yogendra Singh</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        .layer-card:hover { transform: scale(1.02); }
-        .layer-card { transition: all 0.3s ease; }
-        .tab-btn.active { background: #2563eb; color: white; }
-        .flow-arrow { animation: pulse 2s infinite; }
-        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
-        .stock-box { animation: fadeIn 0.5s ease; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+        .layer-card:hover {
+            transform: scale(1.02);
+        }
+
+        .layer-card {
+            transition: all 0.3s ease;
+        }
+
+        .tab-btn.active {
+            background: #2563eb;
+            color: white;
+        }
+
+        .flow-arrow {
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.5;
+            }
+        }
+
+        .stock-box {
+            animation: fadeIn 0.5s ease;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
     </style>
 </head>
+
 <body class="bg-gray-50 min-h-screen">
     <!-- Header -->
     <header class="bg-gradient-to-r from-blue-800 to-purple-800 text-white p-6 shadow-lg">
         <h1 class="text-3xl font-bold text-center">Nifty 50 Trading Signal System</h1>
-        <p class="text-center text-blue-200 mt-2">Complete System Architecture by Utkarsh Pandey</p>
+        <p class="text-center text-blue-200 mt-2">Complete System Architecture by Yogendra Singh</p>
+
         <p class="text-center text-blue-300 text-sm mt-1">End-to-End Latency: ~20-50ms | 50 Stocks Parallel Analysis</p>
     </header>
 
     <!-- Navigation Tabs -->
     <nav class="bg-white shadow-md sticky top-0 z-50 p-3">
         <div class="flex justify-center gap-2 flex-wrap">
-            <button onclick="showTab('overview')" class="tab-btn active px-4 py-2 rounded-lg font-medium bg-gray-100" id="tab-overview">🏗️ 7-Layer Overview</button>
-            <button onclick="showTab('dataflow')" class="tab-btn px-4 py-2 rounded-lg font-medium bg-gray-100" id="tab-dataflow">🔄 Data Flow</button>
-            <button onclick="showTab('concurrency')" class="tab-btn px-4 py-2 rounded-lg font-medium bg-gray-100" id="tab-concurrency">⚡ Concurrency</button>
-            <button onclick="showTab('storage')" class="tab-btn px-4 py-2 rounded-lg font-medium bg-gray-100" id="tab-storage">💾 Storage</button>
-            <button onclick="showTab('techstack')" class="tab-btn px-4 py-2 rounded-lg font-medium bg-gray-100" id="tab-techstack">💻 Tech Stack</button>
-            <button onclick="showTab('signal')" class="tab-btn px-4 py-2 rounded-lg font-medium bg-gray-100" id="tab-signal">📊 Signal Flow</button>
+            <button onclick="showTab('overview')" class="tab-btn active px-4 py-2 rounded-lg font-medium bg-gray-100"
+                id="tab-overview">🏗️ 7-Layer Overview</button>
+            <button onclick="showTab('dataflow')" class="tab-btn px-4 py-2 rounded-lg font-medium bg-gray-100"
+                id="tab-dataflow">🔄 Data Flow</button>
+            <button onclick="showTab('concurrency')" class="tab-btn px-4 py-2 rounded-lg font-medium bg-gray-100"
+                id="tab-concurrency">⚡ Concurrency</button>
+            <button onclick="showTab('storage')" class="tab-btn px-4 py-2 rounded-lg font-medium bg-gray-100"
+                id="tab-storage">💾 Storage</button>
+            <button onclick="showTab('techstack')" class="tab-btn px-4 py-2 rounded-lg font-medium bg-gray-100"
+                id="tab-techstack">💻 Tech Stack</button>
+            <button onclick="showTab('signal')" class="tab-btn px-4 py-2 rounded-lg font-medium bg-gray-100"
+                id="tab-signal">📊 Signal Flow</button>
         </div>
     </nav>
 
     <!-- Content Sections -->
     <main class="max-w-6xl mx-auto p-6">
-        
+
         <!-- OVERVIEW TAB -->
         <section id="content-overview" class="tab-content">
             <h2 class="text-2xl font-bold text-center mb-8 text-gray-800">System Architecture - 7 Layer Model</h2>
-            
+
             <div class="flex flex-col gap-3 max-w-4xl mx-auto">
                 <!-- Layer 7 -->
-                <div class="layer-card p-5 rounded-xl shadow-lg cursor-pointer" style="background: #8B5CF6;" onclick="toggleLayerDetails(this)">
+                <div class="layer-card p-5 rounded-xl shadow-lg cursor-pointer" style="background: #8B5CF6;"
+                    onclick="toggleLayerDetails(this)">
                     <div class="flex justify-between items-center text-white">
                         <div class="flex items-center gap-4">
                             <span class="bg-white/20 px-4 py-2 rounded-full font-bold">L7</span>
@@ -54,12 +101,14 @@
                     </div>
                     <div class="layer-details hidden mt-4 p-4 bg-white/20 rounded-lg text-white">
                         <p><strong>Purpose:</strong> User interfaces and output channels</p>
-                        <p class="mt-2"><strong>Components:</strong> Dashboard (Next.js), REST API (Fastify), WebSocket Server, Telegram Bot, Mobile Push Notifications</p>
+                        <p class="mt-2"><strong>Components:</strong> Dashboard (Next.js), REST API (Fastify), WebSocket
+                            Server, Telegram Bot, Mobile Push Notifications</p>
                     </div>
                 </div>
 
                 <!-- Layer 6 -->
-                <div class="layer-card p-5 rounded-xl shadow-lg cursor-pointer" style="background: #EC4899;" onclick="toggleLayerDetails(this)">
+                <div class="layer-card p-5 rounded-xl shadow-lg cursor-pointer" style="background: #EC4899;"
+                    onclick="toggleLayerDetails(this)">
                     <div class="flex justify-between items-center text-white">
                         <div class="flex items-center gap-4">
                             <span class="bg-white/20 px-4 py-2 rounded-full font-bold">L6</span>
@@ -69,12 +118,14 @@
                     </div>
                     <div class="layer-details hidden mt-4 p-4 bg-white/20 rounded-lg text-white">
                         <p><strong>Purpose:</strong> Generate BUY/SELL signals from analysis</p>
-                        <p class="mt-2"><strong>Components:</strong> Decision Matrix, Weighted Scoring, Risk Management, Position Sizing, Options Strategy Selector</p>
+                        <p class="mt-2"><strong>Components:</strong> Decision Matrix, Weighted Scoring, Risk Management,
+                            Position Sizing, Options Strategy Selector</p>
                     </div>
                 </div>
 
                 <!-- Layer 5 -->
-                <div class="layer-card p-5 rounded-xl shadow-lg cursor-pointer" style="background: #F59E0B;" onclick="toggleLayerDetails(this)">
+                <div class="layer-card p-5 rounded-xl shadow-lg cursor-pointer" style="background: #F59E0B;"
+                    onclick="toggleLayerDetails(this)">
                     <div class="flex justify-between items-center text-white">
                         <div class="flex items-center gap-4">
                             <span class="bg-white/20 px-4 py-2 rounded-full font-bold">L5</span>
@@ -84,12 +135,14 @@
                     </div>
                     <div class="layer-details hidden mt-4 p-4 bg-white/20 rounded-lg text-white">
                         <p><strong>Purpose:</strong> Combine 50 stock analyses into market-level insights</p>
-                        <p class="mt-2"><strong>Components:</strong> Market Breadth Calculator, Sector Rotation Analyzer, Relative Strength Rankings, Market Regime Detector</p>
+                        <p class="mt-2"><strong>Components:</strong> Market Breadth Calculator, Sector Rotation
+                            Analyzer, Relative Strength Rankings, Market Regime Detector</p>
                     </div>
                 </div>
 
                 <!-- Layer 4 - CRITICAL -->
-                <div class="layer-card p-5 rounded-xl shadow-lg cursor-pointer border-4 border-yellow-300" style="background: #EF4444;" onclick="toggleLayerDetails(this)">
+                <div class="layer-card p-5 rounded-xl shadow-lg cursor-pointer border-4 border-yellow-300"
+                    style="background: #EF4444;" onclick="toggleLayerDetails(this)">
                     <div class="flex justify-between items-center text-white">
                         <div class="flex items-center gap-4">
                             <span class="bg-white/20 px-4 py-2 rounded-full font-bold">L4</span>
@@ -99,13 +152,16 @@
                     </div>
                     <div class="layer-details hidden mt-4 p-4 bg-white/20 rounded-lg text-white">
                         <p><strong>Purpose:</strong> Parallel analysis of all 50 stocks (~10ms total)</p>
-                        <p class="mt-2"><strong>Components:</strong> Technical Indicator Engine (RSI, MACD, EMA, ATR, etc.), Options Greeks Calculator, Pattern Recognition</p>
-                        <p class="mt-2 text-yellow-200"><strong>Key:</strong> 50 goroutines run simultaneously - this is where concurrency matters most!</p>
+                        <p class="mt-2"><strong>Components:</strong> Technical Indicator Engine (RSI, MACD, EMA, ATR,
+                            etc.), Options Greeks Calculator, Pattern Recognition</p>
+                        <p class="mt-2 text-yellow-200"><strong>Key:</strong> 50 goroutines run simultaneously - this is
+                            where concurrency matters most!</p>
                     </div>
                 </div>
 
                 <!-- Layer 3 -->
-                <div class="layer-card p-5 rounded-xl shadow-lg cursor-pointer" style="background: #10B981;" onclick="toggleLayerDetails(this)">
+                <div class="layer-card p-5 rounded-xl shadow-lg cursor-pointer" style="background: #10B981;"
+                    onclick="toggleLayerDetails(this)">
                     <div class="flex justify-between items-center text-white">
                         <div class="flex items-center gap-4">
                             <span class="bg-white/20 px-4 py-2 rounded-full font-bold">L3</span>
@@ -122,7 +178,8 @@
                 </div>
 
                 <!-- Layer 2 -->
-                <div class="layer-card p-5 rounded-xl shadow-lg cursor-pointer" style="background: #3B82F6;" onclick="toggleLayerDetails(this)">
+                <div class="layer-card p-5 rounded-xl shadow-lg cursor-pointer" style="background: #3B82F6;"
+                    onclick="toggleLayerDetails(this)">
                     <div class="flex justify-between items-center text-white">
                         <div class="flex items-center gap-4">
                             <span class="bg-white/20 px-4 py-2 rounded-full font-bold">L2</span>
@@ -132,12 +189,14 @@
                     </div>
                     <div class="layer-details hidden mt-4 p-4 bg-white/20 rounded-lg text-white">
                         <p><strong>Purpose:</strong> Transform raw ticks into candles</p>
-                        <p class="mt-2"><strong>Components:</strong> Candle Builder (1m, 5m, 15m), VWAP Calculator, Volume Aggregator, Late Data Handler</p>
+                        <p class="mt-2"><strong>Components:</strong> Candle Builder (1m, 5m, 15m), VWAP Calculator,
+                            Volume Aggregator, Late Data Handler</p>
                     </div>
                 </div>
 
                 <!-- Layer 1 -->
-                <div class="layer-card p-5 rounded-xl shadow-lg cursor-pointer" style="background: #6366F1;" onclick="toggleLayerDetails(this)">
+                <div class="layer-card p-5 rounded-xl shadow-lg cursor-pointer" style="background: #6366F1;"
+                    onclick="toggleLayerDetails(this)">
                     <div class="flex justify-between items-center text-white">
                         <div class="flex items-center gap-4">
                             <span class="bg-white/20 px-4 py-2 rounded-full font-bold">L1</span>
@@ -147,7 +206,8 @@
                     </div>
                     <div class="layer-details hidden mt-4 p-4 bg-white/20 rounded-lg text-white">
                         <p><strong>Purpose:</strong> Connect to market data sources</p>
-                        <p class="mt-2"><strong>Components:</strong> WebSocket Manager, Connection Pool, Auto-Reconnection, Message Normalizer, Kafka Producer</p>
+                        <p class="mt-2"><strong>Components:</strong> WebSocket Manager, Connection Pool,
+                            Auto-Reconnection, Message Normalizer, Kafka Producer</p>
                     </div>
                 </div>
             </div>
@@ -169,7 +229,7 @@
         <!-- DATA FLOW TAB -->
         <section id="content-dataflow" class="tab-content hidden">
             <h2 class="text-2xl font-bold text-center mb-8 text-gray-800">End-to-End Data Flow</h2>
-            
+
             <div class="max-w-4xl mx-auto">
                 <!-- External Sources -->
                 <div class="flex justify-center gap-4 mb-4 flex-wrap">
@@ -192,7 +252,8 @@
                 <!-- WebSocket Manager -->
                 <div class="bg-indigo-600 text-white p-5 rounded-xl shadow-lg max-w-2xl mx-auto mb-4">
                     <div class="font-bold text-xl">WebSocket Connection Pool</div>
-                    <div class="text-indigo-200 mt-2">Auto-reconnection • Heartbeat Monitoring • Backpressure Handling</div>
+                    <div class="text-indigo-200 mt-2">Auto-reconnection • Heartbeat Monitoring • Backpressure Handling
+                    </div>
                     <div class="mt-3 bg-indigo-800 p-3 rounded-lg text-sm">
                         Technology: Node.js + ws library (Non-blocking I/O)
                     </div>
@@ -273,8 +334,8 @@
                     <div class="font-bold text-xl mb-3">Analysis Engine (Go) - 50 Goroutines in Parallel</div>
                     <div class="grid grid-cols-10 gap-1">
                         <script>
-                            for(let i=1; i<=50; i++) {
-                                document.write(`<div class="stock-box bg-white/20 p-2 rounded text-center text-xs" style="animation-delay: ${i*0.02}s">${i}</div>`);
+                            for (let i = 1; i <= 50; i++) {
+                                document.write(`<div class="stock-box bg-white/20 p-2 rounded text-center text-xs" style="animation-delay: ${i * 0.02}s">${i}</div>`);
                             }
                         </script>
                     </div>
@@ -324,7 +385,8 @@
 
         <!-- CONCURRENCY TAB -->
         <section id="content-concurrency" class="tab-content hidden">
-            <h2 class="text-2xl font-bold text-center mb-8 text-gray-800">Concurrency Architecture - 50 Stock Parallel Analysis</h2>
+            <h2 class="text-2xl font-bold text-center mb-8 text-gray-800">Concurrency Architecture - 50 Stock Parallel
+                Analysis</h2>
 
             <div class="max-w-5xl mx-auto">
                 <!-- Trigger -->
@@ -388,11 +450,12 @@
                 <!-- Indicator Dependency Graph -->
                 <div class="bg-gray-100 p-6 rounded-xl">
                     <h3 class="font-bold text-gray-700 text-xl mb-6">📊 Indicator Dependency Waves (per stock)</h3>
-                    
+
                     <div class="space-y-4">
                         <!-- Input -->
                         <div class="flex items-center gap-4 flex-wrap">
-                            <span class="bg-gray-600 text-white px-4 py-2 rounded-lg font-bold w-28 text-center">INPUT</span>
+                            <span
+                                class="bg-gray-600 text-white px-4 py-2 rounded-lg font-bold w-28 text-center">INPUT</span>
                             <div class="flex-1 bg-gray-300 p-3 rounded-lg">
                                 <span class="font-medium">OHLCV Candle Data (Open, High, Low, Close, Volume)</span>
                             </div>
@@ -402,7 +465,8 @@
 
                         <!-- Wave 1 -->
                         <div class="flex items-center gap-4 flex-wrap">
-                            <span class="bg-blue-600 text-white px-4 py-2 rounded-lg font-bold w-28 text-center">WAVE 1</span>
+                            <span class="bg-blue-600 text-white px-4 py-2 rounded-lg font-bold w-28 text-center">WAVE
+                                1</span>
                             <div class="flex-1 flex flex-wrap gap-2">
                                 <span class="bg-blue-200 px-3 py-2 rounded-lg font-medium">RSI(14)</span>
                                 <span class="bg-blue-200 px-3 py-2 rounded-lg font-medium">EMA(9)</span>
@@ -420,10 +484,12 @@
 
                         <!-- Wave 2 -->
                         <div class="flex items-center gap-4 flex-wrap">
-                            <span class="bg-amber-600 text-white px-4 py-2 rounded-lg font-bold w-28 text-center">WAVE 2</span>
+                            <span class="bg-amber-600 text-white px-4 py-2 rounded-lg font-bold w-28 text-center">WAVE
+                                2</span>
                             <div class="flex-1 flex flex-wrap gap-2">
                                 <span class="bg-amber-200 px-3 py-2 rounded-lg font-medium">MACD (needs EMAs)</span>
-                                <span class="bg-amber-200 px-3 py-2 rounded-lg font-medium">Supertrend (needs ATR)</span>
+                                <span class="bg-amber-200 px-3 py-2 rounded-lg font-medium">Supertrend (needs
+                                    ATR)</span>
                                 <span class="bg-amber-200 px-3 py-2 rounded-lg font-medium">Trend Score</span>
                             </div>
                             <span class="text-gray-600 font-bold">~3ms</span>
@@ -433,9 +499,11 @@
 
                         <!-- Wave 3 -->
                         <div class="flex items-center gap-4 flex-wrap">
-                            <span class="bg-green-600 text-white px-4 py-2 rounded-lg font-bold w-28 text-center">WAVE 3</span>
+                            <span class="bg-green-600 text-white px-4 py-2 rounded-lg font-bold w-28 text-center">WAVE
+                                3</span>
                             <div class="flex-1">
-                                <span class="bg-green-200 px-4 py-2 rounded-lg font-medium">Composite Stock Score (-1.0 to +1.0)</span>
+                                <span class="bg-green-200 px-4 py-2 rounded-lg font-medium">Composite Stock Score (-1.0
+                                    to +1.0)</span>
                             </div>
                             <span class="text-gray-600 font-bold">~1ms</span>
                         </div>
@@ -443,7 +511,8 @@
 
                     <div class="mt-6 p-4 bg-green-100 rounded-xl border-2 border-green-400">
                         <span class="font-bold text-green-800 text-lg">✅ Total per stock: ~9ms</span>
-                        <span class="text-green-700 ml-4">→ With 50 stocks running in parallel: Still only ~9ms! 🚀</span>
+                        <span class="text-green-700 ml-4">→ With 50 stocks running in parallel: Still only ~9ms!
+                            🚀</span>
                     </div>
                 </div>
 
@@ -474,7 +543,8 @@
 
         <!-- STORAGE TAB -->
         <section id="content-storage" class="tab-content hidden">
-            <h2 class="text-2xl font-bold text-center mb-8 text-gray-800">Storage Architecture - Hot/Warm/Cold Pattern</h2>
+            <h2 class="text-2xl font-bold text-center mb-8 text-gray-800">Storage Architecture - Hot/Warm/Cold Pattern
+            </h2>
 
             <div class="max-w-5xl mx-auto">
                 <div class="grid gap-6">
@@ -585,8 +655,9 @@
                 <div class="grid md:grid-cols-3 gap-6">
                     <!-- Data Pipeline -->
                     <div class="space-y-4">
-                        <h3 class="font-bold text-lg bg-gray-800 text-white p-3 rounded-lg text-center">📥 Data Pipeline</h3>
-                        
+                        <h3 class="font-bold text-lg bg-gray-800 text-white p-3 rounded-lg text-center">📥 Data Pipeline
+                        </h3>
+
                         <div class="bg-indigo-100 p-4 rounded-xl border-l-4 border-indigo-600">
                             <div class="font-bold text-indigo-800 text-lg">Node.js</div>
                             <div class="text-indigo-600 text-sm">WebSocket Ingestion</div>
@@ -655,7 +726,8 @@
 
                     <!-- Analysis & Output -->
                     <div class="space-y-4">
-                        <h3 class="font-bold text-lg bg-gray-800 text-white p-3 rounded-lg text-center">📊 Analysis & Output</h3>
+                        <h3 class="font-bold text-lg bg-gray-800 text-white p-3 rounded-lg text-center">📊 Analysis &
+                            Output</h3>
 
                         <div class="bg-cyan-100 p-4 rounded-xl border-l-4 border-cyan-600">
                             <div class="font-bold text-cyan-800 text-lg">Go</div>
@@ -772,12 +844,42 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                <tr class="border-b"><td class="p-2">Trend</td><td class="text-center">25%</td><td class="text-center text-green-600 font-bold">+0.8</td><td class="text-center">+0.20</td></tr>
-                                <tr class="border-b"><td class="p-2">Breadth</td><td class="text-center">20%</td><td class="text-center text-green-600 font-bold">+0.65</td><td class="text-center">+0.13</td></tr>
-                                <tr class="border-b"><td class="p-2">Momentum</td><td class="text-center">15%</td><td class="text-center text-yellow-600 font-bold">+0.4</td><td class="text-center">+0.06</td></tr>
-                                <tr class="border-b"><td class="p-2">Options</td><td class="text-center">20%</td><td class="text-center text-green-600 font-bold">+0.7</td><td class="text-center">+0.14</td></tr>
-                                <tr class="border-b"><td class="p-2">Sectors</td><td class="text-center">10%</td><td class="text-center text-green-600 font-bold">+0.5</td><td class="text-center">+0.05</td></tr>
-                                <tr class="border-b"><td class="p-2">Volatility</td><td class="text-center">10%</td><td class="text-center text-yellow-600 font-bold">+0.3</td><td class="text-center">+0.03</td></tr>
+                                <tr class="border-b">
+                                    <td class="p-2">Trend</td>
+                                    <td class="text-center">25%</td>
+                                    <td class="text-center text-green-600 font-bold">+0.8</td>
+                                    <td class="text-center">+0.20</td>
+                                </tr>
+                                <tr class="border-b">
+                                    <td class="p-2">Breadth</td>
+                                    <td class="text-center">20%</td>
+                                    <td class="text-center text-green-600 font-bold">+0.65</td>
+                                    <td class="text-center">+0.13</td>
+                                </tr>
+                                <tr class="border-b">
+                                    <td class="p-2">Momentum</td>
+                                    <td class="text-center">15%</td>
+                                    <td class="text-center text-yellow-600 font-bold">+0.4</td>
+                                    <td class="text-center">+0.06</td>
+                                </tr>
+                                <tr class="border-b">
+                                    <td class="p-2">Options</td>
+                                    <td class="text-center">20%</td>
+                                    <td class="text-center text-green-600 font-bold">+0.7</td>
+                                    <td class="text-center">+0.14</td>
+                                </tr>
+                                <tr class="border-b">
+                                    <td class="p-2">Sectors</td>
+                                    <td class="text-center">10%</td>
+                                    <td class="text-center text-green-600 font-bold">+0.5</td>
+                                    <td class="text-center">+0.05</td>
+                                </tr>
+                                <tr class="border-b">
+                                    <td class="p-2">Volatility</td>
+                                    <td class="text-center">10%</td>
+                                    <td class="text-center text-yellow-600 font-bold">+0.3</td>
+                                    <td class="text-center">+0.03</td>
+                                </tr>
                             </tbody>
                             <tfoot>
                                 <tr class="bg-gray-100 font-bold text-lg">
@@ -801,13 +903,15 @@
                             <span class="text-gray-400">→ Buy ATM/OTM Call</span>
                         </div>
                         <div class="flex items-center gap-4 bg-green-900/50 p-2 rounded-lg flex-wrap">
-                            <span class="bg-green-500 px-4 py-2 rounded-lg w-36 text-center font-bold">+0.4 to +0.7</span>
+                            <span class="bg-green-500 px-4 py-2 rounded-lg w-36 text-center font-bold">+0.4 to
+                                +0.7</span>
                             <span class="font-bold text-green-300 text-lg">BUY</span>
                             <span class="text-gray-300">→ Bull Call Spread</span>
                             <span class="bg-yellow-500 text-black px-3 py-1 rounded font-bold">✓ CURRENT</span>
                         </div>
                         <div class="flex items-center gap-4 flex-wrap">
-                            <span class="bg-gray-600 px-4 py-2 rounded-lg w-36 text-center font-bold">-0.4 to +0.4</span>
+                            <span class="bg-gray-600 px-4 py-2 rounded-lg w-36 text-center font-bold">-0.4 to
+                                +0.4</span>
                             <span class="font-bold text-gray-400 text-lg">NEUTRAL</span>
                             <span class="text-gray-400">→ No Trade</span>
                         </div>
@@ -827,7 +931,8 @@
                 <div class="text-center text-4xl my-4 flow-arrow">⬇️</div>
 
                 <!-- Output Signal -->
-                <div class="bg-gradient-to-r from-green-500 to-green-600 text-white p-8 rounded-xl text-center shadow-xl">
+                <div
+                    class="bg-gradient-to-r from-green-500 to-green-600 text-white p-8 rounded-xl text-center shadow-xl">
                     <h3 class="text-2xl font-bold mb-3">📊 SIGNAL OUTPUT</h3>
                     <div class="text-4xl font-bold mb-3">BUY NIFTY 24500 CE</div>
                     <div class="text-xl text-green-100 mb-4">Weekly Expiry | Confidence: 72%</div>
@@ -846,7 +951,7 @@
     <footer class="bg-gray-800 text-white p-6 mt-12">
         <div class="max-w-4xl mx-auto text-center">
             <h3 class="font-bold text-xl mb-2">Nifty 50 Trading Signal System Architecture</h3>
-            <p class="text-gray-400">Designed by Utkarsh Pandey</p>
+            <p class="text-gray-400">Designed by Yogendra Singh</p>
             <div class="mt-4 flex justify-center gap-4 text-sm flex-wrap">
                 <span class="bg-gray-700 px-3 py-1 rounded">End-to-End: ~20-50ms</span>
                 <span class="bg-gray-700 px-3 py-1 rounded">50 Stocks Parallel</span>
@@ -861,7 +966,7 @@
             document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
             // Remove active from all tabs
             document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
-            
+
             // Show selected content
             document.getElementById('content-' + tabName).classList.remove('hidden');
             // Mark tab as active
@@ -880,14 +985,14 @@
         }
 
         // Generate stock boxes dynamically
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', function () {
             const stockGrid = document.querySelector('#content-dataflow .grid-cols-10');
             if (stockGrid) {
                 stockGrid.innerHTML = '';
-                for(let i=1; i<=50; i++) {
+                for (let i = 1; i <= 50; i++) {
                     const div = document.createElement('div');
                     div.className = 'stock-box bg-white/20 p-2 rounded text-center text-xs';
-                    div.style.animationDelay = `${i*0.02}s`;
+                    div.style.animationDelay = `${i * 0.02}s`;
                     div.textContent = i;
                     stockGrid.appendChild(div);
                 }
@@ -895,4 +1000,5 @@
         });
     </script>
 </body>
+
 </html>

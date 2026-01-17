@@ -1,10 +1,10 @@
 /**
  * Layer 1: Data Ingestion Service
- * 
+ *
  * Connects to market data sources via WebSocket,
  * normalizes data, and publishes to Kafka
- * 
- * @author Utkarsh Pandey
+ *
+ * @author Yogendra Singh
  */
 
 require('dotenv').config();
@@ -13,7 +13,8 @@ const { WebSocketManager } = require('./websocket/manager');
 const { KafkaProducer } = require('./kafka/producer');
 const { Normalizer } = require('./normalizer');
 const { logger } = require('./utils/logger');
-const { metrics } = require('./utils/metrics'); // Modified to only import 'metrics'
+const { metrics } = require('./utils/metrics');
+const client = require('prom-client');
 const symbols = require('../config/symbols.json');
 
 // Initialize Express for health checks
@@ -28,7 +29,7 @@ const httpRequestDurationMicroseconds = new client.Histogram({
   name: 'http_request_duration_seconds',
   help: 'Duration of HTTP requests in seconds',
   labelNames: ['method', 'route', 'code'],
-  buckets: [0.1, 0.3, 0.5, 0.7, 1, 3, 5]
+  buckets: [0.1, 0.3, 0.5, 0.7, 1, 3, 5],
 });
 register.registerMetric(httpRequestDurationMicroseconds);
 
@@ -51,12 +52,12 @@ let normalizer;
  */
 async function initialize() {
   logger.info('🚀 Starting Layer 1: Data Ingestion Service');
-  
+
   try {
     // Initialize Kafka Producer
     kafkaProducer = new KafkaProducer({
       brokers: process.env.KAFKA_BROKERS?.split(',') || ['localhost:9092'],
-      topic: process.env.KAFKA_TOPIC_RAW_TICKS || 'raw-ticks'
+      topic: process.env.KAFKA_TOPIC_RAW_TICKS || 'raw-ticks',
     });
     await kafkaProducer.connect();
     logger.info('✅ Kafka Producer connected');
@@ -70,13 +71,12 @@ async function initialize() {
       apiKey: process.env.ZERODHA_API_KEY,
       accessToken: process.env.ZERODHA_ACCESS_TOKEN,
       symbols: symbols.nifty50,
-      onTick: handleTick
+      onTick: handleTick,
     });
     await wsManager.connect();
     logger.info('✅ WebSocket Manager connected');
 
     logger.info(`🎯 Subscribed to ${symbols.nifty50.length} Nifty 50 symbols`);
-    
   } catch (error) {
     logger.error('❌ Initialization failed:', error);
     process.exit(1);
@@ -91,7 +91,7 @@ async function handleTick(tick) {
   try {
     // Normalize the tick to unified schema
     const normalizedTick = normalizer.normalize(tick);
-    
+
     if (!normalizedTick) {
       metrics.invalidTicksCounter.inc();
       return;
@@ -99,11 +99,10 @@ async function handleTick(tick) {
 
     // Publish to Kafka (partitioned by symbol)
     await kafkaProducer.send(normalizedTick);
-    
+
     // Update metrics
     metrics.ticksCounter.inc({ symbol: normalizedTick.symbol });
     metrics.ticksPerSecond.inc();
-    
   } catch (error) {
     logger.error('Error processing tick:', error);
     metrics.errorCounter.inc({ type: 'tick_processing' });
@@ -118,8 +117,8 @@ app.get('/health', (req, res) => {
     timestamp: new Date().toISOString(),
     connections: {
       kafka: kafkaProducer?.isConnected() || false,
-      websocket: wsManager?.isConnected() || false
-    }
+      websocket: wsManager?.isConnected() || false,
+    },
   };
   res.json(health);
 });
@@ -133,10 +132,10 @@ app.get('/metrics', async (req, res) => {
 // Graceful shutdown
 async function shutdown() {
   logger.info('🛑 Shutting down gracefully...');
-  
+
   if (wsManager) await wsManager.disconnect();
   if (kafkaProducer) await kafkaProducer.disconnect();
-  
+
   process.exit(0);
 }
 

@@ -48,7 +48,7 @@ graph TD
     end
 
     subgraph Ingestion_Layer
-        L1[Layer 1: Ingestion] 
+        L1[Layer 1: Ingestion]
         style L1 fill:#f9f,stroke:#333,stroke-width:2px
         L1 -->|Norm. Ticks| Kafka{Kafka Queue}
     end
@@ -63,7 +63,7 @@ graph TD
         Redis -->|Fetch Candles| L4[Layer 4: Analysis]
         style L4 fill:#bbf,stroke:#333,stroke-width:2px
         L4 -->|Indicators RSI/MACD| Redis
-        
+
         Redis -->|Fetch Indicators| L5[Layer 5: Aggregation]
         style L5 fill:#bbf,stroke:#333,stroke-width:2px
         L5 -->|Sector Heatmap| Redis
@@ -79,6 +79,7 @@ graph TD
 ```
 
 ### ⚡ Key Capabilities
+
 - **Latency**: End-to-end processing (Tick -> Signal) in **~20-50ms**.
 - **Concurrency**: Analyzes **50 stocks in parallel** using Go routines.
 - **Intelligence**: Combines Technicals, Option Chain (PCR), and Sector Rotation.
@@ -90,17 +91,17 @@ graph TD
 
 The system is broken down into 7 distinct layers to ensure separation of concerns and scalability.
 
-| Layer | Technology | Responsibility | Developer Guide |
-|-------|------------|----------------|-----------------|
-| [**L1** Ingestion](./layer-1-ingestion/) | Node.js, `ws` | Connect to Broker WebSocket, normalize ticks, push to Kafka. | [Instructions](./layer-1-ingestion/INSTRUCTIONS.md) |
-| [**L2** Processing](./layer-2-processing/) | Node.js, Kafka | Consume stream, build 1m/5m candles, update Hot Cache. | [Instructions](./layer-2-processing/INSTRUCTIONS.md) |
-| [**L3** Storage](./layer-3-storage/) | Redis, Timescale | **Redis**: Sub-ms access for real-time data.<br>**Timescale**: Historical data for backtesting. | [Instructions](./layer-3-storage/INSTRUCTIONS.md) |
-| [**L4** Analysis](./layer-4-analysis/) | **Go** | The "Engine". Calculates RSI, MACD, Bollinger Bands for 50 stocks in parallel. | [Instructions](./layer-4-analysis/INSTRUCTIONS.md) |
-| [**L5** Aggregation](./layer-5-aggregation/) | **Go** | "Market Breadth". Calculates Advance-Decline Ratio, Sector Heatmap (% movement). | [Instructions](./layer-5-aggregation/INSTRUCTIONS.md) |
-| [**L6** Signal](./layer-6-signal/) | Node.js | The "Brain". Runs the Decision Matrix on aggregated data to generate signals. | [Instructions](./layer-6-signal/INSTRUCTIONS.md) |
-| [**L7** Presentation](./layer-7-presentation/) | Next.js, Telegraf | User Interface. Dashboard for monitoring, Telegram for alerts. | [Instructions](./layer-7-presentation/INSTRUCTIONS.md) |
+| Layer                                          | Technology        | Responsibility                                                                                  | Developer Guide                                        |
+| ---------------------------------------------- | ----------------- | ----------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
+| [**L1** Ingestion](./layer-1-ingestion/)       | Node.js, `ws`     | Connect to Broker WebSocket, normalize ticks, push to Kafka.                                    | [Instructions](./layer-1-ingestion/INSTRUCTIONS.md)    |
+| [**L2** Processing](./layer-2-processing/)     | Node.js, Kafka    | Consume stream, build 1m/5m candles, update Hot Cache.                                          | [Instructions](./layer-2-processing/INSTRUCTIONS.md)   |
+| [**L3** Storage](./layer-3-storage/)           | Redis, Timescale  | **Redis**: Sub-ms access for real-time data.<br>**Timescale**: Historical data for backtesting. | [Instructions](./layer-3-storage/INSTRUCTIONS.md)      |
+| [**L4** Analysis](./layer-4-analysis/)         | **Go**            | The "Engine". Calculates RSI, MACD, Bollinger Bands for 50 stocks in parallel.                  | [Instructions](./layer-4-analysis/INSTRUCTIONS.md)     |
+| [**L5** Aggregation](./layer-5-aggregation/)   | **Go**            | "Market Breadth". Calculates Advance-Decline Ratio, Sector Heatmap (% movement).                | [Instructions](./layer-5-aggregation/INSTRUCTIONS.md)  |
+| [**L6** Signal](./layer-6-signal/)             | Node.js           | The "Brain". Runs the Decision Matrix on aggregated data to generate signals.                   | [Instructions](./layer-6-signal/INSTRUCTIONS.md)       |
+| [**L7** Presentation](./layer-7-presentation/) | Next.js, Telegraf | User Interface. Dashboard for monitoring, Telegram for alerts.                                  | [Instructions](./layer-7-presentation/INSTRUCTIONS.md) |
 
-> **VIEW DIAGRAMS**: [**👉 Architecture Diagrams (Mermaid)**](./docs/architecture/DIAGRAMS.md) - *Detailed System Overview, Data Flow & Signal Logic*
+> **VIEW DIAGRAMS**: [**👉 Architecture Diagrams (Mermaid)**](./docs/architecture/DIAGRAMS.md) - _Detailed System Overview, Data Flow & Signal Logic_
 
 ---
 
@@ -109,6 +110,7 @@ The system is broken down into 7 distinct layers to ensure separation of concern
 How does the system decide to Buy or Sell? It uses a **Weighted Scoring Matrix** in Layer 6.
 
 ### The Formula
+
 A signal is generated if the **Composite Score > 0.7 (70%)**.
 
 1. **Trend (25%)**: Are major stocks (Reliance, HDFC Bank) above their VWAP?
@@ -119,27 +121,28 @@ A signal is generated if the **Composite Score > 0.7 (70%)**.
 6. **Volatility (10%)**: Is India VIX stable?
 
 ### Data Flow Example
+
 1. **L1**: Received tick for Reliance @ ₹2450.
 2. **L2**: Updated 5-min candle.
 3. **L4**: Calculated Reliance RSI = 65 (Bullish).
 4. **L5**: Banking Sector is up +1.5%.
 5. **L6**: **Result**: Trend(Bullish) + Sector(Bullish) + RSI(Bullish) -> **Score 0.85**.
-6. **L7**: Sent Telegram Alert: *"🚀 BUY NIFTY CE | Conf: 85%"*.
+6. **L7**: Sent Telegram Alert: _"🚀 BUY NIFTY CE | Conf: 85%"_.
 
 ---
 
 ## 🛠️ Technology Stack - Why this tech?
 
-| Technology | Role | Why we chose it? |
-|------------|------|------------------|
-| **Node.js** | I/O Heavy Layers (L1, L2, L6, L7) | Event-driven architecture is perfect for handling thousands of WebSocket ticks per second. |
-| **Go (Golang)** | CPU Heavy Layers (L4, L5) | Goroutines allow parallel calculation of indicators for 50 stocks with near-zero overhead. |
-| **Kafka** | Message Queue | Decouples Ingestion from Processing. Ensures no tick is lost during high volatility. |
-| **Redis** | Hot Storage | Sub-millisecond reads are non-negotiable for real-time signals. |
-| **TimescaleDB** | Historical DB | Based on Postgres, it handles time-series data efficiently for backtesting. |
-| **Next.js** | Frontend | Server-Side Rendering (SSR) for fast dashboard load times. |
-| **Docker/K8s** | Infrastructure | **[GitOps Ready](./infrastructure/kubernetes/)**. We use Kustomize ("Flat Base") and fully automated Makefiles. |
-| **Monitoring** | Observability | **[Config as Code](./infrastructure/monitoring/)**. Grafana dashboards and Prometheus alerts are version-controlled. |
+| Technology      | Role                              | Why we chose it?                                                                                                     |
+| --------------- | --------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| **Node.js**     | I/O Heavy Layers (L1, L2, L6, L7) | Event-driven architecture is perfect for handling thousands of WebSocket ticks per second.                           |
+| **Go (Golang)** | CPU Heavy Layers (L4, L5)         | Goroutines allow parallel calculation of indicators for 50 stocks with near-zero overhead.                           |
+| **Kafka**       | Message Queue                     | Decouples Ingestion from Processing. Ensures no tick is lost during high volatility.                                 |
+| **Redis**       | Hot Storage                       | Sub-millisecond reads are non-negotiable for real-time signals.                                                      |
+| **TimescaleDB** | Historical DB                     | Based on Postgres, it handles time-series data efficiently for backtesting.                                          |
+| **Next.js**     | Frontend                          | Server-Side Rendering (SSR) for fast dashboard load times.                                                           |
+| **Docker/K8s**  | Infrastructure                    | **[GitOps Ready](./infrastructure/kubernetes/)**. We use Kustomize ("Flat Base") and fully automated Makefiles.      |
+| **Monitoring**  | Observability                     | **[Config as Code](./infrastructure/monitoring/)**. Grafana dashboards and Prometheus alerts are version-controlled. |
 
 ---
 
@@ -152,6 +155,7 @@ We believe in documenting everything.
 - [**Viability Assessment**](https://docs.google.com/document/d/1XR-1T1U-SA9qUh-LAa9hCxHvI068m_s4Z9Yma6H4gT8/edit?tab=t.0#heading=h.qr4tni4k56y7) - Can this actually make money?
 
 ### Interactive Visualizations
+
 - [**Live Architecture Diagrams**](https://lgt3y5.csb.app/)
 - [**Local HTML Visualization**](./Nifty50_Architecture_Diagrams.html)
 
@@ -160,6 +164,7 @@ We believe in documenting everything.
 ## 🎮 Operational Guide (How to Run)
 
 ### Prerequisites
+
 - Docker & Docker Compose
 - API Credentials (Zerodha/Upstox)
 
@@ -179,6 +184,7 @@ make down
 ```
 
 **Deploy to Kubernetes:**
+
 ```bash
 # Dry Run (Preview)
 make k8s-dry-run
@@ -189,17 +195,23 @@ make k8s-deploy
 # Check Status (HPA & Pods)
 make k8s-status
 ```
+
 # 1. Clone
+
 git clone https://github.com/sonu831/Trading-System.git
 cd Trading-System
 
 # 2. Configure Credentials
+
 cp .env.example .env
+
 # Edit .env and add your broker keys
 
 # 3. Launch
+
 docker-compose up -d
-```
+
+````
 
 ### Individual Layer Development
 If you are developing a specific layer (e.g., L4 Analysis):
@@ -208,7 +220,7 @@ If you are developing a specific layer (e.g., L4 Analysis):
 cd layer-4-analysis
 go mod download
 go run cmd/main.go
-```
+````
 
 **See [INSTRUCTIONS.md](./layer-4-analysis/INSTRUCTIONS.md) inside the directory for details.**
 
@@ -225,7 +237,7 @@ go run cmd/main.go
 
 ## 🤝 Contributing & Feedback
 
-This is an open-source project by **Yogendra Singh**, **Utkarsh Pandey**, and **Aakash**. We welcome community help!
+This is an open-source project by **Yogendra Singh** and **Aakash**. We welcome community help!
 
 - **Questions?** [Start a discussion](https://github.com/sonu831/Trading-System/discussions)
 - **Bugs?** [Report an issue](https://github.com/sonu831/Trading-System/issues/new?template=bug_report.md)

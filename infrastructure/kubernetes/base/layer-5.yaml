@@ -1,0 +1,31 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: layer-5-aggregation
+  namespace: nifty50-system
+  labels:
+    app: layer-5-aggregation
+    layer: aggregation
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: layer-5-aggregation
+  template:
+    metadata:
+      labels:
+        app: layer-5-aggregation
+    spec:
+      containers:
+      - name: layer-5-aggregation
+        image: layer-5-aggregation:latest
+        env:
+        - name: REDIS_HOST
+          value: "redis"
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "250m"

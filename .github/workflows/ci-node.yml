@@ -1,0 +1,42 @@
+name: Node.js CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        layer: 
+          - layer-1-ingestion
+          - layer-2-processing
+          - layer-6-signal
+          - layer-7-presentation/api
+          - layer-7-presentation/dashboard
+          - layer-7-presentation/telegram-bot
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Use Node.js 18
+      uses: actions/setup-node@v3
+      with:
+        node-version: 18
+        cache: 'npm'
+        cache-dependency-path: ${{ matrix.layer }}/package-lock.json
+
+    - name: Install Dependencies
+      working-directory: ${{ matrix.layer }}
+      run: npm install
+
+    - name: Lint (if script exists)
+      working-directory: ${{ matrix.layer }}
+      run: npm run lint --if-present
+
+    - name: Test (if script exists)
+      working-directory: ${{ matrix.layer }}
+      run: npm test --if-present

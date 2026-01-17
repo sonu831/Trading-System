@@ -1,0 +1,33 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: layer-1-ingestion
+  namespace: nifty50-system
+  labels:
+    app: layer-1-ingestion
+    layer: ingestion
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: layer-1-ingestion
+  template:
+    metadata:
+      labels:
+        app: layer-1-ingestion
+    spec:
+      containers:
+      - name: layer-1-ingestion
+        image: layer-1-ingestion:latest
+        ports:
+        - containerPort: 3000
+        env:
+        - name: KAFKA_BROKERS
+          value: "kafka:9092"
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "250m"

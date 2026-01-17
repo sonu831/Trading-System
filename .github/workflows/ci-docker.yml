@@ -1,0 +1,37 @@
+name: Docker Build CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service:
+          - path: layer-1-ingestion
+            name: layer-1
+          - path: layer-2-processing
+            name: layer-2
+          - path: layer-4-analysis
+            name: layer-4
+          - path: layer-5-aggregation
+            name: layer-5
+          - path: layer-6-signal
+            name: layer-6
+          - path: layer-7-presentation/api
+            name: layer-7-api
+          - path: layer-7-presentation/dashboard
+            name: layer-7-dashboard
+          - path: layer-7-presentation/telegram-bot
+            name: layer-7-bot
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Build Docker Image
+      working-directory: ${{ matrix.service.path }}
+      run: docker build . --file Dockerfile --tag ${{ matrix.service.name }}:latest

@@ -1,72 +1,72 @@
-# Infrastructure & Deployment Instructions
+# 🏗️ Infrastructure & Deployment Instructions
 
-This document details the infrastructure setup for the Nifty 50 Trading System, standardized for both local development and Kubernetes deployment.
+This document details the standardized infrastructure setup for the Nifty 50 Trading System, designed for scalability and "GitOps" management.
 
-## 🏗️ Kubernetes (GitOps Structure)
+## 📂 Directory Structure
 
-We use **Kustomize** to manage Kubernetes manifests, allowing us to keep a clean separation between base configurations and environment-specific overlays (GitOps pattern).
-
-### Directory Structure
+We use a **Flat Base** Kustomize structure for simplicity and clarity.
 
 ```text
-infrastructure/kubernetes/
-├── base/                           # Shared manifests (Don't edit directly for envs)
-│   ├── apps/                       # Application layer manifests
-│   │   └── layer-4-analysis/       # Example application deployment
-│   └── observability/              # Shared observability stack
-│       ├── otel-collector/         # Central telemetry collector
-│       ├── prometheus/             # Metrics storage
-│       └── grafana/                # Visualization
-└── overlays/                       # Environment-specific patches
-    └── dev/                        # Local development Cluster configuration
+infrastructure/
+├── kubernetes/
+│   ├── base/                           # Shared manifests (Single Source of Truth)
+│   │   ├── layer-1.yaml                # Ingestion Layer
+│   │   ├── layer-2.yaml                # Processing Layer (Auto-Scaling)
+│   │   ├── layer-3.yaml                # Storage (Redis/Timescale)
+│   │   ├── layer-4.yaml                # Analysis Layer (Auto-Scaling)
+│   │   ├── layer-5.yaml                # Aggregation Layer
+│   │   ├── layer-6.yaml                # Signal Layer
+│   │   ├── layer-7.yaml                # Presentation Bundle (API+Dash+Bot)
+│   │   ├── observability.yaml          # Full Stack (Prom + Grafana + OTEL)
+│   │   └── kustomization.yaml          # Root entry point
+│   └── overlays/                       # Environment-specific patches
+│       └── dev/                        # Development Configuration
+├── monitoring/                         # Configuration as Code
+│   ├── grafana/                        # Dashboards & Provisioning
+│   ├── prometheus/                     # Scraping Configs
+│   └── otel-collector-config.yaml      # Telemetry Pipelines
+└── docker/                             # Shared Docker utilities (if any)
 ```
 
-### How to Deploy (Dev)
+## 🚀 How to Deploy (Kubernetes)
 
-To deploy the development environment to your local cluster (e.g., Minikube, Docker Desktop):
+We use **Kustomize** to deploy. This renders the templates and applies them to your cluster.
 
+### 1. Preview Deployment
+Always check what will be applied:
 ```bash
-# Preview manifests
 kubectl kustomize infrastructure/kubernetes/overlays/dev
+```
 
-# Apply to cluster
+### 2. Apply Deployment
+Deploy the entire system (Apps + Monitoring):
+```bash
 kubectl apply -k infrastructure/kubernetes/overlays/dev
 ```
 
----
-
-## 🔭 Observability Stack
-
-The system is instrumented using **OpenTelemetry (OTEL)**.
-
-1.  **OTEL Collector**: Runs as a sidecar or daemonset. Receives metrics/traces from apps via OTLP (gRPC: 4317, HTTP: 4318).
-2.  **Prometheus**: Scrapes metrics from the OTEL collector on port `8889`.
-3.  **Grafana**: Visualizes data from Prometheus. Accessible on port `3000`.
-
-**Configuration**:
-- The generic OTEL configuration is located at `infrastructure/monitoring/otel-collector-config.yaml`.
-
----
-
-## 🐳 Docker & Local Development
-
-All 7 layers have standardized `Dockerfile`s.
-
-### Running Locally (Docker Compose)
-
-To run the entire system locally without Kubernetes:
-
+### 3. Verify Scaling
+Check if Horizontal Pod Autoscalers (HPA) are active:
 ```bash
-# Build all images
-docker-compose build
-
-# Start services in background
-docker-compose up -d
-
-# Check logs
-docker-compose logs -f
+kubectl get hpa -n nifty50-system
 ```
 
-### Build Standards
-- **Node.js**: Uses `node:18-alpine` for small footprint.
-- **Go**: Uses multi-stage builds (`golang:1.21-alpine` -> `alpine`) for minimal production images.
+## 🔭 Monitoring & Observability
+
+The monitoring stack is fully declarative ("Configuration as Code").
+- **Dashboards**: Edit JSON files in `infrastructure/monitoring/grafana/dashboards/`.
+- **Alerts**: Configured in Grafana UI (or future provisioning).
+- **Pipelines**: Edit `observability.yaml` to change OTEL behavior.
+
+For detailed monitoring guides, see [infrastructure/monitoring/README.md](monitoring/README.md).
+
+## 🐳 Local Development (Docker Compose)
+
+For quick local testing without Kubernetes:
+
+```bash
+# Build & Start
+docker-compose up --build -d
+
+# View Logs
+docker-compose logs -f
+```

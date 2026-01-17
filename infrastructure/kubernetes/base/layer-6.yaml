@@ -1,0 +1,31 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: layer-6-signal
+  namespace: nifty50-system
+  labels:
+    app: layer-6-signal
+    layer: signal
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: layer-6-signal
+  template:
+    metadata:
+      labels:
+        app: layer-6-signal
+    spec:
+      containers:
+      - name: layer-6-signal
+        image: layer-6-signal:latest
+        env:
+        - name: REDIS_HOST
+          value: "redis"
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "250m"

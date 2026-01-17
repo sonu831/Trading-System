@@ -4,10 +4,11 @@
 [![Node.js](https://img.shields.io/badge/Node.js-18+-green.svg)](https://nodejs.org/)
 [![Go](https://img.shields.io/badge/Go-1.21+-blue.svg)](https://golang.org/)
 [![Docker](https://img.shields.io/badge/Docker-Ready-blue.svg)](https://docker.com/)
+[![Build Status](https://github.com/sonu831/Trading-System/actions/workflows/ci-docker.yml/badge.svg)](https://github.com/sonu831/Trading-System/actions)
 
 An ultra-low latency, **7-layer distributed trading system** designed to analyze all Nifty 50 stocks simultaneously and generate high-probability Buy/Sell signals for index options.
 
-**Author:** Yogendra Singh
+**Author:** [Yogendra Singh](https://www.linkedin.com/in/yogendra-singh-73359317/)
 
 ---
 
@@ -41,13 +42,40 @@ The primary goal of this system is to **automate the decision-making process** f
 The system ingests real-time tick data from brokers (Zerodha/Upstox), processes it through a pipeline of services, and delivers actionable alerts via Telegram and a Web Dashboard.
 
 ```mermaid
-graph LR
-    Input[Data Feed] -->|WebSocket| Ingestion[Layer 1]
-    Ingestion -->|Kafka| Processing[Layer 2]
-    Processing -->|Redis| Analysis[Layer 4]
-    Analysis -->|Redis| Aggregation[Layer 5]
-    Aggregation -->|Redis| Decision[Layer 6]
-    Decision -->|Pub/Sub| Alerts[Layer 7]
+graph TD
+    subgraph External_World
+        Broker((Broker API)) -->|WSS Tick Data| L1
+    end
+
+    subgraph Ingestion_Layer
+        L1[Layer 1: Ingestion] 
+        style L1 fill:#f9f,stroke:#333,stroke-width:2px
+        L1 -->|Norm. Ticks| Kafka{Kafka Queue}
+    end
+
+    subgraph Processing_Engine
+        Kafka -->|Consume| L2[Layer 2: Processing]
+        L2 -->|1m/5m Candles| Redis[(Redis Hot Cache)]
+        L2 -.->|Archival| Timescale[(TimescaleDB)]
+    end
+
+    subgraph Analysis_Core
+        Redis -->|Fetch Candles| L4[Layer 4: Analysis]
+        style L4 fill:#bbf,stroke:#333,stroke-width:2px
+        L4 -->|Indicators RSI/MACD| Redis
+        
+        Redis -->|Fetch Indicators| L5[Layer 5: Aggregation]
+        style L5 fill:#bbf,stroke:#333,stroke-width:2px
+        L5 -->|Sector Heatmap| Redis
+    end
+
+    subgraph Decision_Execution
+        Redis -->|Market View| L6[Layer 6: Signal Engine]
+        style L6 fill:#bfb,stroke:#333,stroke-width:2px
+        L6 -->|Signal > 0.7| L7[Layer 7: Alerts]
+        L7 -->|Push| User((User Telegram))
+        L7 -->|Update| Dash([Web Dashboard])
+    end
 ```
 
 ### ⚡ Key Capabilities
@@ -110,7 +138,8 @@ A signal is generated if the **Composite Score > 0.7 (70%)**.
 | **Redis** | Hot Storage | Sub-millisecond reads are non-negotiable for real-time signals. |
 | **TimescaleDB** | Historical DB | Based on Postgres, it handles time-series data efficiently for backtesting. |
 | **Next.js** | Frontend | Server-Side Rendering (SSR) for fast dashboard load times. |
-| **Docker/K8s** | Infrastructure | Ensures the system runs identically on local mac and production cloud. |
+| **Docker/K8s** | Infrastructure | **[GitOps Ready](./infrastructure/kubernetes/)**. We use Kustomize ("Flat Base") and fully automated Makefiles. |
+| **Monitoring** | Observability | **[Config as Code](./infrastructure/monitoring/)**. Grafana dashboards and Prometheus alerts are version-controlled. |
 
 ---
 
@@ -134,10 +163,32 @@ We believe in documenting everything.
 - Docker & Docker Compose
 - API Credentials (Zerodha/Upstox)
 
-### Quick Start (Docker)
-Run the entire stack with one command:
+### Quick Start (Automation) 🚀
+
+We use a **Makefile** to automate everything. No complex commands needed!
 
 ```bash
+# 1. Start Local Dev (Docker)
+make up
+
+# 2. View Logs
+make logs
+
+# 3. Stop System
+make down
+```
+
+**Deploy to Kubernetes:**
+```bash
+# Dry Run (Preview)
+make k8s-dry-run
+
+# Deploy
+make k8s-deploy
+
+# Check Status (HPA & Pods)
+make k8s-status
+```
 # 1. Clone
 git clone https://github.com/sonu831/Trading-System.git
 cd Trading-System

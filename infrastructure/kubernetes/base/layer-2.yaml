@@ -1,0 +1,55 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: layer-2-processing
+  namespace: nifty50-system
+  labels:
+    app: layer-2-processing
+    layer: processing
+spec:
+  replicas: 1 # Controlled by HPA
+  selector:
+    matchLabels:
+      app: layer-2-processing
+  template:
+    metadata:
+      labels:
+        app: layer-2-processing
+    spec:
+      containers:
+      - name: layer-2-processing
+        image: layer-2-processing:latest
+        ports:
+        - containerPort: 3000
+        env:
+        - name: KAFKA_BROKERS
+          value: "kafka:9092"
+        - name: REDIS_HOST
+          value: "redis"
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "200m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: layer-2-processing-hpa
+  namespace: nifty50-system
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: layer-2-processing
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70

@@ -7,7 +7,7 @@
 
 A high-performance, real-time trading signal system for analyzing Nifty 50 stocks and generating buy/sell signals for index options trading.
 
-**Author:** Utkarsh Pandey
+**Author:** Yogendra Singh
 
 ---
 
@@ -21,6 +21,7 @@ A high-performance, real-time trading signal system for analyzing Nifty 50 stock
 - [Data Flow](#-data-flow)
 - [Technology Stack](#-technology-stack)
 - [Disclaimer](#-disclaimer)
+- [Detailed Documentation](#-detailed-documentation)
 - [License](#-license)
 - [Contributing](#-contributing)
 
@@ -42,6 +43,8 @@ A high-performance, real-time trading signal system for analyzing Nifty 50 stock
 │                                                                         │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
+
+> **💡 Interactive Visualization**: Check out the [Live Architecture Diagrams](https://lgt3y5.csb.app/) for a detailed interactive view of data flow, storage, and concurrency.
 
 ## ⚡ Key Features
 
@@ -85,7 +88,7 @@ nifty50-trading-system/
 ├── 📁 layer-6-signal/                # Signal Generation (Node.js)
 ├── 📁 layer-7-presentation/          # UI & Alerts (Next.js + Telegram)
 │
-├── 📁 infrastructure/                # Docker, K8s, Monitoring
+├── 📁 infrastructure/                # K8s Manifests (GitOps), OTEL Config
 ├── 📁 docs/                          # Documentation
 ├── 📁 scripts/                       # Utility scripts
 └── 📁 tests/                         # Test suites
@@ -285,7 +288,8 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 | **Alerts** | Telegram Bot | Mobile notifications |
 | **Containers** | Docker | Containerization |
 | **Orchestration** | Kubernetes | Scaling |
-| **Monitoring** | Prometheus + Grafana | Metrics & visualization |
+| **Monitoring** | Prometheus + Grafana + OpenTelemetry | Metrics & visualization |
+| **Infrastructure** | Kubernetes (Kustomize) | GitOps-based deployment |
 
 ---
 
@@ -299,6 +303,20 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ---
 
+## 📚 Detailed Documentation
+
+For a deeper dive into the architecture, implementation details, and viability assessment, please refer to the following documents:
+
+- [**System Specification Document**](https://docs.google.com/document/d/1i88Qn6kqzYbPCc5oJg3OW2kLMDr3TXCf/edit)
+- [**Architecture Deep Dive**](https://docs.google.com/document/d/17byb7RxFY_2isXWSFsAcKUy9qUCGfujdhDme-wLcc2M/edit?tab=t.0)
+- [**Architectural Viability Assessment**](https://docs.google.com/document/d/1XR-1T1U-SA9qUh-LAa9hCxHvI068m_s4Z9Yma6H4gT8/edit?tab=t.0#heading=h.qr4tni4k56y7)
+
+- [**Interactive Architecture Diagrams (Live)**](https://lgt3y5.csb.app/)
+- [**Local Architecture Visualization**](./Nifty50_Architecture_Diagrams.html)
+- [**Infrastructure Setup Instructions**](./infrastructure/INSTRUCTIONS.md)
+
+---
+
 ## 📜 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
@@ -309,6 +327,6 @@ Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) for de
 
 ---
 
-**Built with ❤️ by Utkarsh Pandey**
+**Built with ❤️ by Yogendra Singh**
 
 ⭐ **Star this repo if you find it helpful!**

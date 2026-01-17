@@ -1,0 +1,898 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nifty 50 Trading System - Architecture Diagrams | Utkarsh Pandey</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .layer-card:hover { transform: scale(1.02); }
+        .layer-card { transition: all 0.3s ease; }
+        .tab-btn.active { background: #2563eb; color: white; }
+        .flow-arrow { animation: pulse 2s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+        .stock-box { animation: fadeIn 0.5s ease; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <!-- Header -->
+    <header class="bg-gradient-to-r from-blue-800 to-purple-800 text-white p-6 shadow-lg">
+        <h1 class="text-3xl font-bold text-center">Nifty 50 Trading Signal System</h1>
+        <p class="text-center text-blue-200 mt-2">Complete System Architecture by Utkarsh Pandey</p>
+        <p class="text-center text-blue-300 text-sm mt-1">End-to-End Latency: ~20-50ms | 50 Stocks Parallel Analysis</p>
+    </header>
+
+    <!-- Navigation Tabs -->
+    <nav class="bg-white shadow-md sticky top-0 z-50 p-3">
+        <div class="flex justify-center gap-2 flex-wrap">
+            <button onclick="showTab('overview')" class="tab-btn active px-4 py-2 rounded-lg font-medium bg-gray-100" id="tab-overview">🏗️ 7-Layer Overview</button>
+            <button onclick="showTab('dataflow')" class="tab-btn px-4 py-2 rounded-lg font-medium bg-gray-100" id="tab-dataflow">🔄 Data Flow</button>
+            <button onclick="showTab('concurrency')" class="tab-btn px-4 py-2 rounded-lg font-medium bg-gray-100" id="tab-concurrency">⚡ Concurrency</button>
+            <button onclick="showTab('storage')" class="tab-btn px-4 py-2 rounded-lg font-medium bg-gray-100" id="tab-storage">💾 Storage</button>
+            <button onclick="showTab('techstack')" class="tab-btn px-4 py-2 rounded-lg font-medium bg-gray-100" id="tab-techstack">💻 Tech Stack</button>
+            <button onclick="showTab('signal')" class="tab-btn px-4 py-2 rounded-lg font-medium bg-gray-100" id="tab-signal">📊 Signal Flow</button>
+        </div>
+    </nav>
+
+    <!-- Content Sections -->
+    <main class="max-w-6xl mx-auto p-6">
+        
+        <!-- OVERVIEW TAB -->
+        <section id="content-overview" class="tab-content">
+            <h2 class="text-2xl font-bold text-center mb-8 text-gray-800">System Architecture - 7 Layer Model</h2>
+            
+            <div class="flex flex-col gap-3 max-w-4xl mx-auto">
+                <!-- Layer 7 -->
+                <div class="layer-card p-5 rounded-xl shadow-lg cursor-pointer" style="background: #8B5CF6;" onclick="toggleLayerDetails(this)">
+                    <div class="flex justify-between items-center text-white">
+                        <div class="flex items-center gap-4">
+                            <span class="bg-white/20 px-4 py-2 rounded-full font-bold">L7</span>
+                            <span class="font-bold text-xl">Presentation Layer</span>
+                        </div>
+                        <span class="text-sm opacity-90 hidden md:block">Next.js, Socket.io, Telegram Bot</span>
+                    </div>
+                    <div class="layer-details hidden mt-4 p-4 bg-white/20 rounded-lg text-white">
+                        <p><strong>Purpose:</strong> User interfaces and output channels</p>
+                        <p class="mt-2"><strong>Components:</strong> Dashboard (Next.js), REST API (Fastify), WebSocket Server, Telegram Bot, Mobile Push Notifications</p>
+                    </div>
+                </div>
+
+                <!-- Layer 6 -->
+                <div class="layer-card p-5 rounded-xl shadow-lg cursor-pointer" style="background: #EC4899;" onclick="toggleLayerDetails(this)">
+                    <div class="flex justify-between items-center text-white">
+                        <div class="flex items-center gap-4">
+                            <span class="bg-white/20 px-4 py-2 rounded-full font-bold">L6</span>
+                            <span class="font-bold text-xl">Signal Generation Layer</span>
+                        </div>
+                        <span class="text-sm opacity-90 hidden md:block">Node.js, Rule Engine</span>
+                    </div>
+                    <div class="layer-details hidden mt-4 p-4 bg-white/20 rounded-lg text-white">
+                        <p><strong>Purpose:</strong> Generate BUY/SELL signals from analysis</p>
+                        <p class="mt-2"><strong>Components:</strong> Decision Matrix, Weighted Scoring, Risk Management, Position Sizing, Options Strategy Selector</p>
+                    </div>
+                </div>
+
+                <!-- Layer 5 -->
+                <div class="layer-card p-5 rounded-xl shadow-lg cursor-pointer" style="background: #F59E0B;" onclick="toggleLayerDetails(this)">
+                    <div class="flex justify-between items-center text-white">
+                        <div class="flex items-center gap-4">
+                            <span class="bg-white/20 px-4 py-2 rounded-full font-bold">L5</span>
+                            <span class="font-bold text-xl">Aggregation Layer</span>
+                        </div>
+                        <span class="text-sm opacity-90 hidden md:block">Go, Redis Pub/Sub</span>
+                    </div>
+                    <div class="layer-details hidden mt-4 p-4 bg-white/20 rounded-lg text-white">
+                        <p><strong>Purpose:</strong> Combine 50 stock analyses into market-level insights</p>
+                        <p class="mt-2"><strong>Components:</strong> Market Breadth Calculator, Sector Rotation Analyzer, Relative Strength Rankings, Market Regime Detector</p>
+                    </div>
+                </div>
+
+                <!-- Layer 4 - CRITICAL -->
+                <div class="layer-card p-5 rounded-xl shadow-lg cursor-pointer border-4 border-yellow-300" style="background: #EF4444;" onclick="toggleLayerDetails(this)">
+                    <div class="flex justify-between items-center text-white">
+                        <div class="flex items-center gap-4">
+                            <span class="bg-white/20 px-4 py-2 rounded-full font-bold">L4</span>
+                            <span class="font-bold text-xl">Analysis Layer ⚡ CRITICAL</span>
+                        </div>
+                        <span class="text-sm opacity-90 hidden md:block">Go (50 Goroutines)</span>
+                    </div>
+                    <div class="layer-details hidden mt-4 p-4 bg-white/20 rounded-lg text-white">
+                        <p><strong>Purpose:</strong> Parallel analysis of all 50 stocks (~10ms total)</p>
+                        <p class="mt-2"><strong>Components:</strong> Technical Indicator Engine (RSI, MACD, EMA, ATR, etc.), Options Greeks Calculator, Pattern Recognition</p>
+                        <p class="mt-2 text-yellow-200"><strong>Key:</strong> 50 goroutines run simultaneously - this is where concurrency matters most!</p>
+                    </div>
+                </div>
+
+                <!-- Layer 3 -->
+                <div class="layer-card p-5 rounded-xl shadow-lg cursor-pointer" style="background: #10B981;" onclick="toggleLayerDetails(this)">
+                    <div class="flex justify-between items-center text-white">
+                        <div class="flex items-center gap-4">
+                            <span class="bg-white/20 px-4 py-2 rounded-full font-bold">L3</span>
+                            <span class="font-bold text-xl">Storage Layer</span>
+                        </div>
+                        <span class="text-sm opacity-90 hidden md:block">Redis, TimescaleDB, S3</span>
+                    </div>
+                    <div class="layer-details hidden mt-4 p-4 bg-white/20 rounded-lg text-white">
+                        <p><strong>Purpose:</strong> Multi-tier storage for different access patterns</p>
+                        <p class="mt-2"><strong>HOT (Redis):</strong> Current prices, live indicators (&lt;1ms)</p>
+                        <p><strong>WARM (TimescaleDB):</strong> Candles, options data (7-30 days)</p>
+                        <p><strong>COLD (S3):</strong> Historical data for backtesting (years)</p>
+                    </div>
+                </div>
+
+                <!-- Layer 2 -->
+                <div class="layer-card p-5 rounded-xl shadow-lg cursor-pointer" style="background: #3B82F6;" onclick="toggleLayerDetails(this)">
+                    <div class="flex justify-between items-center text-white">
+                        <div class="flex items-center gap-4">
+                            <span class="bg-white/20 px-4 py-2 rounded-full font-bold">L2</span>
+                            <span class="font-bold text-xl">Processing Layer</span>
+                        </div>
+                        <span class="text-sm opacity-90 hidden md:block">Kafka Consumers, Node.js</span>
+                    </div>
+                    <div class="layer-details hidden mt-4 p-4 bg-white/20 rounded-lg text-white">
+                        <p><strong>Purpose:</strong> Transform raw ticks into candles</p>
+                        <p class="mt-2"><strong>Components:</strong> Candle Builder (1m, 5m, 15m), VWAP Calculator, Volume Aggregator, Late Data Handler</p>
+                    </div>
+                </div>
+
+                <!-- Layer 1 -->
+                <div class="layer-card p-5 rounded-xl shadow-lg cursor-pointer" style="background: #6366F1;" onclick="toggleLayerDetails(this)">
+                    <div class="flex justify-between items-center text-white">
+                        <div class="flex items-center gap-4">
+                            <span class="bg-white/20 px-4 py-2 rounded-full font-bold">L1</span>
+                            <span class="font-bold text-xl">Ingestion Layer</span>
+                        </div>
+                        <span class="text-sm opacity-90 hidden md:block">Node.js, Kafka Producer</span>
+                    </div>
+                    <div class="layer-details hidden mt-4 p-4 bg-white/20 rounded-lg text-white">
+                        <p><strong>Purpose:</strong> Connect to market data sources</p>
+                        <p class="mt-2"><strong>Components:</strong> WebSocket Manager, Connection Pool, Auto-Reconnection, Message Normalizer, Kafka Producer</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Latency Summary -->
+            <div class="mt-8 bg-gray-800 text-white p-6 rounded-xl max-w-4xl mx-auto">
+                <h3 class="font-bold text-xl mb-4">⚡ End-to-End Latency Budget</h3>
+                <div class="flex flex-wrap gap-4 justify-center">
+                    <div class="bg-indigo-600 px-4 py-2 rounded-lg">Ingestion: &lt;2ms</div>
+                    <div class="bg-blue-600 px-4 py-2 rounded-lg">Processing: ~5ms</div>
+                    <div class="bg-red-600 px-4 py-2 rounded-lg">Analysis: ~10ms</div>
+                    <div class="bg-amber-600 px-4 py-2 rounded-lg">Aggregation: ~3ms</div>
+                    <div class="bg-pink-600 px-4 py-2 rounded-lg">Signal: ~2ms</div>
+                    <div class="bg-green-600 px-4 py-2 rounded-lg font-bold">TOTAL: ~20-50ms</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- DATA FLOW TAB -->
+        <section id="content-dataflow" class="tab-content hidden">
+            <h2 class="text-2xl font-bold text-center mb-8 text-gray-800">End-to-End Data Flow</h2>
+            
+            <div class="max-w-4xl mx-auto">
+                <!-- External Sources -->
+                <div class="flex justify-center gap-4 mb-4 flex-wrap">
+                    <div class="bg-gray-700 text-white p-4 rounded-xl text-center shadow-lg">
+                        <div class="text-3xl mb-2">📡</div>
+                        <div class="font-bold">NSE Feed</div>
+                    </div>
+                    <div class="bg-gray-700 text-white p-4 rounded-xl text-center shadow-lg">
+                        <div class="text-3xl mb-2">📊</div>
+                        <div class="font-bold">Zerodha Kite</div>
+                    </div>
+                    <div class="bg-gray-700 text-white p-4 rounded-xl text-center shadow-lg">
+                        <div class="text-3xl mb-2">📈</div>
+                        <div class="font-bold">Upstox</div>
+                    </div>
+                </div>
+
+                <div class="text-center text-4xl my-4 flow-arrow">⬇️</div>
+
+                <!-- WebSocket Manager -->
+                <div class="bg-indigo-600 text-white p-5 rounded-xl shadow-lg max-w-2xl mx-auto mb-4">
+                    <div class="font-bold text-xl">WebSocket Connection Pool</div>
+                    <div class="text-indigo-200 mt-2">Auto-reconnection • Heartbeat Monitoring • Backpressure Handling</div>
+                    <div class="mt-3 bg-indigo-800 p-3 rounded-lg text-sm">
+                        Technology: Node.js + ws library (Non-blocking I/O)
+                    </div>
+                </div>
+
+                <div class="text-center text-4xl my-4 flow-arrow">⬇️</div>
+
+                <!-- Kafka -->
+                <div class="bg-orange-500 text-white p-5 rounded-xl shadow-lg max-w-3xl mx-auto mb-4">
+                    <div class="font-bold text-xl">Apache Kafka</div>
+                    <div class="text-orange-100 mt-2">Topic: raw-ticks | 50 Partitions (1 per stock)</div>
+                    <div class="flex justify-center gap-2 mt-4 flex-wrap">
+                        <span class="bg-white/20 px-3 py-1 rounded">P0: RELIANCE</span>
+                        <span class="bg-white/20 px-3 py-1 rounded">P1: TCS</span>
+                        <span class="bg-white/20 px-3 py-1 rounded">P2: HDFCBANK</span>
+                        <span class="text-white/60">... 47 more ...</span>
+                    </div>
+                    <div class="mt-3 bg-orange-700 p-3 rounded-lg text-sm">
+                        Features: Durability • Replay Capability • Exactly-Once Semantics
+                    </div>
+                </div>
+
+                <div class="text-center text-4xl my-4 flow-arrow">⬇️</div>
+
+                <!-- Consumer Group -->
+                <div class="bg-blue-600 text-white p-5 rounded-xl shadow-lg max-w-3xl mx-auto mb-4">
+                    <div class="font-bold text-xl mb-3">Kafka Consumer Group (5 Consumers)</div>
+                    <div class="grid grid-cols-5 gap-2">
+                        <div class="bg-blue-800 p-3 rounded-lg text-center text-sm">
+                            <div class="font-bold">C1</div>
+                            <div class="text-blue-200">Stocks 1-10</div>
+                        </div>
+                        <div class="bg-blue-800 p-3 rounded-lg text-center text-sm">
+                            <div class="font-bold">C2</div>
+                            <div class="text-blue-200">Stocks 11-20</div>
+                        </div>
+                        <div class="bg-blue-800 p-3 rounded-lg text-center text-sm">
+                            <div class="font-bold">C3</div>
+                            <div class="text-blue-200">Stocks 21-30</div>
+                        </div>
+                        <div class="bg-blue-800 p-3 rounded-lg text-center text-sm">
+                            <div class="font-bold">C4</div>
+                            <div class="text-blue-200">Stocks 31-40</div>
+                        </div>
+                        <div class="bg-blue-800 p-3 rounded-lg text-center text-sm">
+                            <div class="font-bold">C5</div>
+                            <div class="text-blue-200">Stocks 41-50</div>
+                        </div>
+                    </div>
+                    <div class="mt-3 text-blue-200 text-sm">Each consumer builds candles for its assigned stocks</div>
+                </div>
+
+                <div class="text-center text-4xl my-4 flow-arrow">⬇️</div>
+
+                <!-- Storage Layer -->
+                <div class="flex justify-center gap-4 mb-4 flex-wrap">
+                    <div class="bg-red-500 text-white p-4 rounded-xl text-center shadow-lg">
+                        <div class="text-2xl mb-2">🔥</div>
+                        <div class="font-bold">Redis (HOT)</div>
+                        <div class="text-red-100 text-sm">&lt;1ms reads</div>
+                    </div>
+                    <div class="bg-green-500 text-white p-4 rounded-xl text-center shadow-lg">
+                        <div class="text-2xl mb-2">📊</div>
+                        <div class="font-bold">TimescaleDB (WARM)</div>
+                        <div class="text-green-100 text-sm">7-30 days</div>
+                    </div>
+                    <div class="bg-gray-500 text-white p-4 rounded-xl text-center shadow-lg">
+                        <div class="text-2xl mb-2">❄️</div>
+                        <div class="font-bold">S3 (COLD)</div>
+                        <div class="text-gray-200 text-sm">Years</div>
+                    </div>
+                </div>
+
+                <div class="text-center text-4xl my-4 flow-arrow">⬇️</div>
+
+                <!-- Analysis Engine -->
+                <div class="bg-red-600 text-white p-5 rounded-xl shadow-lg max-w-4xl mx-auto mb-4">
+                    <div class="font-bold text-xl mb-3">Analysis Engine (Go) - 50 Goroutines in Parallel</div>
+                    <div class="grid grid-cols-10 gap-1">
+                        <script>
+                            for(let i=1; i<=50; i++) {
+                                document.write(`<div class="stock-box bg-white/20 p-2 rounded text-center text-xs" style="animation-delay: ${i*0.02}s">${i}</div>`);
+                            }
+                        </script>
+                    </div>
+                    <div class="mt-4 bg-red-800 p-3 rounded-lg">
+                        <span class="text-yellow-300 font-bold">⚡ All 50 stocks analyzed SIMULTANEOUSLY in ~10ms!</span>
+                    </div>
+                </div>
+
+                <div class="text-center text-4xl my-4 flow-arrow">⬇️</div>
+
+                <!-- Aggregation + Signal -->
+                <div class="flex justify-center items-center gap-4 mb-4 flex-wrap">
+                    <div class="bg-amber-500 text-white p-4 rounded-xl shadow-lg">
+                        <div class="font-bold">Aggregation</div>
+                        <div class="text-amber-100 text-sm">Breadth • Sectors • RS</div>
+                    </div>
+                    <div class="text-3xl">➡️</div>
+                    <div class="bg-pink-600 text-white p-4 rounded-xl shadow-lg">
+                        <div class="font-bold">Signal Generator</div>
+                        <div class="text-pink-100 text-sm">Decision Matrix</div>
+                    </div>
+                </div>
+
+                <div class="text-center text-4xl my-4 flow-arrow">⬇️</div>
+
+                <!-- Output Channels -->
+                <div class="flex justify-center gap-4 flex-wrap">
+                    <div class="bg-purple-600 text-white p-4 rounded-xl text-center shadow-lg">
+                        <div class="text-2xl mb-2">📱</div>
+                        <div class="font-bold">Dashboard</div>
+                    </div>
+                    <div class="bg-purple-600 text-white p-4 rounded-xl text-center shadow-lg">
+                        <div class="text-2xl mb-2">✈️</div>
+                        <div class="font-bold">Telegram</div>
+                    </div>
+                    <div class="bg-purple-600 text-white p-4 rounded-xl text-center shadow-lg">
+                        <div class="text-2xl mb-2">🔌</div>
+                        <div class="font-bold">REST API</div>
+                    </div>
+                    <div class="bg-purple-600 text-white p-4 rounded-xl text-center shadow-lg">
+                        <div class="text-2xl mb-2">⚡</div>
+                        <div class="font-bold">WebSocket</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- CONCURRENCY TAB -->
+        <section id="content-concurrency" class="tab-content hidden">
+            <h2 class="text-2xl font-bold text-center mb-8 text-gray-800">Concurrency Architecture - 50 Stock Parallel Analysis</h2>
+
+            <div class="max-w-5xl mx-auto">
+                <!-- Trigger -->
+                <div class="bg-blue-600 text-white p-5 rounded-xl text-center mb-6 shadow-lg">
+                    <div class="font-bold text-xl">🎯 TRIGGER: New 1-minute candle completes</div>
+                    <div class="text-blue-200 mt-2">Every 60 seconds, all 50 stocks need fresh technical analysis</div>
+                </div>
+
+                <!-- Comparison -->
+                <div class="grid md:grid-cols-2 gap-6 mb-8">
+                    <!-- Sequential - BAD -->
+                    <div class="bg-red-50 border-4 border-red-400 p-6 rounded-xl">
+                        <h3 class="font-bold text-red-700 text-xl mb-4">❌ Sequential Processing (BAD)</h3>
+                        <div class="space-y-2">
+                            <div class="flex items-center gap-3">
+                                <span class="w-24 text-sm font-mono">RELIANCE</span>
+                                <div class="flex-1 bg-red-400 h-6 rounded"></div>
+                                <span class="text-sm">20ms</span>
+                            </div>
+                            <div class="flex items-center gap-3">
+                                <span class="w-24 text-sm font-mono">TCS</span>
+                                <div class="flex-1 bg-red-400 h-6 rounded"></div>
+                                <span class="text-sm">20ms</span>
+                            </div>
+                            <div class="flex items-center gap-3">
+                                <span class="w-24 text-sm font-mono">HDFCBANK</span>
+                                <div class="flex-1 bg-red-400 h-6 rounded"></div>
+                                <span class="text-sm">20ms</span>
+                            </div>
+                            <div class="text-center text-gray-500">... 47 more stocks ...</div>
+                        </div>
+                        <div class="mt-4 p-4 bg-red-200 rounded-lg text-red-800 font-bold text-lg text-center">
+                            Total: 50 × 20ms = 1000ms (1 second!) 🐌
+                        </div>
+                    </div>
+
+                    <!-- Parallel - GOOD -->
+                    <div class="bg-green-50 border-4 border-green-400 p-6 rounded-xl">
+                        <h3 class="font-bold text-green-700 text-xl mb-4">✅ Parallel Processing (GOOD)</h3>
+                        <div class="space-y-2">
+                            <div class="flex items-center gap-3">
+                                <span class="w-24 text-sm font-mono">RELIANCE</span>
+                                <div class="w-1/3 bg-green-400 h-6 rounded"></div>
+                            </div>
+                            <div class="flex items-center gap-3">
+                                <span class="w-24 text-sm font-mono">TCS</span>
+                                <div class="w-1/3 bg-green-400 h-6 rounded"></div>
+                            </div>
+                            <div class="flex items-center gap-3">
+                                <span class="w-24 text-sm font-mono">HDFCBANK</span>
+                                <div class="w-1/3 bg-green-400 h-6 rounded"></div>
+                            </div>
+                            <div class="text-center text-gray-500">... all 50 running together ...</div>
+                        </div>
+                        <div class="mt-4 p-4 bg-green-200 rounded-lg text-green-800 font-bold text-lg text-center">
+                            Total: ~9-10ms (All run together!) ⚡
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Indicator Dependency Graph -->
+                <div class="bg-gray-100 p-6 rounded-xl">
+                    <h3 class="font-bold text-gray-700 text-xl mb-6">📊 Indicator Dependency Waves (per stock)</h3>
+                    
+                    <div class="space-y-4">
+                        <!-- Input -->
+                        <div class="flex items-center gap-4 flex-wrap">
+                            <span class="bg-gray-600 text-white px-4 py-2 rounded-lg font-bold w-28 text-center">INPUT</span>
+                            <div class="flex-1 bg-gray-300 p-3 rounded-lg">
+                                <span class="font-medium">OHLCV Candle Data (Open, High, Low, Close, Volume)</span>
+                            </div>
+                        </div>
+
+                        <div class="text-center text-2xl text-gray-400">⬇️ Parallel Execution</div>
+
+                        <!-- Wave 1 -->
+                        <div class="flex items-center gap-4 flex-wrap">
+                            <span class="bg-blue-600 text-white px-4 py-2 rounded-lg font-bold w-28 text-center">WAVE 1</span>
+                            <div class="flex-1 flex flex-wrap gap-2">
+                                <span class="bg-blue-200 px-3 py-2 rounded-lg font-medium">RSI(14)</span>
+                                <span class="bg-blue-200 px-3 py-2 rounded-lg font-medium">EMA(9)</span>
+                                <span class="bg-blue-200 px-3 py-2 rounded-lg font-medium">EMA(21)</span>
+                                <span class="bg-blue-200 px-3 py-2 rounded-lg font-medium">EMA(55)</span>
+                                <span class="bg-blue-200 px-3 py-2 rounded-lg font-medium">EMA(200)</span>
+                                <span class="bg-blue-200 px-3 py-2 rounded-lg font-medium">ATR(14)</span>
+                                <span class="bg-blue-200 px-3 py-2 rounded-lg font-medium">VWAP</span>
+                                <span class="bg-blue-200 px-3 py-2 rounded-lg font-medium">Bollinger</span>
+                            </div>
+                            <span class="text-gray-600 font-bold">~5ms</span>
+                        </div>
+
+                        <div class="text-center text-2xl text-gray-400">⬇️ Wait for dependencies</div>
+
+                        <!-- Wave 2 -->
+                        <div class="flex items-center gap-4 flex-wrap">
+                            <span class="bg-amber-600 text-white px-4 py-2 rounded-lg font-bold w-28 text-center">WAVE 2</span>
+                            <div class="flex-1 flex flex-wrap gap-2">
+                                <span class="bg-amber-200 px-3 py-2 rounded-lg font-medium">MACD (needs EMAs)</span>
+                                <span class="bg-amber-200 px-3 py-2 rounded-lg font-medium">Supertrend (needs ATR)</span>
+                                <span class="bg-amber-200 px-3 py-2 rounded-lg font-medium">Trend Score</span>
+                            </div>
+                            <span class="text-gray-600 font-bold">~3ms</span>
+                        </div>
+
+                        <div class="text-center text-2xl text-gray-400">⬇️ Final computation</div>
+
+                        <!-- Wave 3 -->
+                        <div class="flex items-center gap-4 flex-wrap">
+                            <span class="bg-green-600 text-white px-4 py-2 rounded-lg font-bold w-28 text-center">WAVE 3</span>
+                            <div class="flex-1">
+                                <span class="bg-green-200 px-4 py-2 rounded-lg font-medium">Composite Stock Score (-1.0 to +1.0)</span>
+                            </div>
+                            <span class="text-gray-600 font-bold">~1ms</span>
+                        </div>
+                    </div>
+
+                    <div class="mt-6 p-4 bg-green-100 rounded-xl border-2 border-green-400">
+                        <span class="font-bold text-green-800 text-lg">✅ Total per stock: ~9ms</span>
+                        <span class="text-green-700 ml-4">→ With 50 stocks running in parallel: Still only ~9ms! 🚀</span>
+                    </div>
+                </div>
+
+                <!-- Why Go -->
+                <div class="mt-8 bg-cyan-600 text-white p-6 rounded-xl">
+                    <h3 class="font-bold text-xl mb-4">🐹 Why Go for the Analysis Engine?</h3>
+                    <div class="grid md:grid-cols-2 gap-4">
+                        <div class="bg-cyan-800 p-4 rounded-lg">
+                            <div class="font-bold">Goroutines</div>
+                            <div class="text-cyan-200">Lightweight threads (2KB vs 1MB). Can spin up 50 trivially.</div>
+                        </div>
+                        <div class="bg-cyan-800 p-4 rounded-lg">
+                            <div class="font-bold">Channels</div>
+                            <div class="text-cyan-200">Built-in synchronization. No explicit locks needed.</div>
+                        </div>
+                        <div class="bg-cyan-800 p-4 rounded-lg">
+                            <div class="font-bold">Fast Execution</div>
+                            <div class="text-cyan-200">Compiled code runs faster than interpreted JS/Python.</div>
+                        </div>
+                        <div class="bg-cyan-800 p-4 rounded-lg">
+                            <div class="font-bold">Easy Deploy</div>
+                            <div class="text-cyan-200">Single binary. Fast compile times.</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- STORAGE TAB -->
+        <section id="content-storage" class="tab-content hidden">
+            <h2 class="text-2xl font-bold text-center mb-8 text-gray-800">Storage Architecture - Hot/Warm/Cold Pattern</h2>
+
+            <div class="max-w-5xl mx-auto">
+                <div class="grid gap-6">
+                    <!-- HOT -->
+                    <div class="bg-red-500 text-white p-6 rounded-xl shadow-lg">
+                        <div class="flex items-center gap-4 mb-4">
+                            <span class="text-4xl">🔥</span>
+                            <div>
+                                <h3 class="font-bold text-2xl">HOT LAYER - Redis Cluster</h3>
+                                <p class="text-red-100">Sub-millisecond access to current state</p>
+                            </div>
+                        </div>
+                        <div class="grid md:grid-cols-2 gap-4">
+                            <div class="bg-red-700 p-4 rounded-lg">
+                                <div class="font-bold mb-2">Data Stored:</div>
+                                <ul class="text-red-100 text-sm space-y-1">
+                                    <li>• tick:latest:{symbol} → Current price</li>
+                                    <li>• candle:current:{symbol} → In-progress candle</li>
+                                    <li>• indicators:{symbol} → Latest RSI, MACD, etc.</li>
+                                    <li>• breadth:current → Live market breadth</li>
+                                    <li>• signal:active → Current trading signal</li>
+                                </ul>
+                            </div>
+                            <div class="bg-red-700 p-4 rounded-lg">
+                                <div class="font-bold mb-2">Characteristics:</div>
+                                <ul class="text-red-100 text-sm space-y-1">
+                                    <li>• Latency: &lt;1ms reads</li>
+                                    <li>• Retention: Current values only</li>
+                                    <li>• Pub/Sub for real-time events</li>
+                                    <li>• Cluster mode for high availability</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- WARM -->
+                    <div class="bg-green-500 text-white p-6 rounded-xl shadow-lg">
+                        <div class="flex items-center gap-4 mb-4">
+                            <span class="text-4xl">📊</span>
+                            <div>
+                                <h3 class="font-bold text-2xl">WARM LAYER - TimescaleDB</h3>
+                                <p class="text-green-100">Time-series storage with fast queries</p>
+                            </div>
+                        </div>
+                        <div class="grid md:grid-cols-2 gap-4">
+                            <div class="bg-green-700 p-4 rounded-lg">
+                                <div class="font-bold mb-2">Tables (Hypertables):</div>
+                                <ul class="text-green-100 text-sm space-y-1">
+                                    <li>• candles_1m → 1-minute candles</li>
+                                    <li>• candles_5m → Continuous aggregate from 1m</li>
+                                    <li>• candles_15m → Continuous aggregate from 1m</li>
+                                    <li>• options_snapshots → Options chain every 1 min</li>
+                                    <li>• signals_history → Generated signals</li>
+                                </ul>
+                            </div>
+                            <div class="bg-green-700 p-4 rounded-lg">
+                                <div class="font-bold mb-2">Features Used:</div>
+                                <ul class="text-green-100 text-sm space-y-1">
+                                    <li>• Automatic time-based partitioning</li>
+                                    <li>• Continuous aggregates for rollups</li>
+                                    <li>• 90%+ compression</li>
+                                    <li>• Retention: 7-30 days</li>
+                                    <li>• Full SQL support</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- COLD -->
+                    <div class="bg-gray-600 text-white p-6 rounded-xl shadow-lg">
+                        <div class="flex items-center gap-4 mb-4">
+                            <span class="text-4xl">❄️</span>
+                            <div>
+                                <h3 class="font-bold text-2xl">COLD LAYER - S3 / MinIO</h3>
+                                <p class="text-gray-300">Long-term storage for backtesting</p>
+                            </div>
+                        </div>
+                        <div class="grid md:grid-cols-2 gap-4">
+                            <div class="bg-gray-700 p-4 rounded-lg">
+                                <div class="font-bold mb-2">Data Stored:</div>
+                                <ul class="text-gray-300 text-sm space-y-1">
+                                    <li>• Historical candles (all timeframes)</li>
+                                    <li>• Options chain history</li>
+                                    <li>• Signal backtesting data</li>
+                                    <li>• Market event archives</li>
+                                </ul>
+                            </div>
+                            <div class="bg-gray-700 p-4 rounded-lg">
+                                <div class="font-bold mb-2">Characteristics:</div>
+                                <ul class="text-gray-300 text-sm space-y-1">
+                                    <li>• Format: Parquet (columnar, compressed)</li>
+                                    <li>• Organization: year/month/day/symbol/</li>
+                                    <li>• Retention: Years of data</li>
+                                    <li>• Access: Batch processing only</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- TECH STACK TAB -->
+        <section id="content-techstack" class="tab-content hidden">
+            <h2 class="text-2xl font-bold text-center mb-8 text-gray-800">Complete Technology Stack</h2>
+
+            <div class="max-w-5xl mx-auto">
+                <div class="grid md:grid-cols-3 gap-6">
+                    <!-- Data Pipeline -->
+                    <div class="space-y-4">
+                        <h3 class="font-bold text-lg bg-gray-800 text-white p-3 rounded-lg text-center">📥 Data Pipeline</h3>
+                        
+                        <div class="bg-indigo-100 p-4 rounded-xl border-l-4 border-indigo-600">
+                            <div class="font-bold text-indigo-800 text-lg">Node.js</div>
+                            <div class="text-indigo-600 text-sm">WebSocket Ingestion</div>
+                            <ul class="mt-2 text-gray-600 text-sm">
+                                <li>• ws / socket.io-client</li>
+                                <li>• Non-blocking I/O</li>
+                                <li>• Connection pooling</li>
+                            </ul>
+                        </div>
+
+                        <div class="bg-orange-100 p-4 rounded-xl border-l-4 border-orange-600">
+                            <div class="font-bold text-orange-800 text-lg">Apache Kafka</div>
+                            <div class="text-orange-600 text-sm">Message Queue</div>
+                            <ul class="mt-2 text-gray-600 text-sm">
+                                <li>• 50 partitions</li>
+                                <li>• Exactly-once semantics</li>
+                                <li>• Message replay</li>
+                            </ul>
+                        </div>
+
+                        <div class="bg-blue-100 p-4 rounded-xl border-l-4 border-blue-600">
+                            <div class="font-bold text-blue-800 text-lg">Kafka Consumers</div>
+                            <div class="text-blue-600 text-sm">Stream Processing</div>
+                            <ul class="mt-2 text-gray-600 text-sm">
+                                <li>• Consumer groups</li>
+                                <li>• Candle aggregation</li>
+                                <li>• Watermarking</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- Storage -->
+                    <div class="space-y-4">
+                        <h3 class="font-bold text-lg bg-gray-800 text-white p-3 rounded-lg text-center">💾 Storage</h3>
+
+                        <div class="bg-red-100 p-4 rounded-xl border-l-4 border-red-600">
+                            <div class="font-bold text-red-800 text-lg">Redis Cluster</div>
+                            <div class="text-red-600 text-sm">HOT Cache</div>
+                            <ul class="mt-2 text-gray-600 text-sm">
+                                <li>• &lt;1ms reads</li>
+                                <li>• Pub/Sub events</li>
+                                <li>• Current state</li>
+                            </ul>
+                        </div>
+
+                        <div class="bg-green-100 p-4 rounded-xl border-l-4 border-green-600">
+                            <div class="font-bold text-green-800 text-lg">TimescaleDB</div>
+                            <div class="text-green-600 text-sm">WARM Storage</div>
+                            <ul class="mt-2 text-gray-600 text-sm">
+                                <li>• Hypertables</li>
+                                <li>• Continuous aggregates</li>
+                                <li>• 7-30 days retention</li>
+                            </ul>
+                        </div>
+
+                        <div class="bg-gray-200 p-4 rounded-xl border-l-4 border-gray-600">
+                            <div class="font-bold text-gray-800 text-lg">S3 / MinIO</div>
+                            <div class="text-gray-600 text-sm">COLD Archive</div>
+                            <ul class="mt-2 text-gray-600 text-sm">
+                                <li>• Parquet files</li>
+                                <li>• Backtesting data</li>
+                                <li>• Years of history</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- Analysis & Output -->
+                    <div class="space-y-4">
+                        <h3 class="font-bold text-lg bg-gray-800 text-white p-3 rounded-lg text-center">📊 Analysis & Output</h3>
+
+                        <div class="bg-cyan-100 p-4 rounded-xl border-l-4 border-cyan-600">
+                            <div class="font-bold text-cyan-800 text-lg">Go</div>
+                            <div class="text-cyan-600 text-sm">Analysis Engine</div>
+                            <ul class="mt-2 text-gray-600 text-sm">
+                                <li>• 50 goroutines</li>
+                                <li>• Channels for sync</li>
+                                <li>• Fast math operations</li>
+                            </ul>
+                        </div>
+
+                        <div class="bg-purple-100 p-4 rounded-xl border-l-4 border-purple-600">
+                            <div class="font-bold text-purple-800 text-lg">Next.js</div>
+                            <div class="text-purple-600 text-sm">Dashboard</div>
+                            <ul class="mt-2 text-gray-600 text-sm">
+                                <li>• Server-side rendering</li>
+                                <li>• TradingView charts</li>
+                                <li>• Real-time updates</li>
+                            </ul>
+                        </div>
+
+                        <div class="bg-pink-100 p-4 rounded-xl border-l-4 border-pink-600">
+                            <div class="font-bold text-pink-800 text-lg">Telegram Bot</div>
+                            <div class="text-pink-600 text-sm">Alerts</div>
+                            <ul class="mt-2 text-gray-600 text-sm">
+                                <li>• Instant signals</li>
+                                <li>• Mobile push</li>
+                                <li>• 24/7 operation</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Infrastructure -->
+                <div class="mt-8 bg-gray-900 text-white p-6 rounded-xl">
+                    <h3 class="font-bold text-xl mb-4 text-center">🏗️ Infrastructure & DevOps</h3>
+                    <div class="flex justify-around flex-wrap gap-6">
+                        <div class="text-center">
+                            <div class="text-4xl mb-2">🐳</div>
+                            <div class="font-bold">Docker</div>
+                            <div class="text-gray-400 text-sm">Containerization</div>
+                        </div>
+                        <div class="text-center">
+                            <div class="text-4xl mb-2">☸️</div>
+                            <div class="font-bold">Kubernetes</div>
+                            <div class="text-gray-400 text-sm">Orchestration</div>
+                        </div>
+                        <div class="text-center">
+                            <div class="text-4xl mb-2">📊</div>
+                            <div class="font-bold">Prometheus</div>
+                            <div class="text-gray-400 text-sm">Metrics</div>
+                        </div>
+                        <div class="text-center">
+                            <div class="text-4xl mb-2">📈</div>
+                            <div class="font-bold">Grafana</div>
+                            <div class="text-gray-400 text-sm">Visualization</div>
+                        </div>
+                        <div class="text-center">
+                            <div class="text-4xl mb-2">📝</div>
+                            <div class="font-bold">Loki</div>
+                            <div class="text-gray-400 text-sm">Logging</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SIGNAL FLOW TAB -->
+        <section id="content-signal" class="tab-content hidden">
+            <h2 class="text-2xl font-bold text-center mb-8 text-gray-800">Signal Generation Flow</h2>
+
+            <div class="max-w-4xl mx-auto">
+                <!-- Input Factors -->
+                <div class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
+                    <div class="bg-blue-500 text-white p-4 rounded-xl text-center shadow-lg">
+                        <div class="font-bold">Nifty Trend</div>
+                        <div class="text-3xl font-bold">25%</div>
+                    </div>
+                    <div class="bg-green-500 text-white p-4 rounded-xl text-center shadow-lg">
+                        <div class="font-bold">Market Breadth</div>
+                        <div class="text-3xl font-bold">20%</div>
+                    </div>
+                    <div class="bg-yellow-500 text-white p-4 rounded-xl text-center shadow-lg">
+                        <div class="font-bold">Momentum</div>
+                        <div class="text-3xl font-bold">15%</div>
+                    </div>
+                    <div class="bg-purple-500 text-white p-4 rounded-xl text-center shadow-lg">
+                        <div class="font-bold">Options Flow</div>
+                        <div class="text-3xl font-bold">20%</div>
+                    </div>
+                    <div class="bg-pink-500 text-white p-4 rounded-xl text-center shadow-lg">
+                        <div class="font-bold">Sector Rotation</div>
+                        <div class="text-3xl font-bold">10%</div>
+                    </div>
+                    <div class="bg-gray-500 text-white p-4 rounded-xl text-center shadow-lg">
+                        <div class="font-bold">Volatility</div>
+                        <div class="text-3xl font-bold">10%</div>
+                    </div>
+                </div>
+
+                <div class="text-center text-4xl my-4 flow-arrow">⬇️</div>
+
+                <!-- Scoring Matrix -->
+                <div class="bg-gray-100 p-6 rounded-xl mb-6">
+                    <h3 class="font-bold text-xl text-center mb-4">Weighted Scoring Matrix</h3>
+                    <div class="bg-white p-4 rounded-lg shadow overflow-x-auto">
+                        <table class="w-full">
+                            <thead>
+                                <tr class="border-b-2">
+                                    <th class="text-left p-2">Factor</th>
+                                    <th class="text-center p-2">Weight</th>
+                                    <th class="text-center p-2">Current Value</th>
+                                    <th class="text-center p-2">Contribution</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr class="border-b"><td class="p-2">Trend</td><td class="text-center">25%</td><td class="text-center text-green-600 font-bold">+0.8</td><td class="text-center">+0.20</td></tr>
+                                <tr class="border-b"><td class="p-2">Breadth</td><td class="text-center">20%</td><td class="text-center text-green-600 font-bold">+0.65</td><td class="text-center">+0.13</td></tr>
+                                <tr class="border-b"><td class="p-2">Momentum</td><td class="text-center">15%</td><td class="text-center text-yellow-600 font-bold">+0.4</td><td class="text-center">+0.06</td></tr>
+                                <tr class="border-b"><td class="p-2">Options</td><td class="text-center">20%</td><td class="text-center text-green-600 font-bold">+0.7</td><td class="text-center">+0.14</td></tr>
+                                <tr class="border-b"><td class="p-2">Sectors</td><td class="text-center">10%</td><td class="text-center text-green-600 font-bold">+0.5</td><td class="text-center">+0.05</td></tr>
+                                <tr class="border-b"><td class="p-2">Volatility</td><td class="text-center">10%</td><td class="text-center text-yellow-600 font-bold">+0.3</td><td class="text-center">+0.03</td></tr>
+                            </tbody>
+                            <tfoot>
+                                <tr class="bg-gray-100 font-bold text-lg">
+                                    <td colspan="3" class="p-3 text-right">COMPOSITE SCORE:</td>
+                                    <td class="text-center text-green-600 text-2xl">+0.61</td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="text-center text-4xl my-4 flow-arrow">⬇️</div>
+
+                <!-- Signal Rules -->
+                <div class="bg-gray-800 text-white p-6 rounded-xl mb-6">
+                    <h3 class="font-bold text-xl text-center mb-4">Signal Decision Rules</h3>
+                    <div class="space-y-3">
+                        <div class="flex items-center gap-4 flex-wrap">
+                            <span class="bg-green-600 px-4 py-2 rounded-lg w-36 text-center font-bold">&gt; +0.7</span>
+                            <span class="font-bold text-green-400 text-lg">STRONG BUY</span>
+                            <span class="text-gray-400">→ Buy ATM/OTM Call</span>
+                        </div>
+                        <div class="flex items-center gap-4 bg-green-900/50 p-2 rounded-lg flex-wrap">
+                            <span class="bg-green-500 px-4 py-2 rounded-lg w-36 text-center font-bold">+0.4 to +0.7</span>
+                            <span class="font-bold text-green-300 text-lg">BUY</span>
+                            <span class="text-gray-300">→ Bull Call Spread</span>
+                            <span class="bg-yellow-500 text-black px-3 py-1 rounded font-bold">✓ CURRENT</span>
+                        </div>
+                        <div class="flex items-center gap-4 flex-wrap">
+                            <span class="bg-gray-600 px-4 py-2 rounded-lg w-36 text-center font-bold">-0.4 to +0.4</span>
+                            <span class="font-bold text-gray-400 text-lg">NEUTRAL</span>
+                            <span class="text-gray-400">→ No Trade</span>
+                        </div>
+                        <div class="flex items-center gap-4 flex-wrap">
+                            <span class="bg-red-500 px-4 py-2 rounded-lg w-36 text-center font-bold">-0.7 to -0.4</span>
+                            <span class="font-bold text-red-300 text-lg">SELL</span>
+                            <span class="text-gray-400">→ Bear Put Spread</span>
+                        </div>
+                        <div class="flex items-center gap-4 flex-wrap">
+                            <span class="bg-red-600 px-4 py-2 rounded-lg w-36 text-center font-bold">&lt; -0.7</span>
+                            <span class="font-bold text-red-400 text-lg">STRONG SELL</span>
+                            <span class="text-gray-400">→ Buy ATM/OTM Put</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="text-center text-4xl my-4 flow-arrow">⬇️</div>
+
+                <!-- Output Signal -->
+                <div class="bg-gradient-to-r from-green-500 to-green-600 text-white p-8 rounded-xl text-center shadow-xl">
+                    <h3 class="text-2xl font-bold mb-3">📊 SIGNAL OUTPUT</h3>
+                    <div class="text-4xl font-bold mb-3">BUY NIFTY 24500 CE</div>
+                    <div class="text-xl text-green-100 mb-4">Weekly Expiry | Confidence: 72%</div>
+                    <div class="flex justify-center gap-4 flex-wrap">
+                        <span class="bg-white/20 px-4 py-2 rounded-lg">Stop Loss: ₹50</span>
+                        <span class="bg-white/20 px-4 py-2 rounded-lg">Target: ₹100</span>
+                        <span class="bg-white/20 px-4 py-2 rounded-lg">Risk:Reward = 1:2</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-gray-800 text-white p-6 mt-12">
+        <div class="max-w-4xl mx-auto text-center">
+            <h3 class="font-bold text-xl mb-2">Nifty 50 Trading Signal System Architecture</h3>
+            <p class="text-gray-400">Designed by Utkarsh Pandey</p>
+            <div class="mt-4 flex justify-center gap-4 text-sm flex-wrap">
+                <span class="bg-gray-700 px-3 py-1 rounded">End-to-End: ~20-50ms</span>
+                <span class="bg-gray-700 px-3 py-1 rounded">50 Stocks Parallel</span>
+                <span class="bg-gray-700 px-3 py-1 rounded">7-Layer Architecture</span>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        function showTab(tabName) {
+            // Hide all content sections
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            // Remove active from all tabs
+            document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+            
+            // Show selected content
+            document.getElementById('content-' + tabName).classList.remove('hidden');
+            // Mark tab as active
+            document.getElementById('tab-' + tabName).classList.add('active');
+        }
+
+        function toggleLayerDetails(element) {
+            const details = element.querySelector('.layer-details');
+            if (details.classList.contains('hidden')) {
+                details.classList.remove('hidden');
+                element.classList.add('shadow-xl');
+            } else {
+                details.classList.add('hidden');
+                element.classList.remove('shadow-xl');
+            }
+        }
+
+        // Generate stock boxes dynamically
+        document.addEventListener('DOMContentLoaded', function() {
+            const stockGrid = document.querySelector('#content-dataflow .grid-cols-10');
+            if (stockGrid) {
+                stockGrid.innerHTML = '';
+                for(let i=1; i<=50; i++) {
+                    const div = document.createElement('div');
+                    div.className = 'stock-box bg-white/20 p-2 rounded text-center text-xs';
+                    div.style.animationDelay = `${i*0.02}s`;
+                    div.textContent = i;
+                    stockGrid.appendChild(div);
+                }
+            }
+        });
+    </script>
+</body>
+</html>

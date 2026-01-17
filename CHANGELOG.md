@@ -5,6 +5,23 @@ All notable changes to the **Nifty 50 Trading System** project will be documente
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.1] - 2026-01-18
+
+### 🚀 Added
+
+- **MStock Integration**:
+  - Implemented correct 2-Step Authentication flow (`Login` -> `VerifyTOTP`) using official `@mstock-mirae-asset/nodetradingapi-typeb` SDK.
+  - Added support for generating TOTP using `otpauth` and base32 secrets.
+  - Added robust error handling for "Login Only" tokens vs "Trading Tokens".
+
+### 🐛 Fixed
+
+- **MStock WebSocket**:
+  - Resolved `502 Bad Gateway` diagnosis process (identified as Infrastructure/Account issue).
+  - Fixed SDK initialization for v0.0.2 (removed invalid positional arguments).
+  - Fixed `MTicker` event handling (switched to property-based callbacks `onConnect`, `onBroadcastReceived`).
+  - Added JWT token unwrapping to handle large access tokens.
+
 ## [0.2.0] - 2026-01-17
 
 ### 🚀 Added

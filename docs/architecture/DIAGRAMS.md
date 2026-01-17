@@ -104,12 +104,12 @@ sequenceDiagram
 flowchart TD
     Start([New Candle Data]) --> Input{Gather Inputs}
     
-    Input --> Trend[Trend Analysis (25%)]
-    Input --> Breadth[Market Breadth (20%)]
-    Input --> Momentum[Momentum (15%)]
-    Input --> Options[Options Flow (20%)]
-    Input --> Sector[Sector Strength (10%)]
-    Input --> Vol[Volatility (10%)]
+    Input --> Trend["Trend Analysis (25%)"]
+    Input --> Breadth["Market Breadth (20%)"]
+    Input --> Momentum["Momentum (15%)"]
+    Input --> Options["Options Flow (20%)"]
+    Input --> Sector["Sector Strength (10%)"]
+    Input --> Vol["Volatility (10%)"]
 
     Trend --> Score
     Breadth --> Score
@@ -118,11 +118,11 @@ flowchart TD
     Sector --> Score
     Vol --> Score
 
-    Score[Calculate Composite Score] --> Decision{Score > 0.7?}
+    Score[Calculate Composite Score] --> Decision{"Score > 0.7?"}
     
-    Decision -->|Yes| Risk{Risk Check Passed?}
+    Decision -->|Yes| Risk{"Risk Check Passed?"}
     Decision -->|No| Wait[No Signal]
 
     Risk -->|Yes| Buy[GENERATE BUY SIGNAL]
-    Risk -->|No| Block[Signal Blocked (Risk)]
+    Risk -->|No| Block["Signal Blocked (Risk)"]
 ```

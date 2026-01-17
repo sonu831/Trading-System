@@ -178,11 +178,41 @@ services:
     environment:
       - KAFKA_BROKERS=kafka:29092
       - REDIS_URL=redis://redis:6379
+      - MARKET_DATA_PROVIDER=${MARKET_DATA_PROVIDER:-kite} # Default to kite
       - ZERODHA_API_KEY=${ZERODHA_API_KEY}
       - ZERODHA_ACCESS_TOKEN=${ZERODHA_ACCESS_TOKEN}
+      - MSTOCK_API_KEY=${MSTOCK_API_KEY}
+      - MSTOCK_ACCESS_TOKEN=${MSTOCK_ACCESS_TOKEN}
+      - MSTOCK_CLIENT_CODE=${MSTOCK_CLIENT_CODE}
+      - MSTOCK_PASSWORD=${MSTOCK_PASSWORD}
+      - MSTOCK_TOTP_SECRET=${MSTOCK_TOTP_SECRET}
+      - FLATTRADE_USER_ID=${FLATTRADE_USER_ID}
+      - FLATTRADE_API_KEY=${FLATTRADE_API_KEY}
+      - FLATTRADE_ACTID=${FLATTRADE_ACTID}
     depends_on:
       - kafka
       - redis
+    networks:
+      - trading-network
+    restart: unless-stopped
+    profiles:
+      - app
+
+  # Layer 1: FlatTrade Python Ingestion (Sidecar)
+  flattrade-ingestion:
+    build:
+      context: ./layer-1-flattrade-python
+      dockerfile: Dockerfile
+    container_name: flattrade-ingestion
+    environment:
+      - KAFKA_BROKERS=kafka:29092
+      - FLATTRADE_USER_ID=${FLATTRADE_USER_ID}
+      - FLATTRADE_API_KEY=${FLATTRADE_API_KEY}
+      - FLATTRADE_API_SECRET=${FLATTRADE_API_SECRET}
+      - FLATTRADE_ACTID=${FLATTRADE_ACTID}
+      - FLATTRADE_PASSWORD=${FLATTRADE_PASSWORD}
+    depends_on:
+      - kafka
     networks:
       - trading-network
     restart: unless-stopped

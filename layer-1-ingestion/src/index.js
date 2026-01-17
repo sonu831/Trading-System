@@ -7,6 +7,12 @@
  * @author Yogendra Singh
  */
 
+// Register ts-node to handle TypeScript files in node_modules regarding the SDK
+require('ts-node').register({
+  transpileOnly: true,
+  ignore: [/node_modules\/(?!@mstock-mirae-asset)/],
+});
+
 require('dotenv').config();
 const express = require('express');
 const { VendorFactory } = require('./vendors/factory');

@@ -1,0 +1,6 @@
+NorenRestApiPy
+websocket-client
+requests
+pandas
+kafka-python
+python-dotenv

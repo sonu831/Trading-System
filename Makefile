@@ -39,6 +39,11 @@ down:
 	@echo "🛑 Stopping Local System..."
 	docker-compose --profile app down
 	@echo "✅ System stopped!"
+
+up-ingestion:
+	@echo "🚀 Starting Ingestion Stack (Kafka, Redis, Node, Python)..."
+	docker-compose up --build -d kafka zookeeper redis ingestion flattrade-ingestion
+	@echo "✅ Ingestion stack started!"
 logs:
 	docker-compose logs -f
 

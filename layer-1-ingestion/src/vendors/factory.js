@@ -4,7 +4,10 @@
  */
 const { KiteVendor } = require('./kite');
 const { IndianApiVendor } = require('./indianapi');
-const { logger } = require('../../utils/logger');
+const { MStockVendor } = require('./mstock');
+const { FlatTradeVendor } = require('./flattrade');
+const { CompositeVendor } = require('./composite');
+const { logger } = require('../utils/logger');
 
 class VendorFactory {
   static createVendor(options) {
@@ -19,6 +22,15 @@ class VendorFactory {
 
       case 'indianapi':
         return new IndianApiVendor(options);
+
+      case 'mstock':
+        return new MStockVendor(options);
+
+      case 'flattrade':
+        return new FlatTradeVendor(options);
+
+      case 'composite':
+        return new CompositeVendor(options);
 
       default:
         logger.warn(`⚠️ Unknown provider '${provider}', falling back to Kite`);

@@ -2,16 +2,20 @@
  * Zerodha Kite Vendor Integration
  */
 const WebSocket = require('ws');
+const KiteConnect = require('kiteconnect').KiteConnect;
 const { BaseVendor } = require('./base');
-const { logger } = require('../../utils/logger');
-const { metrics } = require('../../utils/metrics');
+const { KiteMapper } = require('../mappers/kite');
+const { logger } = require('../utils/logger');
+const { metrics } = require('../utils/metrics');
 
 class KiteVendor extends BaseVendor {
   constructor(options) {
     super(options);
     this.name = 'Kite';
-    this.apiKey = options.apiKey;
-    this.accessToken = options.accessToken;
+    this.apiKey = process.env.ZERODHA_API_KEY;
+    this.accessToken = process.env.ZERODHA_ACCESS_TOKEN;
+    this.kc = new KiteConnect({ api_key: this.apiKey, access_token: this.accessToken });
+    this.mapper = new KiteMapper();
     this.symbols = options.symbols || []; // Expected to be array of objects with token
 
     this.ws = null;
@@ -96,9 +100,14 @@ class KiteVendor extends BaseVendor {
       // Zerodha sends binary data for ticks
       if (Buffer.isBuffer(data)) {
         const ticks = this.parseBinaryTicks(data);
+        metrics.messagesReceived.inc(ticks.length);
+
         ticks.forEach((tick) => {
-          if (this.onTick) {
-            this.onTick(tick);
+          // Map raw kite tick to internal schema using Mapper
+          const standardizedTick = this.mapper.map(tick);
+
+          if (standardizedTick && this.onTick) {
+            this.onTick(standardizedTick);
           }
         });
       }

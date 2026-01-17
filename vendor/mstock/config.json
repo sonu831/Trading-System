@@ -1,0 +1,14 @@
+{
+  "api_url": "https://api.mstock.trade/openapi/typeb",
+  "endpoints": {
+    "login": "/connect/login",
+    "orders": "/orders/regular",
+    "quote": "/instruments/quote",
+    "historical": "/instruments/historical",
+    "intraday": "/instruments/intraday"
+  },
+  "headers": {
+    "X-Mirae-Version": "1",
+    "Content-Type": "application/json"
+  }
+}

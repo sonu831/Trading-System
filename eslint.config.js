@@ -2,6 +2,9 @@ const js = require('@eslint/js');
 const globals = require('globals');
 
 module.exports = [
+  {
+    ignores: ['**/node_modules/**', '**/dist/**', '**/build/**', '**/vendor/**'],
+  },
   js.configs.recommended,
   {
     languageOptions: {
@@ -16,7 +19,6 @@ module.exports = [
       'no-unused-vars': 'warn',
       'no-console': 'off',
     },
-    ignores: ['node_modules/', 'dist/', 'build/'],
   },
   {
     files: ['layer-7-presentation/dashboard/**/*.{js,jsx,ts,tsx}'],

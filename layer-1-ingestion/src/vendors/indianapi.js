@@ -1,11 +1,3 @@
-/**
- * IndianAPI Vendor Integration (Placeholder)
- * This is a simulated adapter for the 'IndianApi' vendor.
- */
-const { BaseVendor } = require('./base');
-const { logger } = require('../../utils/logger');
-const { metrics } = require('../../utils/metrics');
-
 const fs = require('fs');
 const path = require('path');
 const { BaseVendor } = require('./base');

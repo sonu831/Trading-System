@@ -8,7 +8,7 @@
 
 ### Core Products
 
-1.  **Stock Analysis Portal** (`layer-7-presentation/stock-analysis-portal`): The client-facing "Window to the Market".
+1.  **Stock Analysis Portal** (`layer-7-presentation-notification/stock-analysis-portal`): The client-facing "Window to the Market".
 2.  **Control Tower** (Grafana): The internal "God's Eye View" of system health.
 
 ## 🏗 Architecture Layers
@@ -72,7 +72,7 @@ Strictly adhere to these casing standards to ensure consistency across the polyg
 
 | Type                       | Convention                  | Example                                                  |
 | -------------------------- | --------------------------- | -------------------------------------------------------- |
-| **Root Layer Directories** | `kebab-case` (numbered)     | `layer-1-ingestion`, `layer-7-presentation`              |
+| **Root Layer Directories** | `kebab-case` (numbered)     | `layer-1-ingestion`, `layer-7-presentation-notification` |
 | **Component Directories**  | `kebab-case`                | `stock-analysis-portal`, `dashboard-components`          |
 | **Infrastructure Files**   | `docker-compose.[name].yml` | `docker-compose.infra.yml`, `docker-compose.gateway.yml` |
 | **Config Files**           | `kebab-case` or standard    | `prometheus.yml`, `nginx.conf`, `tailwind.config.js`     |

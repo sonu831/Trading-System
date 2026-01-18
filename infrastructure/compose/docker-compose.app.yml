@@ -69,7 +69,7 @@ services:
       dockerfile: Dockerfile
     container_name: analysis
     ports:
-      - "8081:8081"
+      - '8081:8081'
     environment:
       - REDIS_URL=redis://redis:6379
       - KAFKA_BROKERS=kafka:29092
@@ -85,7 +85,7 @@ services:
       dockerfile: Dockerfile
     container_name: aggregation
     ports:
-      - "8080:8080"
+      - '8080:8080'
     environment:
       - REDIS_URL=redis://redis:6379
       - TIMESCALE_URL=postgresql://trading:trading123@timescaledb:5432/nifty50
@@ -100,7 +100,7 @@ services:
       dockerfile: Dockerfile
     container_name: signal
     ports:
-      - "8082:8082"
+      - '8082:8082'
     environment:
       - REDIS_URL=redis://redis:6379
       - TIMESCALE_URL=postgresql://trading:trading123@timescaledb:5432/nifty50
@@ -111,32 +111,17 @@ services:
   # Layer 7: API Server
   backend-api:
     build:
-      context: ../../layer-7-presentation/api
+      context: ../../layer-7-presentation-notification/api
       dockerfile: Dockerfile
     container_name: backend-api
     ports:
-      - "4000:4000"
+      - '4000:4000'
     environment:
       - REDIS_URL=redis://redis:6379
       - TIMESCALE_URL=postgresql://trading:trading123@timescaledb:5432/nifty50
     networks:
       - trading-network
     restart: unless-stopped
-
-  # Layer 7: Telegram Bot (Notifications)
-  telegram-bot:
-    build:
-      context: ../../layer-7-presentation/telegram-bot
-      dockerfile: Dockerfile
-    container_name: telegram-bot
-    environment:
-      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
-      - REDIS_URL=redis://redis:6379
-    networks:
-      - trading-network
-    restart: unless-stopped
-    profiles:
-      - notify
 
 # ===========================================
 # NETWORKS (External - shared with infra)

@@ -1,0 +1,43 @@
+version: '3.8'
+
+services:
+  # ===========================================
+  # NOTIFICATION SERVICES
+  # ===========================================
+
+  # Layer 7: Telegram Bot
+  telegram-bot:
+    build:
+      context: ../../layer-7-presentation-notification/telegram-bot
+      dockerfile: Dockerfile
+    container_name: telegram-bot
+    environment:
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - REDIS_URL=redis://redis:6379
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+    networks:
+      - trading-network
+    restart: unless-stopped
+
+  # Layer 7: Email Service
+  email-service:
+    build:
+      context: ../../layer-7-presentation-notification/email-service
+      dockerfile: Dockerfile
+    container_name: email-service
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - SMTP_HOST=${SMTP_HOST:-}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_USER=${SMTP_USER:-}
+      - SMTP_PASS=${SMTP_PASS:-}
+      - ADMIN_EMAIL=${ADMIN_EMAIL:-}
+      - SYSTEM_EMAIL=${SYSTEM_EMAIL:-}
+    networks:
+      - trading-network
+    restart: unless-stopped
+
+networks:
+  trading-network:
+    external: true
+    name: compose_trading-network

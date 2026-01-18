@@ -17,22 +17,22 @@ spec:
         app: layer-2-processing
     spec:
       containers:
-      - name: layer-2-processing
-        image: layer-2-processing:latest
-        ports:
-        - containerPort: 3000
-        env:
-        - name: KAFKA_BROKERS
-          value: "kafka:9092"
-        - name: REDIS_HOST
-          value: "redis"
-        resources:
-          requests:
-            memory: "256Mi"
-            cpu: "200m"
-          limits:
-            memory: "512Mi"
-            cpu: "500m"
+        - name: layer-2-processing
+          image: layer-2-processing:latest
+          ports:
+            - containerPort: 3000
+          env:
+            - name: KAFKA_BROKERS
+              value: 'kafka:9092'
+            - name: REDIS_HOST
+              value: 'redis'
+          resources:
+            requests:
+              memory: '256Mi'
+              cpu: '200m'
+            limits:
+              memory: '512Mi'
+              cpu: '500m'
 ---
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
@@ -47,9 +47,9 @@ spec:
   minReplicas: 2
   maxReplicas: 10
   metrics:
-  - type: Resource
-    resource:
-      name: cpu
-      target:
-        type: Utilization
-        averageUtilization: 70
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70

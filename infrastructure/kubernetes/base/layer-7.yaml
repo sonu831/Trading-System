@@ -17,20 +17,20 @@ spec:
         app: layer-7-api
     spec:
       containers:
-      - name: layer-7-api
-        image: layer-7-api:latest
-        ports:
-        - containerPort: 4000
-        env:
-        - name: REDIS_HOST
-          value: "redis"
-        resources:
-          requests:
-            memory: "128Mi"
-            cpu: "100m"
-          limits:
-            memory: "256Mi"
-            cpu: "500m"
+        - name: layer-7-api
+          image: layer-7-api:latest
+          ports:
+            - containerPort: 4000
+          env:
+            - name: REDIS_HOST
+              value: 'redis'
+          resources:
+            requests:
+              memory: '128Mi'
+              cpu: '100m'
+            limits:
+              memory: '256Mi'
+              cpu: '500m'
 ---
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
@@ -45,12 +45,12 @@ spec:
   minReplicas: 2
   maxReplicas: 5
   metrics:
-  - type: Resource
-    resource:
-      name: cpu
-      target:
-        type: Utilization
-        averageUtilization: 70
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -71,20 +71,20 @@ spec:
         app: layer-7-dashboard
     spec:
       containers:
-      - name: layer-7-dashboard
-        image: layer-7-dashboard:latest
-        ports:
-        - containerPort: 3000
-        env:
-        - name: API_URL
-          value: "http://layer-7-api:4000"
-        resources:
-          requests:
-            memory: "256Mi"
-            cpu: "100m"
-          limits:
-            memory: "512Mi"
-            cpu: "500m"
+        - name: layer-7-dashboard
+          image: layer-7-dashboard:latest
+          ports:
+            - containerPort: 3000
+          env:
+            - name: API_URL
+              value: 'http://layer-7-api:4000'
+          resources:
+            requests:
+              memory: '256Mi'
+              cpu: '100m'
+            limits:
+              memory: '512Mi'
+              cpu: '500m'
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -105,15 +105,15 @@ spec:
         app: layer-7-bot
     spec:
       containers:
-      - name: layer-7-bot
-        image: layer-7-bot:latest
-        env:
-        - name: TELEGRAM_BOT_TOKEN
-          value: "your-token"
-        resources:
-          requests:
-            memory: "128Mi"
-            cpu: "50m"
-          limits:
-            memory: "256Mi"
-            cpu: "100m"
+        - name: layer-7-bot
+          image: layer-7-bot:latest
+          env:
+            - name: TELEGRAM_BOT_TOKEN
+              value: 'your-token'
+          resources:
+            requests:
+              memory: '128Mi'
+              cpu: '50m'
+            limits:
+              memory: '256Mi'
+              cpu: '100m'

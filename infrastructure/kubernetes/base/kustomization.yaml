@@ -1,28 +1,28 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
-- layer-1.yaml
-- layer-2.yaml
-- layer-3.yaml
-- layer-4.yaml
-- layer-5.yaml
-- layer-6.yaml
-- layer-7.yaml
-- observability.yaml
+  - layer-1.yaml
+  - layer-2.yaml
+  - layer-3.yaml
+  - layer-4.yaml
+  - layer-5.yaml
+  - layer-6.yaml
+  - layer-7.yaml
+  - observability.yaml
 
 configMapGenerator:
-- name: grafana-datasources
-  files:
-  - ../../monitoring/grafana/provisioning/datasources/datasource.yaml
-- name: grafana-dashboards-provider
-  files:
-  - ../../monitoring/grafana/provisioning/dashboards/dashboard.yaml
-- name: grafana-system-overview
-  files:
-  - ../../monitoring/grafana/dashboards/system-overview.json
-- name: prometheus-config
-  files:
-  - ../../monitoring/prometheus/prometheus.yml
-- name: otel-collector-config
-  files:
-  - ../../monitoring/otel-collector-config.yaml
+  - name: grafana-datasources
+    files:
+      - ../../monitoring/grafana/provisioning/datasources/datasource.yaml
+  - name: grafana-dashboards-provider
+    files:
+      - ../../monitoring/grafana/provisioning/dashboards/dashboard.yaml
+  - name: grafana-system-overview
+    files:
+      - ../../monitoring/grafana/dashboards/system-overview.json
+  - name: prometheus-config
+    files:
+      - ../../monitoring/prometheus/prometheus.yml
+  - name: otel-collector-config
+    files:
+      - ../../monitoring/otel-collector-config.yaml

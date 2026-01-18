@@ -73,13 +73,13 @@ sequenceDiagram
     participant User
 
     Note over NSE, User: Latency Budget: ~50ms
-    
+
     NSE->>L1: Tick Data (Price Update)
     L1->>Kafka: Publish to 'raw-ticks' (Partition by Symbol)
     Kafka->>L2: Consume Tick
     L2->>L2: Update Candle (1m, 5m)
     L2->>Redis: Update 'candle:current:RELIANCE'
-    
+
     par Parallel Analysis
         L2->>Redis: Pub/Sub 'event:candle_update'
         Redis->>L4: Trigger Analysis
@@ -89,7 +89,7 @@ sequenceDiagram
 
     L4->>L6: Trigger Signal Check
     L6->>L6: Run Decision Matrix
-    
+
     alt Signal Generated
         L6->>Redis: Publish 'signal:buy'
         Redis->>User: Notify (Telegram/Dashboard)
@@ -103,7 +103,7 @@ sequenceDiagram
 ```mermaid
 flowchart TD
     Start([New Candle Data]) --> Input{Gather Inputs}
-    
+
     Input --> Trend["Trend Analysis (25%)"]
     Input --> Breadth["Market Breadth (20%)"]
     Input --> Momentum["Momentum (15%)"]
@@ -119,7 +119,7 @@ flowchart TD
     Vol --> Score
 
     Score[Calculate Composite Score] --> Decision{"Score > 0.7?"}
-    
+
     Decision -->|Yes| Risk{"Risk Check Passed?"}
     Decision -->|No| Wait[No Signal]
 

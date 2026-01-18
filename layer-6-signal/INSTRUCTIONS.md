@@ -1,15 +1,18 @@
 # Layer 6: Signal Generation Instructions
 
 ## Overview
+
 This layer consumes the aggregated market view from Layer 5 and the technical analysis from Layer 4. It runs the Decision Matrix logic to generate Buy/Sell signals.
 
 ## Development Guidelines
 
 ### Node.js Standards
+
 - **Logic Isolation**: Keep trading logic separate from infrastructure code (Kafka/Redis).
 - **Floating Point Math**: Use a library like `decimal.js` or careful handling to avoid floating point errors (e.g., `0.1 + 0.2`).
 
 ### Business Logic (The "Brain")
+
 - **Decision Matrix**:
   - Input: Trend (25%), Breadth (20%), Momentum (15%), Options Chain (20%), Sectors (10%), Volatility (10%).
   - Output: Signal Confidence Score (0.0 to 1.0).
@@ -31,24 +34,29 @@ layer-6-signal/
 ```
 
 ## Logging & Auditing
+
 - **Audit Values**: Every signal MUST log the exact values of the inputs that triggered it.
   - "Signal generated because RSI=75 AND Breadth=Positive AND PCR=1.2".
 
 ```javascript
-logger.info({
-  event: 'signal_generated',
-  symbol: 'NIFTY',
-  action: 'BUY',
-  confidence: 0.85,
-  inputs: {
-    rsi: 75,
-    pcr: 1.2,
-    trend: 'bullish'
-  }
-}, 'Buy signal generated');
+logger.info(
+  {
+    event: 'signal_generated',
+    symbol: 'NIFTY',
+    action: 'BUY',
+    confidence: 0.85,
+    inputs: {
+      rsi: 75,
+      pcr: 1.2,
+      trend: 'bullish',
+    },
+  },
+  'Buy signal generated'
+);
 ```
 
 ## Testing
+
 - **Scenario Testing**: Create mock scenarios (e.g., "The perfect storm") and verify the system generates a signal.
 - **Negative Testing**: Feed conflicting data (e.g., Price rising but Options signalling bearish) and verify NO signal or LOW confidence.
 

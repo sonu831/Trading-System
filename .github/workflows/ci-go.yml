@@ -2,35 +2,35 @@ name: Go CI
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
-    branches: [ main ]
+    branches: [main]
 
 jobs:
   validate:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        layer: 
+        layer:
           - layer-4-analysis
           - layer-5-aggregation
 
     steps:
-    - uses: actions/checkout@v3
+      - uses: actions/checkout@v3
 
-    - name: Set up Go
-      uses: actions/setup-go@v4
-      with:
-        go-version: '1.21'
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.21'
 
-    - name: Download Dependencies
-      working-directory: ${{ matrix.layer }}
-      run: go mod download
+      - name: Download Dependencies
+        working-directory: ${{ matrix.layer }}
+        run: go mod download
 
-    - name: Verify
-      working-directory: ${{ matrix.layer }}
-      run: go vet ./...
+      - name: Verify
+        working-directory: ${{ matrix.layer }}
+        run: go vet ./...
 
-    - name: Run Tests
-      working-directory: ${{ matrix.layer }}
-      run: go test -v ./...
+      - name: Run Tests
+        working-directory: ${{ matrix.layer }}
+        run: go test -v ./...

@@ -1,16 +1,19 @@
 # Layer 4: Analysis Engine Instructions
 
 ## Overview
+
 This is the core calculation engine of the system. It analyzes all 50 Nifty stocks **simultaneously** using Go's concurrency primitives. It receives candle data from Redis/TimescaleDB and computes technical indicators (RSI, MACD, etc.) and Option Greeks.
 
 ## Development Guidelines
 
 ### Go Standards
+
 - **Version**: Go 1.21+
 - **Module Name**: `github.com/utkarsh-pandey/nifty50-trading-system/layer-4-analysis`
 - **Linter**: Use `golangci-lint` with default settings + `errcheck`, `gocritic`.
 
 ### Concurrency Patterns
+
 - **Goroutines**: Spin up one goroutine per stock for parallel analysis.
 - **Channels**: Use buffered channels for passing tick data to analysis workers to prevent blocking.
 - **Synchronization**: Use `sync.WaitGroup` to wait for all 50 stocks to finish analysis before aggregating the result.
@@ -31,6 +34,7 @@ func Worker(ctx context.Context, jobs <-chan StockData, results chan<- AnalysisR
 ```
 
 ### Code Formatting & Style
+
 - **Structuring**:
   - `cmd/` for entry points.
   - `pkg/` for library code (indicators, greeks).
@@ -44,7 +48,8 @@ if err := indicator.CalculateRSI(prices); err != nil {
 ```
 
 ### Struct Definitions
-- Use strictly typed structs for all indicators. 
+
+- Use strictly typed structs for all indicators.
 - JSON tags are required for exporting results to Redis/Frontend.
 
 ```go
@@ -58,10 +63,12 @@ type AnalysisResult struct {
 ```
 
 ## Dependencies
+
 - `github.com/redis/go-redis/v9`: Redis client.
 - `github.com/markcheno/go-talib`: Technical Analysis library (or custom implementation).
 
 ## Testing
+
 - **Unit Tests**: Test indicator math against known values (e.g., TradingView outputs).
 - **Benchmarks**: Critical for this layer. Use `go test -bench=.` to ensure calculating indicators for 50 stocks takes < 10ms.
 

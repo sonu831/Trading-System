@@ -1,6 +1,6 @@
 {
   "name": "trading-system",
-  "version": "1.0.0",
+  "version": "0.3.0",
   "description": "[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT) [![Node.js](https://img.shields.io/badge/Node.js-18+-green.svg)](https://nodejs.org/) [![Go](https://img.shields.io/badge/Go-1.21+-blue.svg)](https://golang.org/) [![Docker](https://img.shields.io/badge/Docker-Ready-blue.svg)](https://docker.com/) [![Build Status](https://github.com/sonu831/Trading-System/actions/workflows/ci-docker.yml/badge.svg)](https://github.com/sonu831/Trading-System/actions)",
   "main": "index.js",
   "directories": {
@@ -8,7 +8,12 @@
     "test": "tests"
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "fix": "npm run lint:fix && npm run format"
   },
   "keywords": [],
   "author": "",

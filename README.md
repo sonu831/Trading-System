@@ -119,10 +119,11 @@ Trading-System/
 ├── layer-4-analysis/        # Technical analysis (Go)
 ├── layer-5-aggregation/     # Market breadth (Go)
 ├── layer-6-signal/          # Signal generation (Node.js)
-├── layer-7-presentation/
-│   ├── api/                 # REST API (Fastify)
-│   ├── dashboard/           # Frontend (Next.js)
-│   └── telegram-bot/        # Notifications
+├── layer-7-presentation-notification/
+│   ├── api/                   # REST API (Fastify)
+│   ├── stock-analysis-portal/ # Dashboard (Next.js)
+│   ├── telegram-bot/          # Guru Ji Bot
+│   └── email-service/         # Email Notifications
 ├── infrastructure/
 │   ├── compose/             # Modular Docker Compose files
 │   ├── monitoring/          # Prometheus, Grafana configs
@@ -137,18 +138,18 @@ Trading-System/
 
 Each layer has its own documentation:
 
-| Document                                                                   | Description                       |
-| -------------------------------------------------------------------------- | --------------------------------- |
-| [infrastructure/INSTRUCTIONS.md](infrastructure/INSTRUCTIONS.md)           | Infrastructure & deployment guide |
-| [infrastructure/compose/README.md](infrastructure/compose/README.md)       | Modular Docker Compose guide      |
-| [layer-1-ingestion/README.md](layer-1-ingestion/README.md)                 | Data ingestion layer              |
-| [layer-1-ingestion/INSTRUCTIONS.md](layer-1-ingestion/INSTRUCTIONS.md)     | L1 setup instructions             |
-| [layer-2-processing/README.md](layer-2-processing/README.md)               | Tick processing layer             |
-| [layer-3-storage/README.md](layer-3-storage/README.md)                     | Database schema                   |
-| [layer-4-analysis/README.md](layer-4-analysis/README.md)                   | Technical analysis engine         |
-| [layer-5-aggregation/INSTRUCTIONS.md](layer-5-aggregation/INSTRUCTIONS.md) | Aggregation layer                 |
-| [layer-6-signal/README.md](layer-6-signal/README.md)                       | Signal generation                 |
-| [layer-7-presentation/README.md](layer-7-presentation/README.md)           | Frontend & API                    |
+| Document                                                                                   | Description                       |
+| ------------------------------------------------------------------------------------------ | --------------------------------- |
+| [infrastructure/INSTRUCTIONS.md](infrastructure/INSTRUCTIONS.md)                           | Infrastructure & deployment guide |
+| [infrastructure/compose/README.md](infrastructure/compose/README.md)                       | Modular Docker Compose guide      |
+| [layer-1-ingestion/README.md](layer-1-ingestion/README.md)                                 | Data ingestion layer              |
+| [layer-1-ingestion/INSTRUCTIONS.md](layer-1-ingestion/INSTRUCTIONS.md)                     | L1 setup instructions             |
+| [layer-2-processing/README.md](layer-2-processing/README.md)                               | Tick processing layer             |
+| [layer-3-storage/README.md](layer-3-storage/README.md)                                     | Database schema                   |
+| [layer-4-analysis/README.md](layer-4-analysis/README.md)                                   | Technical analysis engine         |
+| [layer-5-aggregation/INSTRUCTIONS.md](layer-5-aggregation/INSTRUCTIONS.md)                 | Aggregation layer                 |
+| [layer-6-signal/README.md](layer-6-signal/README.md)                                       | Signal generation                 |
+| [layer-7-presentation-notification/README.md](layer-7-presentation-notification/README.md) | Frontend & API                    |
 
 ---
 

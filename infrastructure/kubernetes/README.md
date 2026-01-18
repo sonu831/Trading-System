@@ -43,19 +43,21 @@ graph TD
 ## 🚀 How to Deploy
 
 ### 1. Dry Run (Verify YAML)
+
 ```bash
 kubectl kustomize infrastructure/kubernetes/overlays/dev
 ```
 
 ### 2. Apply to Cluster
+
 ```bash
 kubectl apply -k infrastructure/kubernetes/overlays/dev
 ```
 
 ## 📊 Auto-Scaling Policies (HPA)
 
-| Service | Min Pods | Max Pods | Scale Trigger |
-|---------|----------|----------|---------------|
-| **Layer 2 (Processing)** | 2 | 10 | CPU > 70% |
-| **Layer 4 (Analysis)** | 5 | 20 | CPU > 60% |
-| **Layer 7 (API)** | 2 | 5 | CPU > 70% |
+| Service                  | Min Pods | Max Pods | Scale Trigger |
+| ------------------------ | -------- | -------- | ------------- |
+| **Layer 2 (Processing)** | 2        | 10       | CPU > 70%     |
+| **Layer 4 (Analysis)**   | 5        | 20       | CPU > 60%     |
+| **Layer 7 (API)**        | 2        | 5        | CPU > 70%     |

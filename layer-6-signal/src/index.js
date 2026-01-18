@@ -2,6 +2,7 @@ const express = require('express');
 const promClient = require('prom-client');
 const redis = require('./redis/client');
 const engine = require('./engine/decisionEngine');
+const logger = require('./utils/logger');
 
 const app = express();
 const PORT = process.env.PORT || 8082; // Signal Layer Port
@@ -40,7 +41,7 @@ app.use((req, res, next) => {
 
 async function start() {
   try {
-    console.log('🚀 Starting Layer 6 (Signal Generation)...');
+    logger.info('🚀 Starting Layer 6 (Signal Generation)...');
 
     // 1. Connect to Redis
     await redis.connect();
@@ -95,15 +96,15 @@ async function start() {
           timestamp: Date.now(),
         });
       } catch (e) {
-        console.error('Metric Publish Error', e);
+        logger.error({ err: e }, 'Metric Publish Error');
       }
     }, 5000);
 
     app.listen(PORT, () => {
-      console.log(`✅ Layer 6 listening on port ${PORT}`);
+      logger.info(`✅ Layer 6 listening on port ${PORT}`);
     });
   } catch (err) {
-    console.error('🔥 Fatal Error:', err);
+    logger.fatal({ err }, '🔥 Fatal Error:');
     process.exit(1);
   }
 }
@@ -114,16 +115,10 @@ async function handleAnalysisUpdate(analysis) {
     const signal = engine.evaluate(analysis);
 
     if (signal) {
-      console.log(
+      logger.info(
+        { signal },
         `🔔 SIGNAL GENERATED: ${signal.action} ${signal.symbol} @ ${signal.price} (Conf: ${signal.confidence})`
       );
-
-      // Log for Audit
-      const logEntry = {
-        event: 'signal_generated',
-        ...signal,
-      };
-      console.log(JSON.stringify(logEntry));
 
       // Publish Signal to Kafka/Redis for Layer 7
       await redis.publish('signals:trade', signal);
@@ -140,7 +135,7 @@ async function handleAnalysisUpdate(analysis) {
       signalConfidence.set({ symbol: signal.symbol }, signal.confidence);
     }
   } catch (err) {
-    console.error('Error processing analysis:', err);
+    logger.error({ err }, 'Error processing analysis');
   }
 }
 

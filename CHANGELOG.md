@@ -5,6 +5,45 @@ All notable changes to the **Nifty 50 Trading System** project will be documente
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-01-19
+
+### 🚀 Added
+
+- **Notification Layer Refactor**:
+  - Created **`email-service`**: A new Node.js consumer that listens to Redis events and sends automated emails via SMTP.
+  - Isolated notifications into **`infrastructure/compose/docker-compose.notify.yml`** for independent management.
+  - Added **`make notify`** to the `Makefile` for streamlined startup of the notification stack.
+- **Bot Features (Guru Ji 2.0)**:
+  - **Suggestions Box**: Implemented `/suggest <text>` command to capture user feedback directly into the **PostgreSQL** `user_suggestions` table.
+  - **Email Subscriptions**: Added `/subscribe <email>` command to collect user emails for newsletters and automated stock updates.
+  - **Service Probing**: Enhanced `/status` command to perform active health checks (pinging API, Analysis, Aggregation, and Signal layers).
+  - **Automated Alerts**:
+    - **Morning Greeting**: Automated cron job for 9:00 AM IST greetings.
+    - **Backfill Notifications**: Real-time Telegram alerts upon completion of historical data backfills.
+    - **Deployment Alerts**: Immediate "Namaste Ji" broadcast when the bot service restarts.
+- **Layer 7 Renaming**:
+  - Renamed `layer-7-presentation` to **`layer-7-presentation-notification`** to accurately reflect its expanded scope (Dashboard, API, Bot, Email).
+
+### 🏗️ Refactor
+
+- **Structured Logging**:
+  - Implemented **Pino** logging in **Layer 6 (Signal)** and **Layer 7 (Email/Bot/API)** for unified JSON-formatted observability.
+- **Database Schema**:
+  - Added `user_suggestions` and `user_subscribers` tables to the TimescaleDB/PostgreSQL instance.
+
+### 🛠 Changed
+
+- **Configuration**:
+  - Integrated real **Gmail SMTP** support with `.env` variables for secure email delivery.
+  - Updated documentation (`README.md`, `CONTRIBUTING.md`, etc.) to match new layer names and features.
+
+### 🐛 Fixed
+
+- **Grafana Proxying**:
+  - Resolved `rewrite` issues in `next.config.js` to enable seamless Grafana access via the Unified Gateway.
+- **Dependency Issues**:
+  - Fixed `fsevents` build failure in Linux/Docker environments for the Email service.
+
 ## [0.2.4] - 2026-01-18
 
 ### 🚀 Added
@@ -15,7 +54,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - **Naming Conventions**: Strict `camelCase` (JS), `snake_case` (Go/Scripts), and `kebab-case` (Infrastructure).
     - **Rule Sets**: Mandatory structured logging, error wrapping, and security practices.
 - **Product Branding**:
-  - Renamed "Dashboard" to **Stock Analysis Portal** (`layer-7-presentation/stock-analysis-portal`) to align with the "Stock Analysis By Gurus" product identity.
+  - Renamed "Dashboard" to **Stock Analysis Portal** (`layer-7-presentation-notification/stock-analysis-portal`) to align with the "Stock Analysis By Gurus" product identity.
 
 ### 🏗️ Refactor
 

@@ -18,17 +18,30 @@ module.exports = [
     rules: {
       'no-unused-vars': 'warn',
       'no-console': 'off',
+      'no-empty': 'warn',
     },
   },
   {
-    files: ['layer-7-presentation/dashboard/**/*.{js,jsx,ts,tsx}'],
+    files: ['layer-7-presentation-notification/stock-analysis-portal/**/*.{js,jsx,ts,tsx}'],
     languageOptions: {
       sourceType: 'module',
       ecmaVersion: 2022,
+      globals: {
+        ...globals.browser,
+        ...globals.es2021,
+      },
       parserOptions: {
         ecmaFeatures: {
           jsx: true,
         },
+      },
+    },
+  },
+  {
+    files: ['**/tests/**/*.js', '**/*.test.js'],
+    languageOptions: {
+      globals: {
+        ...globals.jest,
       },
     },
   },

@@ -9,10 +9,10 @@ class Normalizer {
   constructor() {
     // Create token to symbol mapping
     this.tokenSymbolMap = {};
-    symbolConfig.nifty50.forEach(item => {
+    symbolConfig.nifty50.forEach((item) => {
       this.tokenSymbolMap[item.token] = {
         symbol: item.symbol,
-        exchange: item.exchange
+        exchange: item.exchange,
       };
     });
   }
@@ -26,7 +26,7 @@ class Normalizer {
     try {
       // Get symbol info from token
       const symbolInfo = this.tokenSymbolMap[rawTick.token];
-      
+
       if (!symbolInfo) {
         logger.warn(`Unknown token: ${rawTick.token}`);
         return null;
@@ -52,11 +52,10 @@ class Normalizer {
         low: rawTick.low || 0,
         close: rawTick.close || 0,
         buyQuantity: rawTick.buyQuantity || 0,
-        sellQuantity: rawTick.sellQuantity || 0
+        sellQuantity: rawTick.sellQuantity || 0,
       };
 
       return this.validate(normalizedTick) ? normalizedTick : null;
-      
     } catch (error) {
       logger.error('Normalization error:', error);
       return null;

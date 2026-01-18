@@ -94,13 +94,17 @@ fastify.get('/api/v1/system-status', async (req, reply) => {
     let signalCount = 0;
     try {
       signalCount = await redis.publisher.lLen('signals:history');
-    } catch (e) {}
+    } catch {
+      /* ignore */
+    }
 
     let candleCount = 0;
     try {
       const res = await db.query('SELECT count(*) FROM candles_1m');
       candleCount = parseInt(res.rows[0].count);
-    } catch (e) {}
+    } catch {
+      /* ignore */
+    }
 
     const l1 = (await getMetric('system:layer1:metrics')) || {
       type: 'Stream',
@@ -164,11 +168,71 @@ fastify.post('/api/v1/system/backfill/trigger', async (request, reply) => {
   }
 });
 
+// Suggestions Endpoint
+fastify.post('/api/v1/suggestions', async (req, reply) => {
+  const { user, text, source } = req.body;
+  if (!text) return reply.code(400).send({ error: 'Text is required' });
+
+  try {
+    await db.query(
+      'INSERT INTO user_suggestions (username, message, source, created_at) VALUES ($1, $2, $3, NOW())',
+      [user || 'Anonymous', text, source || 'telegram']
+    );
+
+    // Publish event for Consumers (Email Service)
+    const payload = JSON.stringify({
+      user: user || 'Anonymous',
+      text,
+      source: source || 'telegram',
+    });
+    await redis.publisher.publish('notifications:suggestions', payload);
+
+    return { success: true, message: 'Suggestion saved' };
+  } catch (err) {
+    reply.code(500).send({ error: err.message });
+  }
+});
+
+// Email Subscriptions Endpoint
+fastify.post('/api/v1/subscribers', async (req, reply) => {
+  const { chatId, username, email } = req.body;
+  if (!chatId || !email) return reply.code(400).send({ error: 'ChatID and Email are required' });
+
+  try {
+    await db.query(
+      `INSERT INTO user_subscribers (chat_id, username, email, subscribed_at) 
+       VALUES ($1, $2, $3, NOW())
+       ON CONFLICT (chat_id) DO UPDATE SET email = EXCLUDED.email, username = EXCLUDED.username, is_active = TRUE`,
+      [chatId.toString(), username || 'Anonymous', email]
+    );
+    return { success: true, message: 'Subscribed successfully' };
+  } catch (err) {
+    reply.code(500).send({ error: err.message });
+  }
+});
+
 // Start Server
 const start = async () => {
   try {
     await redis.connect();
-    // await db.connect(); // Lazy connect via pool usually fine
+    // Initialize DB Schema
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS user_suggestions (
+        id SERIAL PRIMARY KEY,
+        username TEXT,
+        message TEXT NOT NULL,
+        source TEXT,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+      CREATE TABLE IF NOT EXISTS user_subscribers (
+        id SERIAL PRIMARY KEY,
+        chat_id TEXT UNIQUE NOT NULL,
+        username TEXT,
+        email TEXT UNIQUE NOT NULL,
+        subscribed_at TIMESTAMPTZ DEFAULT NOW(),
+        is_active BOOLEAN DEFAULT TRUE
+      );
+    `);
 
     await fastify.listen({ port: PORT, host: '0.0.0.0' });
     fastify.log.info(`Server listening on ${fastify.server.address().port}`);

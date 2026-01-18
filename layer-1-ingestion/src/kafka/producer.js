@@ -1,6 +1,6 @@
 /**
  * Kafka Producer - Publishes normalized ticks to Kafka
- * 
+ *
  * Features:
  * - Symbol-based partitioning (50 partitions for 50 stocks)
  * - Batch sending for efficiency
@@ -17,7 +17,7 @@ class KafkaProducer {
     this.brokers = options.brokers;
     this.topic = options.topic;
     this.connected = false;
-    
+
     // Create symbol to partition mapping
     this.symbolPartitionMap = {};
     symbolConfig.nifty50.forEach((symbol, index) => {
@@ -30,15 +30,15 @@ class KafkaProducer {
       brokers: this.brokers,
       retry: {
         initialRetryTime: 100,
-        retries: 8
-      }
+        retries: 8,
+      },
     });
 
     this.producer = this.kafka.producer({
       allowAutoTopicCreation: true,
       idempotent: true, // Enable exactly-once semantics
       transactionalId: 'ingestion-producer',
-      maxInFlightRequests: 5
+      maxInFlightRequests: 5,
     });
   }
 
@@ -71,20 +71,21 @@ class KafkaProducer {
 
       await this.producer.send({
         topic: this.topic,
-        messages: [{
-          key: tick.symbol,
-          value: JSON.stringify(tick),
-          partition: partition,
-          timestamp: tick.timestamp.toString(),
-          headers: {
-            'source': 'ingestion-layer',
-            'version': '1.0'
-          }
-        }]
+        messages: [
+          {
+            key: tick.symbol,
+            value: JSON.stringify(tick),
+            partition: partition,
+            timestamp: tick.timestamp.toString(),
+            headers: {
+              source: 'ingestion-layer',
+              version: '1.0',
+            },
+          },
+        ],
       });
 
       metrics.kafkaMessagesSent.inc({ topic: this.topic });
-      
     } catch (error) {
       logger.error('Failed to send message to Kafka:', error);
       metrics.errorCounter.inc({ type: 'kafka_send' });
@@ -101,16 +102,16 @@ class KafkaProducer {
       throw new Error('Producer not connected');
     }
 
-    const messages = ticks.map(tick => ({
+    const messages = ticks.map((tick) => ({
       key: tick.symbol,
       value: JSON.stringify(tick),
       partition: this.symbolPartitionMap[tick.symbol] || 0,
-      timestamp: tick.timestamp.toString()
+      timestamp: tick.timestamp.toString(),
     }));
 
     await this.producer.send({
       topic: this.topic,
-      messages: messages
+      messages: messages,
     });
 
     metrics.kafkaMessagesSent.inc({ topic: this.topic }, ticks.length);

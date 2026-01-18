@@ -27,6 +27,7 @@ help:
 	@echo "  make infra          Data stores only (Kafka, Redis, DB)"
 	@echo "  make app            Pipeline only (L1-L6 + API)"
 	@echo "  make ui             Dashboard only (fast rebuild)"
+	@echo "  make notify         Telegram Bot (Guru Ji)"
 	@echo "  make observe        Monitoring only (Prometheus, Grafana)"
 	@echo ""
 	@echo "🔧 LOCAL DEVELOPMENT"
@@ -67,8 +68,9 @@ up: infra app ui
 down:
 	@echo "🛑 Stopping all containers..."
 	-$(DC) -f $(COMPOSE_DIR)/docker-compose.gateway.yml down
+	-$(DC) -f $(COMPOSE_DIR)/docker-compose.notify.yml down
 	-$(DC) -f $(COMPOSE_DIR)/docker-compose.ui.yml down
-	-$(DC) -f $(COMPOSE_DIR)/docker-compose.app.yml --profile notify --profile flattrade down
+	-$(DC) -f $(COMPOSE_DIR)/docker-compose.app.yml --profile flattrade down
 	-$(DC) -f $(COMPOSE_DIR)/docker-compose.observe.yml down
 	-$(DC) -f $(COMPOSE_DIR)/docker-compose.infra.yml down
 	@echo "✅ Stopped."
@@ -93,6 +95,11 @@ observe:
 	@echo "📊 Starting Observability..."
 	$(DC) -f $(COMPOSE_DIR)/docker-compose.observe.yml up -d
 	@echo "✅ Prometheus: 9090 | Grafana: 3001"
+
+notify:
+	@echo "🔔 Starting Notifications..."
+	$(DC) -f $(COMPOSE_DIR)/docker-compose.notify.yml up -d
+	@echo "✅ Telegram Bot & Email Service running"
 
 gateway:
 	@echo "🌐 Starting Gateway..."
@@ -132,10 +139,10 @@ layer6:
 	cd layer-6-signal && npm run dev
 
 layer7-api:
-	cd layer-7-presentation/api && npm run dev
+	cd layer-7-presentation-notification/api && npm run dev
 
 layer7-dashboard:
-	cd layer-7-presentation/stock-analysis-portal && npm run dev
+	cd layer-7-presentation-notification/stock-analysis-portal && npm run dev
 
 dev: infra
 	@echo "✅ Dev environment ready. Run layers manually."

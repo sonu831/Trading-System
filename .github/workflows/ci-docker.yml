@@ -2,9 +2,9 @@ name: Docker Build CI
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
-    branches: [ main ]
+    branches: [main]
 
 jobs:
   build:
@@ -30,8 +30,8 @@ jobs:
             name: layer-7-bot
 
     steps:
-    - uses: actions/checkout@v3
+      - uses: actions/checkout@v3
 
-    - name: Build Docker Image
-      working-directory: ${{ matrix.service.path }}
-      run: docker build . --file Dockerfile --tag ${{ matrix.service.name }}:latest
+      - name: Build Docker Image
+        working-directory: ${{ matrix.service.path }}
+        run: docker build . --file Dockerfile --tag ${{ matrix.service.name }}:latest

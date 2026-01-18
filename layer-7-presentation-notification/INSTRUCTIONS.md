@@ -8,7 +8,7 @@ This layer handles the user interface and external API. It consists of a Next.js
 
 ### 1. Dashboard (Next.js)
 
-- **Path**: `layer-7-presentation/dashboard`
+- **Path**: `layer-7-presentation-notification/dashboard`
 - **Standards**:
   - Use Functional Components with Hooks.
   - Use `TailwindCSS` for styling.
@@ -17,14 +17,14 @@ This layer handles the user interface and external API. It consists of a Next.js
 
 ### 2. REST API (Fastify)
 
-- **Path**: `layer-7-presentation/api`
+- **Path**: `layer-7-presentation-notification/api`
 - **Standards**:
   - Use Schemas for request/response validation.
   - Follow RESTful conventions (`GET /api/v1/signals`, `GET /api/v1/candles`).
 
 ### 3. Telegram Bot (Telegraf)
 
-- **Path**: `layer-7-presentation/telegram-bot`
+- **Path**: `layer-7-presentation-notification/telegram-bot`
 - **Standards**:
   - Handle rate limiting diligently to avoid bans by Telegram.
   - Use formatting (Markdown/HTML) to make alerts readable.
@@ -51,7 +51,7 @@ This layer handles the user interface and external API. It consists of a Next.js
 ## Project Structure
 
 ```text
-layer-7-presentation/
+layer-7-presentation-notification/
 ├── dashboard/           # Next.js App
 │   ├── components/
 │   ├── pages/

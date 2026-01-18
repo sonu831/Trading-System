@@ -1,8 +1,3 @@
-/**
- * Logger utility using Pino
- * Replacement for Winston
- */
-
 const pino = require('pino');
 
 const logger = pino({
@@ -17,4 +12,4 @@ const logger = pino({
   },
 });
 
-module.exports = { logger };
+module.exports = logger;

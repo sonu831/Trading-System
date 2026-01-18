@@ -45,8 +45,8 @@ infrastructure/monitoring/
 
 ## 📊 Core Dashboards
 
-| Dashboard | Description | File |
-|-----------|-------------|------|
+| Dashboard           | Description                               | File                                      |
+| ------------------- | ----------------------------------------- | ----------------------------------------- |
 | **System Overview** | High-level CPU, Memory, and Request Rates | `grafana/dashboards/system-overview.json` |
 
 ## 🚀 Access

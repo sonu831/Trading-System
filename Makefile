@@ -65,7 +65,7 @@ infra-all:
 
 infra-down:
 	@echo "🛑 Stopping infrastructure..."
-	docker-compose down
+	docker-compose --profile app --profile flattrade-only down
 	@echo "✅ Infrastructure stopped."
 
 # ===========================================
@@ -107,6 +107,59 @@ layer2-install:
 	cd layer-2-processing && npm install
 
 # ===========================================
+# LAYER 4: ANALYSIS (Go)
+# ===========================================
+
+layer4:
+	@echo "📈 Starting Layer 4: Analysis..."
+	cd layer-4-analysis && go run cmd/main.go
+
+layer4-build:
+	@echo "🔨 Building Layer 4..."
+	cd layer-4-analysis && go build -o bin/analysis cmd/main.go
+
+# ===========================================
+# LAYER 5: AGGREGATION (Go)
+# ===========================================
+
+layer5:
+	@echo "📊 Starting Layer 5: Aggregation..."
+	cd layer-5-aggregation && go run cmd/main.go
+
+layer5-build:
+	@echo "🔨 Building Layer 5..."
+	cd layer-5-aggregation && go build -o bin/aggregation cmd/main.go
+
+# ===========================================
+# LAYER 6: SIGNAL GENERATION
+# ===========================================
+
+layer6:
+	@echo "🧠 Starting Layer 6: Signal Generation..."
+	cd layer-6-signal && npm run dev
+
+layer6-install:
+	@echo "📦 Installing Layer 6 dependencies..."
+	cd layer-6-signal && npm install
+
+# ===========================================
+# LAYER 7: PRESENTATION
+# ===========================================
+
+layer7-api:
+	@echo "🔌 Starting Layer 7: API..."
+	cd layer-7-presentation/api && npm run dev
+
+layer7-dashboard:
+	@echo "🖥️ Starting Layer 7: Dashboard..."
+	cd layer-7-presentation/dashboard && npm run dev
+
+layer7-install:
+	@echo "📦 Installing Layer 7 dependencies..."
+	cd layer-7-presentation/api && npm install
+	cd layer-7-presentation/dashboard && npm install
+
+# ===========================================
 # DOCKER (Full Stack)
 # ===========================================
 
@@ -115,12 +168,16 @@ docker-build:
 	docker-compose build
 
 docker-up:
-	@echo "🐳 Starting full stack..."
+	@echo "🐳 Starting full stack (excluding flattrade-ingestion)..."
 	docker-compose --profile app up -d
+
+docker-flattrade:
+	@echo "🚀 Starting Flattrade Ingestion (requires valid credentials)..."
+	docker-compose --profile flattrade-only up -d
 
 docker-down:
 	@echo "� Stopping all containers..."
-	docker-compose down
+	docker-compose --profile app --profile flattrade-only down
 
 # ===========================================
 # TESTING
@@ -154,6 +211,15 @@ logs-layer1:
 
 logs-layer2:
 	docker-compose logs -f processing
+
+logs-layer4:
+	docker-compose logs -f analysis
+
+logs-layer5:
+	docker-compose logs -f aggregation
+
+logs-layer6:
+	docker-compose logs -f signal
 
 # ===========================================
 # CLEANUP

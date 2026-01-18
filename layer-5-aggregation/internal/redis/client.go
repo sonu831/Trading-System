@@ -22,9 +22,21 @@ func NewClient() (*Client, error) {
 		redisURL = "localhost:6379"
 	}
 
-	rdb := redis.NewClient(&redis.Options{
-		Addr: redisURL,
-	})
+	var opt *redis.Options
+	var err error
+
+	if len(redisURL) > 8 && redisURL[:8] == "redis://" {
+		opt, err = redis.ParseURL(redisURL)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		opt = &redis.Options{
+			Addr: redisURL,
+		}
+	}
+
+	rdb := redis.NewClient(opt)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -50,6 +62,16 @@ func (c *Client) PublishMarketView(ctx context.Context, key string, data interfa
 
 	// Also publish to channel for real-time subscribers
 	return c.rdb.Publish(ctx, "market_view", jsonData).Err()
+}
+
+// PublishMetrics publishes system metrics
+func (c *Client) PublishMetrics(ctx context.Context, key string, data interface{}) error {
+	jsonData, err := json.Marshal(data)
+	if err != nil {
+		return err
+	}
+	// Store with 1 minute TTL
+	return c.rdb.Set(ctx, key, jsonData, 1*time.Minute).Err()
 }
 
 // GetMarketView retrieves market view from Redis

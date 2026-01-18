@@ -22,6 +22,7 @@ type MarketView struct {
 	TopGainers        []StockSummary           `json:"top_gainers"`
 	TopLosers         []StockSummary           `json:"top_losers"`
 	MostActive        []StockSummary           `json:"most_active"`
+	AllStocks         []StockSummary           `json:"all_stocks"`
 }
 
 // SectorMetrics represents performance of a sector
@@ -167,6 +168,7 @@ func (e *Engine) runAggregation() {
 		SectorPerformance: sectorPerf,
 		TopGainers:        topGainers,
 		TopLosers:         topLosers,
+		AllStocks:         stockSummaries,
 	}
 
 	// Publish to Redis
@@ -343,6 +345,11 @@ func (e *Engine) Stop() {
 	e.dbClient.Close()
 	e.redis.Close()
 	e.running = false
+}
+
+// PublishRuntimeMetrics publishes runtime metrics like goroutine count
+func (e *Engine) PublishRuntimeMetrics(metrics interface{}) error {
+	return e.redis.PublishMetrics(e.ctx, "system:layer5:metrics", metrics)
 }
 
 // Helper functions

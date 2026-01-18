@@ -11,7 +11,9 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"runtime"
 	"syscall"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
@@ -42,6 +44,44 @@ func main() {
 		log.Println("📊 Metrics server listening on :8081")
 		if err := http.ListenAndServe(":8081", nil); err != nil {
 			log.Printf("⚠️ Metrics server failed: %v", err)
+		}
+	}()
+
+	// Start Metrics Publisher
+	go func() {
+		ticker := time.NewTicker(5 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				metrics := map[string]interface{}{
+					"goroutines": runtime.NumGoroutine(),
+					"service":    "analysis",
+					"timestamp":  time.Now(),
+				}
+				engine.PublishRuntimeMetrics(metrics)
+			}
+		}
+	}()
+
+	// Start Metrics Publisher
+	go func() {
+		ticker := time.NewTicker(5 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				metrics := map[string]interface{}{
+					"goroutines": runtime.NumGoroutine(),
+					"service":    "analysis",
+					"timestamp":  time.Now(),
+				}
+				engine.PublishRuntimeMetrics(metrics)
+			}
 		}
 	}()
 

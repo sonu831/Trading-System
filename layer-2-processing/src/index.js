@@ -20,6 +20,7 @@ const {
   setLatestPrice,
   setLatestCandle,
   disconnectRedis,
+  setMetrics,
 } = require('./services/redis-cache');
 
 // Initialize Express for health checks & metrics
@@ -44,6 +45,23 @@ const processingLatencyHistogram = new client.Histogram({
   buckets: [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1],
 });
 register.registerMetric(processingLatencyHistogram);
+
+const httpRequestDurationMicroseconds = new client.Histogram({
+  name: 'http_request_duration_seconds',
+  help: 'Duration of HTTP requests in seconds',
+  labelNames: ['method', 'route', 'code'],
+  buckets: [0.1, 0.3, 0.5, 0.7, 1, 3, 5],
+});
+register.registerMetric(httpRequestDurationMicroseconds);
+
+// Middleware for HTTP request duration
+app.use((req, res, next) => {
+  const end = httpRequestDurationMicroseconds.startTimer();
+  res.on('finish', () => {
+    end({ method: req.method, route: req.route ? req.route.path : req.path, code: res.statusCode });
+  });
+  next();
+});
 
 // Health check endpoint
 app.get('/health', (req, res) => {
@@ -112,25 +130,40 @@ async function handleMessage(message) {
 async function main() {
   console.log('🚀 Starting Layer 2: Processing Service...');
 
+  // 1. Start Express Server FIRST (so Prometheus can always scrape)
+  app.listen(PORT, () => {
+    console.log(`📡 Health/Metrics server running on port ${PORT}`);
+  });
+
   try {
-    // 1. Connect to Database
+    // 2. Connect to Database
     await connectDB();
 
-    // 2. Connect to Redis
+    // 3. Connect to Redis
     await connectRedis();
 
-    // 3. Start Kafka Consumer
+    // 4. Start Kafka Consumer
     await startConsumer(handleMessage);
 
-    // 4. Start Express Server
-    app.listen(PORT, () => {
-      console.log(`📡 Health/Metrics server running on port ${PORT}`);
-    });
+    // 5. Start Metrics Loop
+    setInterval(async () => {
+      const mem = process.memoryUsage();
+      await setMetrics({
+        candles_processed:
+          parseInt(
+            ((await client.register.getSingleMetricAsString('candles_processed_total')) || '0')
+              .split(' ')
+              .pop()
+          ) || 0,
+        heap_used: (mem.heapUsed / 1024 / 1024).toFixed(2) + 'MB',
+        timestamp: Date.now(),
+      });
+    }, 5000);
 
     console.log('✅ Layer 2 Processing Service is running.');
   } catch (err) {
     console.error('❌ Failed to start Layer 2:', err.message);
-    process.exit(1);
+    // Don't exit - keep the container running so Prometheus can scrape it
   }
 }
 

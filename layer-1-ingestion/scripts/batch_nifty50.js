@@ -13,12 +13,19 @@ require('dotenv').config({ path: path.resolve(__dirname, '../../.env') });
 
 const { DateTime } = require('luxon');
 const { MStockVendor } = require('../src/vendors/mstock');
-const masterMap = require('../../vendor/nifty50_shared.json');
+// Load master map - works in both local and Docker environments
+const vendorPath = path.resolve(__dirname, '..', 'vendor', 'nifty50_shared.json');
+const masterMap = require(vendorPath);
 
 // --- Configuration ---
 const args = process.argv.slice(2);
 const HISTORY_DAYS = parseInt(args.includes('--days') ? args[args.indexOf('--days') + 1] : '5', 10);
 const TARGET_SYMBOL = args.includes('--symbol') ? args[args.indexOf('--symbol') + 1] : null;
+const SKIP_REDIS = args.includes('--no-redis');
+
+const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
+const redis = require('redis');
+let redisClient = null;
 
 const INTERVAL = 'ONE_MINUTE';
 const OUTPUT_DIR = path.resolve(__dirname, '../data/historical');
@@ -61,13 +68,37 @@ async function main() {
   console.log(`📁 Output Directory: ${OUTPUT_DIR}`);
   console.log(`📉 Stocks to Process: ${processList.length}`);
 
-  // 2. Initialize Vendor
+  // 2. Initialize Vendor & Redis
+  if (!SKIP_REDIS) {
+    try {
+      redisClient = redis.createClient({ url: REDIS_URL });
+      await redisClient.connect();
+      console.log('✅ Connected to Redis for status reporting.');
+    } catch (e) {
+      console.warn('⚠️ Redis not available, skipping status reporting.');
+    }
+  }
+
+  const updateStatus = async (progress, details) => {
+    if (redisClient) {
+      const statusObj = {
+        status: 'running',
+        progress: Math.round(progress),
+        details: details,
+        job_type: 'historical_backfill',
+        timestamp: Date.now(),
+      };
+      await redisClient.set('system:layer1:backfill', JSON.stringify(statusObj));
+    }
+  };
+
   const vendor = new MStockVendor();
   try {
     await vendor.connect();
     console.log('✅ Authenticated with MStock.');
   } catch (e) {
     console.error('❌ Auth Failed:', e.message);
+    if (redisClient) await redisClient.quit();
     process.exit(1);
   }
 
@@ -85,6 +116,14 @@ async function main() {
     }
 
     console.log(`\n🔄 Processing ${symbol} (Token: ${token})...`);
+
+    // Calculate progress for step 1 (0-50%)
+    const currentIdx = processList.indexOf(item);
+    const stepProgress = (currentIdx / processList.length) * 50;
+    await updateStatus(
+      stepProgress,
+      `Fetching ${symbol} (${currentIdx + 1}/${processList.length})`
+    );
 
     try {
       const fetchParams = {
@@ -178,6 +217,16 @@ async function main() {
 
     // Rate Limit Delay
     await new Promise((r) => setTimeout(r, BATCH_DELAY_MS));
+
+    // Send metric to parent if possible
+    if (process.send) {
+      process.send({
+        type: 'metric',
+        name: 'externalApiCalls',
+        labels: { vendor: 'mstock', endpoint: 'getHistoricalData', status: 'success' },
+        value: 1,
+      });
+    }
   }
 
   // 4. Cleanup
@@ -188,6 +237,11 @@ async function main() {
   console.log('==========================================');
 
   await vendor.disconnect();
+  if (redisClient) {
+    // Leave status at 50% for the next step
+    await updateStatus(50, 'Step 1 Complete: Data Downloaded');
+    await redisClient.quit();
+  }
   process.exit(0);
 }
 

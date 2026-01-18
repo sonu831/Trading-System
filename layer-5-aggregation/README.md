@@ -1,33 +1,36 @@
-# Layer 5: Aggregation
+# Layer 5: Aggregation Service 📊
 
-**Deep Dive Documentation**: [Developer Instructions](./INSTRUCTIONS.md)
+## **What is this?**
 
-## Overview
-Aggregates individual stock analysis to form market-level insights (Breadth, Sector Rotation).
+The Aggregation Layer is a **Golang** service that acts as the "Market Strategist". It takes individual stock analysis from Layer 4 and synthesizes the **Big Picture**. It answers questions like "Is the market Bullish?", "Which Sector is leading?", "What is the Advance/Decline ratio?".
 
-## Technology Stack
-- **Language**: Go 1.21+
-- **Key Libraries**: `go-redis`
-- **Focus**: Data Aggregation
+## **Why is it needed?**
 
-## 🚀 How to Run
+- **Macro View**: Trading decisions often depend on overall market sentiment, not just individual stock price.
+- **Data Compression**: It processes mostly raw analysis data into consumable summaries (`MarketView`) for the Dashboard.
 
-### Option 1: Docker (Recommended)
-```bash
-# From project root
-docker-compose up -d layer-5-aggregation
-```
+## **How it works**
 
-### Option 2: Local Development
-Requires Go 1.21 installed.
+1.  **Composite Scoring**:
+    - Receives analyzed stocks.
+    - Calculates a `CompositeScore` based on Trend + Momentum weights.
+    - Determines Sentiment: **BULLISH**, **BEARISH**, or **NEUTRAL**.
+2.  **Sector Analysis**:
+    - Groups stocks by sector (e.g., IT, Banking, Auto).
+    - Calculates average change and performance for each sector.
+3.  **Market Breadth**:
+    - Counts Advances (Stocks Green) vs Declines (Stocks Red).
+    - Calculates A/D Ratio.
+4.  **Pub/Sub Broadcasting**:
+    - Compiles `MarketView` object.
+    - Publishes to Redis Channel `market_view:latest` for the API/Dashboard.
 
-```bash
-# 1. Download Modules
-go mod download
+## **Key Logs & Monitoring**
 
-# 2. Run
-go run cmd/main.go
-```
+- `[INFO] 📊 Starting market aggregation...`: Indicates cycle start.
+- `[INFO] ✅ Aggregation completed in 45ms | Sentiment: BULLISH`: High-level summary log.
 
-## Authors
-- **Yogendra Singh**
+## **Tech Stack**
+
+- **Golang**: Leveraging strict typing for financial calculations.
+- **Redis**: Heavily uses Redis for caching the "Latest State".

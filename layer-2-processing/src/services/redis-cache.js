@@ -107,4 +107,12 @@ module.exports = {
   getLatestPrice,
   setLatestCandle,
   disconnectRedis,
+  setMetrics: async (metrics) => {
+    if (!client) return;
+    try {
+      await client.set('system:layer2:metrics', JSON.stringify(metrics));
+    } catch (e) {
+      console.error('Metric Publish Error', e);
+    }
+  },
 };

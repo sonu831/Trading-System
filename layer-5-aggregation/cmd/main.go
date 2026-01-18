@@ -12,7 +12,9 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"runtime"
 	"syscall"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/utkarsh-pandey/nifty50-trading-system/layer-5-aggregation/internal/aggregator"
@@ -51,6 +53,25 @@ func main() {
 		log.Printf("📊 HTTP server listening on :%s", port)
 		if err := http.ListenAndServe(":"+port, nil); err != nil {
 			log.Printf("⚠️ HTTP server error: %v", err)
+		}
+	}()
+
+	// Start Metrics Publisher
+	go func() {
+		ticker := time.NewTicker(5 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				metrics := map[string]interface{}{
+					"goroutines": runtime.NumGoroutine(),
+					"service":    "aggregation",
+					"timestamp":  time.Now(),
+				}
+				engine.PublishRuntimeMetrics(metrics)
+			}
 		}
 	}()
 

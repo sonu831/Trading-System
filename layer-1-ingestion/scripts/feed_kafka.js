@@ -9,6 +9,10 @@ const KAFKA_BROKER = process.env.KAFKA_BROKER || 'localhost:9092';
 const TOPIC = 'market_data_feed';
 const DATA_DIR = path.resolve(__dirname, '../data/historical');
 
+const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
+const redis = require('redis');
+let redisClient = null;
+
 const kafka = new Kafka({
   clientId: 'layer-1-history-feeder',
   brokers: [KAFKA_BROKER],
@@ -32,6 +36,27 @@ async function main() {
     const files = fs.readdirSync(DATA_DIR).filter((f) => f.endsWith('.json'));
     console.log(`Found ${files.length} data files.`);
 
+    // Initialize Redis
+    try {
+      redisClient = redis.createClient({ url: REDIS_URL });
+      await redisClient.connect();
+    } catch (e) {
+      console.warn('⚠️ Redis not available');
+    }
+
+    const updateStatus = async (progress, details) => {
+      if (redisClient) {
+        const statusObj = {
+          status: 'running',
+          progress: Math.round(progress),
+          details: details,
+          job_type: 'historical_backfill',
+          timestamp: Date.now(),
+        };
+        await redisClient.set('system:layer1:backfill', JSON.stringify(statusObj));
+      }
+    };
+
     for (const file of files) {
       const filePath = path.join(DATA_DIR, file);
       const rawData = fs.readFileSync(filePath, 'utf-8');
@@ -41,6 +66,13 @@ async function main() {
       const candles = jsonData.candles; // [[time, o, h, l, c, v], ...]
 
       console.log(`📤 Feeding ${symbol} (${candles.length} candles) to topic '${TOPIC}'...`);
+
+      const currentIdx = files.indexOf(file);
+      const stepProgress = 50 + (currentIdx / files.length) * 50;
+      await updateStatus(
+        stepProgress,
+        `Feeding ${symbol} to Kafka (${currentIdx + 1}/${files.length})`
+      );
 
       // Transform candles to standard object if needed
       // Currently sending raw candle array wrapped in standardized event
@@ -77,6 +109,9 @@ async function main() {
     console.error('❌ Feed Error:', e);
   } finally {
     await producer.disconnect();
+    if (redisClient) {
+      await redisClient.quit();
+    }
   }
 }
 

@@ -13,13 +13,23 @@ require('ts-node').register({
   ignore: [/node_modules\/(?!@mstock-mirae-asset)/],
 });
 
-require('dotenv').config();
+require('dotenv').config(); // Load local .env if exists
+require('dotenv').config({ path: '../.env' }); // Also load root .env for local development
+
+// IMPORTANT: Initialize global axios interceptor BEFORE importing SDKs
+// This patches axios globally to track all external API calls
+const { setupGlobalInterceptor } = require('./utils/axios-interceptor');
+setupGlobalInterceptor();
+
+const path = require('path');
+const { fork } = require('child_process');
+
 const express = require('express');
 const { VendorFactory } = require('./vendors/factory');
 const { KafkaProducer } = require('./kafka/producer');
 const { Normalizer } = require('./normalizer');
 const { logger } = require('./utils/logger');
-const { metrics } = require('./utils/metrics');
+const { metrics, register } = require('./utils/metrics');
 const client = require('prom-client');
 const symbols = require('../config/symbols.json');
 
@@ -27,38 +37,18 @@ const symbols = require('../config/symbols.json');
 const app = express();
 const PORT = process.env.INGESTION_PORT || 3001;
 
-// Prometheus Registry & Metrics
-const register = new client.Registry(); // New Prometheus registry
-client.collectDefaultMetrics({ register });
-
 const httpRequestDurationMicroseconds = new client.Histogram({
   name: 'http_request_duration_seconds',
   help: 'Duration of HTTP requests in seconds',
   labelNames: ['method', 'route', 'code'],
   buckets: [0.1, 0.3, 0.5, 0.7, 1, 3, 5],
+  registers: [register],
 });
-register.registerMetric(httpRequestDurationMicroseconds);
 
-// Ingestion-specific metrics
-const ticksReceivedCounter = new client.Counter({
-  name: 'ingestion_ticks_received_total',
-  help: 'Total number of ticks received from WebSocket',
-  labelNames: ['symbol'],
-});
-register.registerMetric(ticksReceivedCounter);
-
-const kafkaMessagesSentCounter = new client.Counter({
-  name: 'ingestion_kafka_messages_sent_total',
-  help: 'Total number of messages sent to Kafka',
-  labelNames: ['topic'],
-});
-register.registerMetric(kafkaMessagesSentCounter);
-
-const websocketConnectionGauge = new client.Gauge({
-  name: 'ingestion_websocket_connected',
-  help: 'WebSocket connection status (1=connected, 0=disconnected)',
-});
-register.registerMetric(websocketConnectionGauge);
+// Use shared metrics instead of local ones
+const ticksReceivedCounter = metrics.ticksCounter;
+const kafkaMessagesSentCounter = metrics.kafkaMessagesSent;
+const websocketConnectionGauge = metrics.websocketConnections;
 
 // Middleware for HTTP request duration
 app.use((req, res, next) => {
@@ -67,6 +57,16 @@ app.use((req, res, next) => {
     end({ method: req.method, route: req.route ? req.route.path : req.path, code: res.statusCode });
   });
   next();
+});
+
+// Metrics Endpoint
+app.get('/metrics', async (req, res) => {
+  try {
+    res.set('Content-Type', register.contentType);
+    res.end(await register.metrics());
+  } catch (ex) {
+    res.status(500).end(ex);
+  }
 });
 
 // Initialize components
@@ -89,15 +89,47 @@ async function initialize() {
     await kafkaProducer.connect();
     logger.info('✅ Kafka Producer connected');
 
+    // Initialize Redis for System Metrics
+    const redis = require('redis');
+    const redisClient = redis.createClient({
+      url: process.env.REDIS_URL || 'redis://localhost:6379',
+    });
+    redisClient.on('error', (err) => logger.error('Redis Client Error', err));
+    await redisClient.connect();
+    logger.info('✅ Redis Metric Publisher connected');
+
+    // Start Metrics Publishing Loop
+    setInterval(async () => {
+      try {
+        const mem = process.memoryUsage();
+        const packetsVal = await metrics.websocketPackets.get();
+        const bytesVal = await metrics.websocketDataBytes.get();
+
+        const l1Metrics = {
+          heap_used: (mem.heapUsed / 1024 / 1024).toFixed(2) + 'MB',
+          uptime: process.uptime().toFixed(0) + 's',
+          websocket_packets: (packetsVal?.values[0]?.value || 0).toLocaleString(),
+          websocket_data_kb: ((bytesVal?.values[0]?.value || 0) / 1024).toFixed(2) + ' KB',
+          type: 'Stream',
+          source: 'MStock',
+          timestamp: Date.now(),
+        };
+        await redisClient.set('system:layer1:metrics', JSON.stringify(l1Metrics));
+      } catch (e) {
+        logger.error('Metric Publish Error', e);
+      }
+    }, 5000);
+
     // Initialize Normalizer
     normalizer = new Normalizer();
     logger.info('✅ Normalizer initialized');
 
     // Load Subscription List from Global Shared Map
-    const path = require('path');
     let subscriptionList = [];
     try {
-      const mapPath = path.resolve(__dirname, '../../vendor/nifty50_shared.json');
+      // In Docker: /app/src/index.js -> ../vendor = /app/vendor (mounted)
+      // Locally: layer-1-ingestion/src/index.js -> ../vendor = layer-1-ingestion/vendor (symlink)
+      const mapPath = path.resolve(__dirname, '../vendor/nifty50_shared.json');
       const masterMap = require(mapPath);
 
       // Map to MStock Format: "NSE:Token"
@@ -129,36 +161,145 @@ async function initialize() {
 
     // --- Auto-Switch to Historical Backfill if Market is Closed ---
     const { MarketHours } = require('./utils/market-hours');
-    const { exec } = require('child_process');
-    const util = require('util');
-    const execPromise = util.promisify(exec);
-    // path already declared above
+    // ...
+
+    const runScriptWithIPC = (scriptPath, args = []) => {
+      return new Promise((resolve, reject) => {
+        const child = fork(scriptPath, args, { stdio: 'inherit' });
+
+        child.on('message', (msg) => {
+          if (msg.type === 'metric') {
+            try {
+              // Direct lookup by key in the metrics object
+              const metric = metrics[msg.name];
+              if (metric) {
+                logger.debug(
+                  `📈 IPC Metric Update: ${msg.name} | ${JSON.stringify(msg.labels)} | +${msg.value || 1}`
+                );
+                if (metric.inc) metric.inc(msg.labels, msg.value || 1);
+                else if (metric.set) metric.set(msg.labels, msg.value || 1);
+                else if (metric.observe) metric.observe(msg.labels, msg.value || 1);
+              } else {
+                logger.warn(
+                  `⚠️ Metric ${msg.name} not found in parent. Available: ${Object.keys(metrics).join(', ')}`
+                );
+              }
+            } catch (err) {
+              logger.error(`Failed to update metric ${msg.name} from child`, err);
+            }
+          }
+        });
+
+        child.on('close', (code) => {
+          if (code === 0) resolve();
+          else reject(new Error(`Exit code ${code}`));
+        });
+      });
+    };
 
     const marketHours = new MarketHours();
-    if (!marketHours.isMarketOpen()) {
-      logger.info('🌙 Market is Closed. Switching to Historical Data Backfill Mode...');
+    let isBackfilling = false;
 
+    const updateBackfillStatus = async (status, progress = 0, details = '') => {
       try {
+        const statusObj = {
+          status,
+          progress,
+          details,
+          job_type: 'historical_backfill',
+          timestamp: Date.now(),
+        };
+        await redisClient.set('system:layer1:backfill', JSON.stringify(statusObj));
+
+        // Update Prometheus
+        if (status === 'running') {
+          metrics.batchJobStatus.set({ job_type: 'historical_backfill' }, 1);
+        } else if (status === 'completed') {
+          metrics.batchJobStatus.set({ job_type: 'historical_backfill' }, 2);
+        } else if (status === 'failed') {
+          metrics.batchJobStatus.set({ job_type: 'historical_backfill' }, 3);
+        } else {
+          metrics.batchJobStatus.set({ job_type: 'historical_backfill' }, 0);
+        }
+
+        if (progress > 0) {
+          metrics.batchJobProgress.set(
+            { job_type: 'historical_backfill', metric: 'percent' },
+            progress
+          );
+        }
+      } catch (e) {
+        logger.error('Failed to update backfill status', e);
+      }
+    };
+
+    const runBackfill = async () => {
+      if (isBackfilling) {
+        logger.warn('⚠️ Backfill already in progress. Skipping...');
+        return;
+      }
+      isBackfilling = true;
+      try {
+        const startTime = Date.now();
+        await updateBackfillStatus('running', 5, 'Starting Backfill Process...');
+
         // 1. Run Batch Fetch
         logger.info('⏳ Step 1: Fetching Historical Data (Last 5 Days)...');
+        await updateBackfillStatus('running', 10, 'Fetching Historical Data...');
+
         const batchScript = path.resolve(__dirname, '../scripts/batch_nifty50.js');
-        const { stdout: batchOut, stderr: batchErr } = await execPromise(
-          `node ${batchScript} --days 5`
-        );
-        if (batchOut) logger.info(`Batch Output: ${batchOut}`);
-        if (batchErr) logger.warn(`Batch Stderr: ${batchErr}`);
+        await runScriptWithIPC(batchScript, ['--days', '5']);
+
+        await updateBackfillStatus('running', 50, 'Step 1 Complete: Data Downloaded');
 
         // 2. Feed Kafka
         logger.info('⏳ Step 2: Feeding Data to Kafka...');
+        await updateBackfillStatus('running', 55, 'Feeding Data to Kafka...');
         const feedScript = path.resolve(__dirname, '../scripts/feed_kafka.js');
-        const { stdout: feedOut, stderr: feedErr } = await execPromise(`node ${feedScript}`);
-        if (feedOut) logger.info(`Feed Output: ${feedOut}`);
-        if (feedErr) logger.warn(`Feed Stderr: ${feedErr}`);
+        await runScriptWithIPC(feedScript);
 
-        logger.info('✅ Auto-Backfill Complete. Layer 2 should have received historical data.');
+        const duration = (Date.now() - startTime) / 1000;
+        metrics.batchJobDuration.observe(
+          { job_type: 'historical_backfill', status: 'success' },
+          duration
+        );
+
+        await updateBackfillStatus('completed', 100, 'Backfill Complete');
+        logger.info('✅ Backfill Complete.');
       } catch (err) {
-        logger.error(`❌ Auto-Backfill Failed: ${err.message}`);
+        await updateBackfillStatus('failed', 0, err.message);
+        logger.error(`❌ Backfill Failed: ${err.message}`);
+      } finally {
+        isBackfilling = false;
       }
+    };
+
+    // --- Command Listener (Always Active) ---
+    try {
+      const commandClient = redis.createClient({
+        url: process.env.REDIS_URL || 'redis://localhost:6379',
+      });
+      await commandClient.connect();
+      await commandClient.subscribe('system:commands', async (message) => {
+        try {
+          const { command } = JSON.parse(message);
+          if (command === 'START_BACKFILL') {
+            logger.info('📥 Received START_BACKFILL command. Triggering backfill...');
+            runBackfill();
+          }
+        } catch (e) {
+          logger.error('Command Parse Error', e);
+        }
+      });
+      logger.info('✅ Command Listener connected');
+    } catch (e) {
+      logger.error('❌ Failed to connect Command Listener:', e);
+    }
+
+    // --- Auto-Run if Market is Closed ---
+    if (!marketHours.isMarketOpen()) {
+      logger.info('🌙 Market is Closed. Auto-triggering Historical Data Backfill...');
+      runBackfill();
     }
   } catch (error) {
     logger.error('❌ Initialization failed:', error);

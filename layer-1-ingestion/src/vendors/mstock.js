@@ -1,6 +1,7 @@
 const { BaseVendor } = require('./base');
 const { MStockMapper } = require('../mappers/mstock');
 const { logger } = require('../utils/logger');
+const { metrics } = require('../utils/metrics');
 const OTPAuth = require('otpauth');
 const { MConnect, MTicker } = require('@mstock-mirae-asset/nodetradingapi-typeb');
 
@@ -207,8 +208,12 @@ class MStockVendor extends BaseVendor {
       };
 
       // Event: Tick Received
-      // onBroadcastReceived is called for EACH tick, not an array
       this.ticker.onBroadcastReceived = (tick) => {
+        // Track raw packet metrics
+        metrics.websocketPackets.inc({ vendor: 'mstock' });
+        const byteSize = tick ? JSON.stringify(tick).length : 0;
+        metrics.websocketDataBytes.inc({ vendor: 'mstock' }, byteSize);
+
         const normalized = this.mapper.map(tick);
         if (normalized && this.onTick) {
           this.onTick(normalized);
@@ -273,14 +278,24 @@ class MStockVendor extends BaseVendor {
   async getHistoricalData(params, retryCount = 0) {
     if (!this.client) return { status: false, message: 'Client not initialized' };
     const { ResponseBuilder } = require('../utils/response-builder');
+    const { metrics } = require('../utils/metrics');
+
+    const startTime = Date.now();
+    const endpoint = 'getHistoricalData';
 
     try {
       // Normalize Params (BaseVendor handles this, but safety check)
       const response = await this.client.getHistoricalData(params);
 
+      // Track metrics
+      const latency = (Date.now() - startTime) / 1000;
+      metrics.externalApiLatency.observe({ vendor: 'mstock', endpoint }, latency);
+
       if (response && response.status === true) {
+        metrics.externalApiCalls.inc({ vendor: 'mstock', endpoint, status: 'success' });
         return ResponseBuilder.success(response.data);
       } else {
+        metrics.externalApiCalls.inc({ vendor: 'mstock', endpoint, status: 'error' });
         // Check for 401 / Invalid Request in partial failure
         if (
           (response.message && response.message.includes('401')) ||
@@ -295,6 +310,11 @@ class MStockVendor extends BaseVendor {
         );
       }
     } catch (e) {
+      // Track failed API call
+      const latency = (Date.now() - startTime) / 1000;
+      metrics.externalApiLatency.observe({ vendor: 'mstock', endpoint }, latency);
+      metrics.externalApiCalls.inc({ vendor: 'mstock', endpoint, status: 'error' });
+
       // Auto-Recover from 401
       if (
         (e.message === '401_AUTH_ERROR' ||

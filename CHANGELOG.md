@@ -5,6 +5,51 @@ All notable changes to the **Nifty 50 Trading System** project will be documente
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.2] - 2026-01-18
+
+### 🚀 Added
+
+- **Historical Backfill Control**:
+  - Implemented **Manual Backfill Trigger** via Dashboard button and REST API (`POST /api/v1/system/backfill/trigger`).
+  - Added **Granular Progress Tracking**: Dashboard now shows symbol-level details (e.g., "Fetching M&M (25/50)") instead of just a flat percentage.
+  - Implemented **Concurrency Safety**: Prevents multiple simultaneous backfill executions via global `isBackfilling` state and Redis locks.
+- **Advanced Network Observability**:
+  - **WebSocket Telemetry**: Added raw packet count (`websocket_packets_total`) and data size (`websocket_data_bytes_total`) tracking for all market data vendors.
+  - **IPC Metric Bridge**: Built an IPC channel between the main Ingestion service and its child backfill processes, allowing real-time metric updates (HTTP calls, latency) to be captured from background jobs.
+  - **Global Dashboard Enhancements**:
+    - Added localized progress bars to the **Layer 1 (Ingestion)** card.
+    - Added visual feedback (pulse effects) to **TimescaleDB** and **Kafka** cards to indicate active historical data feeding.
+- **Grafana "Control Tower" v2**:
+  - Reorganized dashboard rows to prioritize **Data Ingestion Network Health**.
+  - Added **Vendor-Neutral** panels for API Traffic and Latency (pre-configured for multi-vendor support).
+  - Improved "No Data" handling: Idle market states now show `0` instead of "No Data".
+
+### 🏗️ Implementation Stages (Backfill Flow)
+
+The historical backfill process has been re-engineered for observability across three stages:
+
+1.  **Stage 1: Initialization**
+    - Ingestion service detects market closure or receives a Redis `START_BACKFILL` command.
+    - Sets global `isBackfilling` flag and updates Redis status to `running`.
+2.  **Stage 2: Background Data Ingestion (IPC Bridge)**
+    - Launches child process using `fork` with an active IPC channel.
+    - Script downloads historical OHLC data from Vendor HTTP APIs.
+    - **Observability**: Real-time progress (symbol-by-symbol) and network metrics are sent via `process.send()` to the parent service.
+3.  **Stage 3: Kafka Pipeline & Storage Integration**
+    - Downloaded data is fed into Kafka, triggering the standard processing pipeline.
+    - **Visual Mapping**: Dashboard triggers pulse animations on Storage and Kafka cards to visualize the data flow from internal storage into the real-time pipeline.
+
+### 🛠 Changed
+
+- **Infrastructure**:
+  - Refactored backfill logic into a reusable `runBackfill` module with explicit IPC support.
+  - Updated Grafana dashboard layout to resolve grid coordinate overlaps.
+
+### 🐛 Fixed
+
+- **Prometheus Scrapping**: Fixed missing metrics from backfill scripts by switching from `exec` to `fork` with IPC.
+- **UI State**: Resolved "No Data" gaps in Grafana panels during market-closed hours.
+
 ## [0.2.1] - 2026-01-18
 
 ### 🚀 Added

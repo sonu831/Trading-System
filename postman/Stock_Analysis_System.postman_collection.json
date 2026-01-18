@@ -1,0 +1,72 @@
+{
+  "info": {
+    "_postman_id": "8b3f1234-5678-90ab-cdef-1234567890ab",
+    "name": "Stock Analysis By Gurus System",
+    "description": "API Collection for the Nifty 50 AI Trading System.\n\nBase URL: http://localhost:4000",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "System Health & Status",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/system-status",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "system-status"]
+        },
+        "description": "Fetches the real-time health status and metrics of all 7 layers (Ingestion to Presentation)."
+      },
+      "response": []
+    },
+    {
+      "name": "Market View (Live)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/market-view",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "market-view"]
+        },
+        "description": "Returns the aggregated market breadth, sentiment (Bullish/Bearish), sector performance, and top movers."
+      },
+      "response": []
+    },
+    {
+      "name": "Trade Signals",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/signals",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "signals"]
+        },
+        "description": "Returns the list of latest generated trading signals."
+      },
+      "response": []
+    },
+    {
+      "name": "Health Check",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/health",
+          "host": ["{{baseUrl}}"],
+          "path": ["health"]
+        }
+      },
+      "response": []
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:4000",
+      "type": "string"
+    }
+  ]
+}

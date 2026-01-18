@@ -45,7 +45,7 @@ services:
     image: provectuslabs/kafka-ui:latest
     container_name: kafka-ui
     ports:
-      - "8080:8080"
+      - "8090:8080"
     environment:
       KAFKA_CLUSTERS_0_NAME: local
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
@@ -80,7 +80,19 @@ services:
     environment:
       REDIS_HOSTS: local:redis:6379
     ports:
-      - "8081:8081"
+      - "8085:8081"
+    depends_on:
+      - redis
+    networks:
+      - trading-network
+
+  redis-exporter:
+    image: oliver006/redis_exporter:latest
+    container_name: redis-exporter
+    environment:
+      REDIS_ADDR: redis://redis:6379
+    ports:
+      - "9121:9121"
     depends_on:
       - redis
     networks:
@@ -129,6 +141,18 @@ services:
       - ./infrastructure/pgadmin/pgpass:/pgpass:ro
     entrypoint: >
       /bin/sh -c " chmod 600 /pgpass; /entrypoint.sh "
+
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:latest
+    container_name: postgres-exporter
+    environment:
+      DATA_SOURCE_NAME: "postgresql://trading:trading123@timescaledb:5432/nifty50?sslmode=disable"
+    ports:
+      - "9187:9187"
+    depends_on:
+      - timescaledb
+    networks:
+      - trading-network
 
   # ===========================================
   # MONITORING - Prometheus
@@ -187,6 +211,24 @@ services:
       - trading-network
 
   # ===========================================
+  # MONITORING - cAdvisor (Container Metrics)
+  # ===========================================
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:latest
+    container_name: cadvisor
+    privileged: true
+    ports:
+      - "8083:8080"
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+    networks:
+      - trading-network
+
+  # ===========================================
   # APPLICATION LAYERS
   # ===========================================
 
@@ -196,6 +238,8 @@ services:
       context: ./layer-1-ingestion
       dockerfile: Dockerfile
     container_name: ingestion
+    env_file:
+      - .env
     environment:
       - KAFKA_BROKERS=kafka:29092
       - REDIS_URL=redis://redis:6379
@@ -213,6 +257,8 @@ services:
     depends_on:
       - kafka
       - redis
+    volumes:
+      - ./vendor:/app/vendor:ro
     networks:
       - trading-network
     restart: unless-stopped
@@ -238,7 +284,7 @@ services:
       - trading-network
     restart: unless-stopped
     profiles:
-      - app
+      - flattrade-only
 
   # Layer 2: Processing
   processing:
@@ -266,12 +312,16 @@ services:
       context: ./layer-4-analysis
       dockerfile: Dockerfile
     container_name: analysis
+    ports:
+      - "8081:8081"
     environment:
       - REDIS_URL=redis://redis:6379
       - KAFKA_BROKERS=kafka:29092
+      - TIMESCALE_URL=postgresql://trading:trading123@timescaledb:5432/nifty50
     depends_on:
       - redis
       - kafka
+      - timescaledb
     networks:
       - trading-network
     restart: unless-stopped
@@ -284,11 +334,15 @@ services:
       context: ./layer-5-aggregation
       dockerfile: Dockerfile
     container_name: aggregation
+    ports:
+      - "8080:8080"
     environment:
       - REDIS_URL=redis://redis:6379
+      - TIMESCALE_URL=postgresql://trading:trading123@timescaledb:5432/nifty50
     depends_on:
       - redis
       - analysis
+      - timescaledb
     networks:
       - trading-network
     restart: unless-stopped
@@ -301,6 +355,8 @@ services:
       context: ./layer-6-signal
       dockerfile: Dockerfile
     container_name: signal
+    ports:
+      - "8082:8082"
     environment:
       - REDIS_URL=redis://redis:6379
       - TIMESCALE_URL=postgresql://trading:trading123@timescaledb:5432/nifty50
@@ -323,8 +379,8 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - NEXT_PUBLIC_API_URL=http://api:4000
-      - NEXT_PUBLIC_WS_URL=ws://api:4000
+      - NEXT_PUBLIC_API_URL=http://localhost:4000/api/v1
+      - NEXT_PUBLIC_WS_URL=ws://localhost:4000
     depends_on:
       - signal
     networks:

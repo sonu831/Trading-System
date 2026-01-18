@@ -10,6 +10,7 @@ import (
 
 	"github.com/utkarsh-pandey/nifty50-trading-system/layer-4-analysis/internal/db"
 	"github.com/utkarsh-pandey/nifty50-trading-system/layer-4-analysis/internal/indicators"
+	redisClient "github.com/utkarsh-pandey/nifty50-trading-system/layer-4-analysis/internal/redis"
 )
 
 // Nifty50 stocks list
@@ -56,6 +57,7 @@ type Engine struct {
 	running  bool
 	mu       sync.Mutex
 	dbClient *db.Client
+	redis    *redisClient.Client
 	symbols  []string
 }
 
@@ -66,6 +68,14 @@ func NewEngine(ctx context.Context) (*Engine, error) {
 	// Connect to TimescaleDB
 	dbClient, err := db.NewClient(ctx)
 	if err != nil {
+		cancel()
+		return nil, err
+	}
+
+	// Connect to Redis
+	redis, err := redisClient.NewClient()
+	if err != nil {
+		dbClient.Close()
 		cancel()
 		return nil, err
 	}
@@ -85,6 +95,7 @@ func NewEngine(ctx context.Context) (*Engine, error) {
 		workers:  50,
 		results:  make(chan StockAnalysis, 100),
 		dbClient: dbClient,
+		redis:    redis,
 		symbols:  symbols,
 	}, nil
 }
@@ -154,7 +165,7 @@ func (e *Engine) runAnalysis() {
 func (e *Engine) analyzeStock(symbol string) {
 	startTime := time.Now()
 
-	// TODO: Fetch candle data from Redis
+	// Fetch candle data from DB
 	candles := e.fetchCandles(symbol)
 
 	if len(candles) < 200 {
@@ -290,7 +301,11 @@ func (e *Engine) collectResults() {
 		case <-e.ctx.Done():
 			return
 		case result := <-e.results:
-			// TODO: Publish to Redis
+			// Publish to Redis
+			if err := e.redis.PublishAnalysis(e.ctx, result); err != nil {
+				log.Printf("⚠️ Failed to publish analysis for %s: %v", result.Symbol, err)
+			}
+
 			log.Printf("📈 %s: Score=%.2f, RSI=%.1f, Trend=%s",
 				result.Symbol,
 				result.CompositeScore,
@@ -312,6 +327,11 @@ func (e *Engine) Stop() {
 
 	e.cancel()
 	e.running = false
+}
+
+// PublishRuntimeMetrics publishes runtime metrics like goroutine count
+func (e *Engine) PublishRuntimeMetrics(metrics interface{}) error {
+	return e.redis.PublishMetrics(e.ctx, "system:layer4:metrics", metrics)
 }
 
 // Helper functions

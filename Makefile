@@ -1,96 +1,195 @@
-.PHONY: help up down logs status k8s-dry-run k8s-deploy k8s-delete k8s-status
+# ===========================================
+# Nifty 50 Trading System - Makefile
+# ===========================================
+
+.PHONY: help infra infra-down layer1 layer2 batch feed dev test clean logs
 
 # Default target
 help:
-	@echo "🚀 Nifty 50 Trading System Automation"
+	@echo "🚀 Nifty 50 Trading System - Available Commands"
 	@echo ""
-	@echo "Local Development (Docker Compose):"
-	@echo "  make up          - Build and start all 7 layers + monitoring locally"
-	@echo "  make down        - Stop and remove all local containers"
-	@echo "  make logs        - Follow logs for all services"
-	@echo "  make status      - Check status of local containers"
+	@echo "📦 INFRASTRUCTURE"
+	@echo "  make infra          - Start Kafka, Redis, TimescaleDB"
+	@echo "  make infra-all      - Start ALL infrastructure (incl. Prometheus, Grafana)"
+	@echo "  make infra-down     - Stop all infrastructure"
 	@echo ""
-	@echo "Kubernetes (GitOps):"
-	@echo "  make k8s-dry-run - Preview generated manifests (Kustomize)"
-	@echo "  make k8s-deploy  - Deploy entire system to current cluster"
-	@echo "  make k8s-delete  - Delete deployment from cluster"
-	@echo "  make k8s-status  - Check pods and HPA status"
+	@echo "🔧 LAYER 1: INGESTION"
+	@echo "  make layer1         - Start Layer 1 (npm run dev)"
+	@echo "  make layer1-install - Install Layer 1 dependencies"
+	@echo "  make batch          - Run Batch Historical Fetch (All 50 stocks)"
+	@echo "  make batch-symbol   - Run Batch for single stock (SYMBOL=RELIANCE)"
+	@echo "  make feed           - Feed historical data to Kafka"
+	@echo ""
+	@echo "🏭 LAYER 2: PROCESSING"
+	@echo "  make layer2         - Start Layer 2 (npm run dev)"
+	@echo "  make layer2-install - Install Layer 2 dependencies"
+	@echo ""
+	@echo "🐳 DOCKER"
+	@echo "  make docker-build   - Build all application Docker images"
+	@echo "  make docker-up      - Start full stack (infra + apps)"
+	@echo "  make docker-down    - Stop everything"
+	@echo ""
+	@echo "🧪 TESTING"
+	@echo "  make test           - Run all tests"
+	@echo "  make test-layer1    - Run Layer 1 tests"
+	@echo ""
+	@echo "🧹 CLEANUP"
+	@echo "  make clean          - Remove node_modules & build artifacts"
+	@echo "  make clean-data     - Remove local data (CAUTION: Deletes DB data)"
+	@echo ""
+	@echo "📊 MONITORING"
+	@echo "  make logs           - Tail all container logs"
+	@echo "  make logs-kafka     - Tail Kafka logs"
+	@echo ""
 
-# ==============================================================================
-# Local Development (Docker Compose)
-# ==============================================================================
-up:
-	@echo "🐳 Building and Starting Local System..."
-	docker-compose --profile app up --build -d
-	@echo "✅ System started!"
-	@echo ""
-	@echo "🖥️  Web Endpoints:"
-	@echo "   - 📈 Dashboard:       http://localhost:3000"
-	@echo "   - 📊 Grafana:         http://localhost:3001  (User: admin / Pass: admin123)"
-	@echo "   - 🕸️  Kafka UI:        http://localhost:8080"
-	@echo "   - 🔴 Redis UI:        http://localhost:8081"
-	@echo "   - 🔍 Prometheus:      http://localhost:9090"
-	@echo ""
-	@echo "🗄️  Database Ports:"
-	@echo "   - 🐘 TimescaleDB:     localhost:5432 (User: trading / Pass: trading123 / DB: nifty50)"
-	@echo "   - 🔴 Redis:           localhost:6379"
+# ===========================================
+# INFRASTRUCTURE
+# ===========================================
 
-down:
-	@echo "🛑 Stopping Local System..."
-	docker-compose --profile app down
-	@echo "✅ System stopped!"
+infra:
+	@echo "� Starting Core Infrastructure (Kafka, Redis, TimescaleDB)..."
+	docker-compose up -d zookeeper kafka redis timescaledb
+	@echo "✅ Infrastructure started!"
+	@echo "   Kafka:       localhost:9092"
+	@echo "   Redis:       localhost:6379"
+	@echo "   TimescaleDB: localhost:5432"
 
-up-ingestion:
-	@echo "🚀 Starting Ingestion Stack (Kafka, Redis, Node, Python)..."
-	docker-compose up --build -d kafka zookeeper redis ingestion flattrade-ingestion
-	@echo "✅ Ingestion stack started!"
+infra-all:
+	@echo "🚀 Starting ALL Infrastructure..."
+	docker-compose up -d zookeeper kafka redis timescaledb prometheus grafana kafka-ui redis-commander
+	@echo "✅ Full infrastructure started!"
+	@echo "   Kafka UI:    http://localhost:8080"
+	@echo "   Redis UI:    http://localhost:8081"
+	@echo "   Grafana:     http://localhost:3001"
+	@echo "   Prometheus:  http://localhost:9090"
+
+infra-down:
+	@echo "🛑 Stopping infrastructure..."
+	docker-compose down
+	@echo "✅ Infrastructure stopped."
+
+# ===========================================
+# LAYER 1: INGESTION
+# ===========================================
+
+layer1:
+	@echo "� Starting Layer 1: Ingestion..."
+	cd layer-1-ingestion && npm run dev
+
+layer1-install:
+	@echo "📦 Installing Layer 1 dependencies..."
+	cd layer-1-ingestion && npm install
+
+batch:
+	@echo "📊 Running Batch Historical Fetch (All 50 Stocks)..."
+	cd layer-1-ingestion && node scripts/batch_nifty50.js
+
+batch-symbol:
+	@echo "📊 Running Batch for $(SYMBOL)..."
+	cd layer-1-ingestion && node scripts/batch_nifty50.js --symbol $(SYMBOL)
+
+feed: infra
+	@echo "Waiting for Kafka to stabilize..."
+	sleep 30
+	@echo "📤 Feeding Historical Data to Kafka..."
+	cd layer-1-ingestion && node scripts/feed_kafka.js
+
+# ===========================================
+# LAYER 2: PROCESSING
+# ===========================================
+
+layer2:
+	@echo "🏭 Starting Layer 2: Processing..."
+	cd layer-2-processing && npm run dev
+
+layer2-install:
+	@echo "📦 Installing Layer 2 dependencies..."
+	cd layer-2-processing && npm install
+
+# ===========================================
+# DOCKER (Full Stack)
+# ===========================================
+
+docker-build:
+	@echo "� Building all Docker images..."
+	docker-compose build
+
+docker-up:
+	@echo "🐳 Starting full stack..."
+	docker-compose --profile app up -d
+
+docker-down:
+	@echo "� Stopping all containers..."
+	docker-compose down
+
+# ===========================================
+# TESTING
+# ===========================================
+
+test:
+	@echo "🧪 Running all tests..."
+	cd layer-1-ingestion && npm test
+	cd layer-2-processing && npm test
+
+test-layer1:
+	@echo "🧪 Running Layer 1 tests..."
+	cd layer-1-ingestion && npm test
+
+test-integration:
+	@echo "🧪 Running integration tests..."
+	cd layer-1-ingestion && npm run test:integration
+
+# ===========================================
+# MONITORING & LOGS
+# ===========================================
+
 logs:
 	docker-compose logs -f
 
+logs-kafka:
+	docker-compose logs -f kafka
+
+logs-layer1:
+	docker-compose logs -f ingestion
+
+logs-layer2:
+	docker-compose logs -f processing
+
+# ===========================================
+# CLEANUP
+# ===========================================
+
 clean:
-	@echo "🧹 Removing Local System and Volumes..."
-	docker-compose --profile app down -v
-	@echo "✅ System cleaned!"
+	@echo "🧹 Cleaning build artifacts..."
+	rm -rf layer-1-ingestion/node_modules
+	rm -rf layer-2-processing/node_modules
+	rm -rf layer-1-ingestion/dist
+	rm -rf layer-2-processing/dist
+	@echo "✅ Cleaned!"
 
-status:
-	docker-compose ps
+clean-data:
+	@echo "⚠️  WARNING: This will delete all local database data!"
+	@read -p "Are you sure? [y/N] " confirm && [ "$$confirm" = "y" ] || exit 1
+	rm -rf data/timescaledb/*
+	rm -rf data/redis/*
+	rm -rf data/kafka/*
+	rm -rf data/zookeeper/*
+	@echo "✅ Data cleaned!"
 
-# ==============================================================================
-# CODE QUALITY
-# ==============================================================================
-lint:
-	@echo "🔍 Linting code..."
-	@npx eslint . --quiet || echo "⚠️ ESLint found issues"
-	@echo "🔍 Linting Go modules..."
-	@cd layer-4-analysis && go vet ./... || echo "⚠️ Go vet found issues in Layer 4"
-	@cd layer-5-aggregation && go vet ./... || echo "⚠️ Go vet found issues in Layer 5"
+# ===========================================
+# QUICK SHORTCUTS
+# ===========================================
 
-format:
-	@echo "💅 Formatting code..."
-	@npx prettier --write .
-	@gofmt -w layer-4-analysis layer-5-aggregation
-	@echo "✅ Formatting complete!"
+# Start everything needed for development
+dev: infra layer1-install layer2-install
+	@echo "✅ Development environment ready!"
+	@echo "   Run 'make layer1' in Terminal 1"
+	@echo "   Run 'make layer2' in Terminal 2"
 
-# ==============================================================================
-# Kubernetes Deployment
-# ==============================================================================
-k8s-dry-run:
-	@echo "👀 Generating Kustomize Build Preview..."
-	kubectl kustomize --load-restrictor LoadRestrictionsNone infrastructure/kubernetes/overlays/dev
-
-k8s-deploy:
-	@echo "🚀 Deploying to Kubernetes..."
-	kubectl kustomize --load-restrictor LoadRestrictionsNone infrastructure/kubernetes/overlays/dev | kubectl apply -f -
-	@echo "✅ Deployment applied. Watch status with 'make k8s-status'"
-
-k8s-delete:
-	@echo "🗑️  Deleting Deployment..."
-	kubectl kustomize --load-restrictor LoadRestrictionsNone infrastructure/kubernetes/overlays/dev | kubectl delete -f -
-
-k8s-status:
-	@echo "📊 Cluster Status:"
-	@echo "--- PODS ---"
-	kubectl get pods -n nifty50-system
-	@echo ""
-	@echo "--- HPA (Auto-Scaling) ---"
-	kubectl get hpa -n nifty50-system
+# Full E2E test flow
+e2e: infra
+	@echo "⏳ Waiting for infrastructure to be ready..."
+	sleep 10
+	cd layer-1-ingestion && node scripts/batch_nifty50.js --symbol RELIANCE --days 1
+	cd layer-1-ingestion && node scripts/feed_kafka.js
+	@echo "✅ E2E test complete! Check TimescaleDB for data."

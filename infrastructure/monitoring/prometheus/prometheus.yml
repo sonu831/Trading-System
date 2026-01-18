@@ -8,11 +8,11 @@ scrape_configs:
   
   - job_name: 'layer-1-ingestion'
     static_configs:
-      - targets: ['ingestion:3000']
+      - targets: ['ingestion:3001']
 
   - job_name: 'layer-2-processing'
     static_configs:
-      - targets: ['processing:3001']
+      - targets: ['processing:3002']
 
   - job_name: 'layer-4-analysis'
     static_configs:

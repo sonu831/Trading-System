@@ -1,0 +1,14 @@
+{
+  "Servers": {
+    "1": {
+      "Name": "Nifty50 Trading",
+      "Group": "Servers",
+      "Host": "timescaledb",
+      "Port": 5432,
+      "MaintenanceDB": "nifty50",
+      "Username": "trading",
+      "SSLMode": "prefer",
+      "PassFile": "/pgpass"
+    }
+  }
+}

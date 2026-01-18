@@ -1,0 +1,452 @@
+[
+  {
+    "symbol": "RELIANCE",
+    "exchange": "NSE",
+    "sector": "Energy",
+    "tokens": {
+      "kite": "256265",
+      "mstock": "2885"
+    }
+  },
+  {
+    "symbol": "TCS",
+    "exchange": "NSE",
+    "sector": "IT",
+    "tokens": {
+      "kite": "2953217",
+      "mstock": "11536"
+    }
+  },
+  {
+    "symbol": "HDFCBANK",
+    "exchange": "NSE",
+    "sector": "Banking",
+    "tokens": {
+      "kite": "341249",
+      "mstock": "1333"
+    }
+  },
+  {
+    "symbol": "INFY",
+    "exchange": "NSE",
+    "sector": "IT",
+    "tokens": {
+      "kite": "408065",
+      "mstock": "1594"
+    }
+  },
+  {
+    "symbol": "ICICIBANK",
+    "exchange": "NSE",
+    "sector": "Banking",
+    "tokens": {
+      "kite": "1270529",
+      "mstock": "4963"
+    }
+  },
+  {
+    "symbol": "HINDUNILVR",
+    "exchange": "NSE",
+    "sector": "FMCG",
+    "tokens": {
+      "kite": "356865",
+      "mstock": "1394"
+    }
+  },
+  {
+    "symbol": "SBIN",
+    "exchange": "NSE",
+    "sector": "Banking",
+    "tokens": {
+      "kite": "779521",
+      "mstock": "3045"
+    }
+  },
+  {
+    "symbol": "BHARTIARTL",
+    "exchange": "NSE",
+    "sector": "Telecom",
+    "tokens": {
+      "kite": "2714625",
+      "mstock": "10604"
+    }
+  },
+  {
+    "symbol": "KOTAKBANK",
+    "exchange": "NSE",
+    "sector": "Banking",
+    "tokens": {
+      "kite": "492033",
+      "mstock": "1922"
+    }
+  },
+  {
+    "symbol": "ITC",
+    "exchange": "NSE",
+    "sector": "FMCG",
+    "tokens": {
+      "kite": "424961",
+      "mstock": "1660"
+    }
+  },
+  {
+    "symbol": "LT",
+    "exchange": "NSE",
+    "sector": "Infrastructure",
+    "tokens": {
+      "kite": "500510",
+      "mstock": "11483"
+    }
+  },
+  {
+    "symbol": "AXISBANK",
+    "exchange": "NSE",
+    "sector": "Banking",
+    "tokens": {
+      "kite": "1510401",
+      "mstock": "5900"
+    }
+  },
+  {
+    "symbol": "BAJFINANCE",
+    "exchange": "NSE",
+    "sector": "Finance",
+    "tokens": {
+      "kite": "81153",
+      "mstock": "317"
+    }
+  },
+  {
+    "symbol": "ASIANPAINT",
+    "exchange": "NSE",
+    "sector": "Consumer",
+    "tokens": {
+      "kite": "60417",
+      "mstock": "236"
+    }
+  },
+  {
+    "symbol": "MARUTI",
+    "exchange": "NSE",
+    "sector": "Auto",
+    "tokens": {
+      "kite": "2815745",
+      "mstock": "10999"
+    }
+  },
+  {
+    "symbol": "HCLTECH",
+    "exchange": "NSE",
+    "sector": "IT",
+    "tokens": {
+      "kite": "1850625",
+      "mstock": "7229"
+    }
+  },
+  {
+    "symbol": "TITAN",
+    "exchange": "NSE",
+    "sector": "Consumer",
+    "tokens": {
+      "kite": "897537",
+      "mstock": "3506"
+    }
+  },
+  {
+    "symbol": "WIPRO",
+    "exchange": "NSE",
+    "sector": "IT",
+    "tokens": {
+      "kite": "969473",
+      "mstock": "3787"
+    }
+  },
+  {
+    "symbol": "SUNPHARMA",
+    "exchange": "NSE",
+    "sector": "Pharma",
+    "tokens": {
+      "kite": "857857",
+      "mstock": "3351"
+    }
+  },
+  {
+    "symbol": "ULTRACEMCO",
+    "exchange": "NSE",
+    "sector": "Cement",
+    "tokens": {
+      "kite": "2952193",
+      "mstock": "11532"
+    }
+  },
+  {
+    "symbol": "ONGC",
+    "exchange": "NSE",
+    "sector": "Energy",
+    "tokens": {
+      "kite": "633601",
+      "mstock": "2475"
+    }
+  },
+  {
+    "symbol": "NTPC",
+    "exchange": "NSE",
+    "sector": "Power",
+    "tokens": {
+      "kite": "2977281",
+      "mstock": "11630"
+    }
+  },
+  {
+    "symbol": "POWERGRID",
+    "exchange": "NSE",
+    "sector": "Power",
+    "tokens": {
+      "kite": "3834113",
+      "mstock": "14977"
+    }
+  },
+  {
+    "symbol": "TATAMOTORS",
+    "exchange": "NSE",
+    "sector": "Auto",
+    "tokens": {
+      "kite": "884737",
+      "mstock": "3456"
+    }
+  },
+  {
+    "symbol": "M&M",
+    "exchange": "NSE",
+    "sector": "Auto",
+    "tokens": {
+      "kite": "519937",
+      "mstock": "2031"
+    }
+  },
+  {
+    "symbol": "BAJAJFINSV",
+    "exchange": "NSE",
+    "sector": "Finance",
+    "tokens": {
+      "kite": "4268801",
+      "mstock": "16675"
+    }
+  },
+  {
+    "symbol": "ADANIPORTS",
+    "exchange": "NSE",
+    "sector": "Infrastructure",
+    "tokens": {
+      "kite": "3861249",
+      "mstock": "15083"
+    }
+  },
+  {
+    "symbol": "COALINDIA",
+    "exchange": "NSE",
+    "sector": "Mining",
+    "tokens": {
+      "kite": "5215745",
+      "mstock": "20374"
+    }
+  },
+  {
+    "symbol": "TATASTEEL",
+    "exchange": "NSE",
+    "sector": "Metal",
+    "tokens": {
+      "kite": "895745",
+      "mstock": "3499"
+    }
+  },
+  {
+    "symbol": "TECHM",
+    "exchange": "NSE",
+    "sector": "IT",
+    "tokens": {
+      "kite": "3465729",
+      "mstock": "13538"
+    }
+  },
+  {
+    "symbol": "JSWSTEEL",
+    "exchange": "NSE",
+    "sector": "Metal",
+    "tokens": {
+      "kite": "3001089",
+      "mstock": "11723"
+    }
+  },
+  {
+    "symbol": "INDUSINDBK",
+    "exchange": "NSE",
+    "sector": "Banking",
+    "tokens": {
+      "kite": "1346049",
+      "mstock": "5258"
+    }
+  },
+  {
+    "symbol": "HINDALCO",
+    "exchange": "NSE",
+    "sector": "Metal",
+    "tokens": {
+      "kite": "348929",
+      "mstock": "1363"
+    }
+  },
+  {
+    "symbol": "DRREDDY",
+    "exchange": "NSE",
+    "sector": "Pharma",
+    "tokens": {
+      "kite": "225537",
+      "mstock": "881"
+    }
+  },
+  {
+    "symbol": "DIVISLAB",
+    "exchange": "NSE",
+    "sector": "Pharma",
+    "tokens": {
+      "kite": "2800641",
+      "mstock": "10940"
+    }
+  },
+  {
+    "symbol": "CIPLA",
+    "exchange": "NSE",
+    "sector": "Pharma",
+    "tokens": {
+      "kite": "177665",
+      "mstock": "694"
+    }
+  },
+  {
+    "symbol": "GRASIM",
+    "exchange": "NSE",
+    "sector": "Cement",
+    "tokens": {
+      "kite": "315393",
+      "mstock": "1232"
+    }
+  },
+  {
+    "symbol": "BRITANNIA",
+    "exchange": "NSE",
+    "sector": "FMCG",
+    "tokens": {
+      "kite": "140033",
+      "mstock": "547"
+    }
+  },
+  {
+    "symbol": "NESTLEIND",
+    "exchange": "NSE",
+    "sector": "FMCG",
+    "tokens": {
+      "kite": "4598529",
+      "mstock": "17963"
+    }
+  },
+  {
+    "symbol": "EICHERMOT",
+    "exchange": "NSE",
+    "sector": "Auto",
+    "tokens": {
+      "kite": "232961",
+      "mstock": "910"
+    }
+  },
+  {
+    "symbol": "APOLLOHOSP",
+    "exchange": "NSE",
+    "sector": "Healthcare",
+    "tokens": {
+      "kite": "5473281",
+      "mstock": "157"
+    }
+  },
+  {
+    "symbol": "BPCL",
+    "exchange": "NSE",
+    "sector": "Energy",
+    "tokens": {
+      "kite": "134657",
+      "mstock": "526"
+    }
+  },
+  {
+    "symbol": "HEROMOTOCO",
+    "exchange": "NSE",
+    "sector": "Auto",
+    "tokens": {
+      "kite": "345089",
+      "mstock": "1348"
+    }
+  },
+  {
+    "symbol": "SBILIFE",
+    "exchange": "NSE",
+    "sector": "Insurance",
+    "tokens": {
+      "kite": "5582849",
+      "mstock": "21808"
+    }
+  },
+  {
+    "symbol": "HDFCLIFE",
+    "exchange": "NSE",
+    "sector": "Insurance",
+    "tokens": {
+      "kite": "119553",
+      "mstock": "467"
+    }
+  },
+  {
+    "symbol": "BAJAJ-AUTO",
+    "exchange": "NSE",
+    "sector": "Auto",
+    "tokens": {
+      "kite": "4267265",
+      "mstock": "16669"
+    }
+  },
+  {
+    "symbol": "TATACONSUM",
+    "exchange": "NSE",
+    "sector": "FMCG",
+    "tokens": {
+      "kite": "878593",
+      "mstock": "3432"
+    }
+  },
+  {
+    "symbol": "ADANIENT",
+    "exchange": "NSE",
+    "sector": "Infrastructure",
+    "tokens": {
+      "kite": "6401",
+      "mstock": "25"
+    }
+  },
+  {
+    "symbol": "LTIM",
+    "exchange": "NSE",
+    "sector": "IT",
+    "tokens": {
+      "kite": "4561409",
+      "mstock": null
+    }
+  },
+  {
+    "symbol": "SHRIRAMFIN",
+    "exchange": "NSE",
+    "sector": "Finance",
+    "tokens": {
+      "kite": "1102337",
+      "mstock": null
+    }
+  }
+]

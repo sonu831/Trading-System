@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/utkarsh-pandey/nifty50-trading-system/layer-4-analysis/internal/db"
 	"github.com/utkarsh-pandey/nifty50-trading-system/layer-4-analysis/internal/indicators"
 )
 
@@ -27,44 +28,64 @@ var Nifty50Symbols = []string{
 
 // StockAnalysis represents the complete analysis result for a stock
 type StockAnalysis struct {
-	Symbol         string             `json:"symbol"`
-	Timestamp      time.Time          `json:"timestamp"`
-	LTP            float64            `json:"ltp"`
-	Change         float64            `json:"change"`
-	ChangePct      float64            `json:"change_pct"`
-	RSI            float64            `json:"rsi"`
-	MACD           indicators.MACDResult `json:"macd"`
-	EMAs           map[int]float64    `json:"emas"`
-	ATR            float64            `json:"atr"`
-	VWAP           float64            `json:"vwap"`
+	Symbol         string                      `json:"symbol"`
+	Timestamp      time.Time                   `json:"timestamp"`
+	LTP            float64                     `json:"ltp"`
+	Change         float64                     `json:"change"`
+	ChangePct      float64                     `json:"change_pct"`
+	RSI            float64                     `json:"rsi"`
+	MACD           indicators.MACDResult       `json:"macd"`
+	EMAs           map[int]float64             `json:"emas"`
+	ATR            float64                     `json:"atr"`
+	VWAP           float64                     `json:"vwap"`
 	Supertrend     indicators.SupertrendResult `json:"supertrend"`
 	Bollinger      indicators.BollingerResult  `json:"bollinger"`
-	TrendScore     float64            `json:"trend_score"`
-	MomentumScore  float64            `json:"momentum_score"`
-	CompositeScore float64            `json:"composite_score"`
-	LatencyMs      int64              `json:"latency_ms"`
+	TrendScore     float64                     `json:"trend_score"`
+	MomentumScore  float64                     `json:"momentum_score"`
+	CompositeScore float64                     `json:"composite_score"`
+	LatencyMs      int64                       `json:"latency_ms"`
 }
 
 // Engine is the main analysis engine
 type Engine struct {
-	ctx        context.Context
-	cancel     context.CancelFunc
-	workers    int
-	results    chan StockAnalysis
-	wg         sync.WaitGroup
-	running    bool
-	mu         sync.Mutex
+	ctx      context.Context
+	cancel   context.CancelFunc
+	workers  int
+	results  chan StockAnalysis
+	wg       sync.WaitGroup
+	running  bool
+	mu       sync.Mutex
+	dbClient *db.Client
+	symbols  []string
 }
 
 // NewEngine creates a new analysis engine
 func NewEngine(ctx context.Context) (*Engine, error) {
 	ctx, cancel := context.WithCancel(ctx)
-	
+
+	// Connect to TimescaleDB
+	dbClient, err := db.NewClient(ctx)
+	if err != nil {
+		cancel()
+		return nil, err
+	}
+
+	// Get available symbols from DB
+	symbols, err := dbClient.GetAvailableSymbols(ctx)
+	if err != nil {
+		log.Printf("⚠️ Could not fetch symbols from DB, using defaults: %v", err)
+		symbols = Nifty50Symbols
+	}
+
+	log.Printf("📊 Found %d symbols in database", len(symbols))
+
 	return &Engine{
-		ctx:     ctx,
-		cancel:  cancel,
-		workers: 50, // One goroutine per stock
-		results: make(chan StockAnalysis, 100),
+		ctx:      ctx,
+		cancel:   cancel,
+		workers:  50,
+		results:  make(chan StockAnalysis, 100),
+		dbClient: dbClient,
+		symbols:  symbols,
 	}, nil
 }
 
@@ -106,15 +127,15 @@ func (e *Engine) analysisLoop() {
 	}
 }
 
-// runAnalysis performs parallel analysis of all 50 stocks
+// runAnalysis performs parallel analysis of all stocks
 func (e *Engine) runAnalysis() {
 	startTime := time.Now()
-	log.Printf("📊 Starting analysis of %d stocks...", len(Nifty50Symbols))
+	log.Printf("📊 Starting analysis of %d stocks...", len(e.symbols))
 
 	var wg sync.WaitGroup
 
 	// Fan-out: Start a goroutine for each stock
-	for _, symbol := range Nifty50Symbols {
+	for _, symbol := range e.symbols {
 		wg.Add(1)
 		go func(sym string) {
 			defer wg.Done()
@@ -126,7 +147,7 @@ func (e *Engine) runAnalysis() {
 	wg.Wait()
 
 	elapsed := time.Since(startTime)
-	log.Printf("✅ Analysis completed in %v for all 50 stocks", elapsed)
+	log.Printf("✅ Analysis completed in %v for %d stocks", elapsed, len(e.symbols))
 }
 
 // analyzeStock performs analysis for a single stock
@@ -238,11 +259,28 @@ func (e *Engine) analyzeStock(symbol string) {
 	}
 }
 
-// fetchCandles retrieves candle data from Redis/storage
+// fetchCandles retrieves candle data from TimescaleDB
 func (e *Engine) fetchCandles(symbol string) []Candle {
-	// TODO: Implement Redis fetch
-	// For now, return mock data
-	return generateMockCandles(200)
+	dbCandles, err := e.dbClient.FetchCandles(e.ctx, symbol, 300)
+	if err != nil {
+		log.Printf("⚠️ Failed to fetch candles for %s: %v", symbol, err)
+		return nil
+	}
+
+	// Convert db.Candle to analyzer.Candle
+	candles := make([]Candle, len(dbCandles))
+	for i, c := range dbCandles {
+		candles[i] = Candle{
+			Time:   c.Time,
+			Open:   c.Open,
+			High:   c.High,
+			Low:    c.Low,
+			Close:  c.Close,
+			Volume: c.Volume,
+		}
+	}
+
+	return candles
 }
 
 // collectResults collects and publishes analysis results

@@ -35,164 +35,127 @@ class MStockVendor extends BaseVendor {
       await this.authenticate();
       if (this.ticker) {
         logger.info('MStockVendor: Disconnecting MTicker...');
-        this.ticker.disconnect(); // Correct method name for SDK 0.0.2
+        this.ticker.disconnect();
       }
       await this.startWebSocket();
       logger.info('MStockVendor: Connected via SDK.');
     } catch (error) {
       logger.error(`MStockVendor connection failed: ${error.message}`);
-      // Do not throw, allow retry logic to happen if implemented or just fail gracefully
-      // But for initial connect, we might want to propagate to Composite
     }
   }
 
-  async authenticate() {
+  async authenticate(force = false) {
     // If access token is provided manually, set it
-    if (this.accessToken) {
+    // Unless we are forcing a new login (Re-auth)
+    if (this.accessToken && !force) {
       this.client.setAccessToken(this.accessToken);
       logger.info('MStockVendor: Using provided Access Token.');
-      return;
-    }
-
-    // Auto-login (2-Step Process: Login -> VerifyTOTP)
-    if (this.clientCode && this.password && this.totpSecret) {
-      logger.info(`MStockVendor: Step 1 - Login for ${this.clientCode}`);
+      // Fall through to unwrapping logic.
+    } else if (this.clientCode && this.password && this.totpSecret) {
+      // =================================================================
+      // VERIFIED 2-STEP AUTHENTICATION FLOW
+      // =================================================================
+      logger.info(
+        `MStockVendor: Starting 2-Step Authentication for ${this.clientCode} (Force: ${force})`
+      );
 
       try {
-        // Step 1: Login with empty TOTP
+        // Step 1: Login (Empty TOTP)
+        logger.info(`MStockVendor: Step 1 - Initial Login (Empty TOTP)`);
         const loginResponse = await this.client.login({
           clientcode: this.clientCode,
           password: this.password,
-          totp: '', // Must be empty
-          state: '',
+          totp: '', // Must be empty for step 1
+          state: 'live',
         });
 
-        logger.info(`MStockVendor: Step 1 Response: ${JSON.stringify(loginResponse)}`);
-
-        if (!loginResponse || !loginResponse.data) {
+        if (!loginResponse || !loginResponse.data || !loginResponse.data.jwtToken) {
           throw new Error(`Step 1 Login failed: ${JSON.stringify(loginResponse)}`);
         }
 
-        // CRITICAL CHANGE: Even if Step 1 says "Login Success" and gives a token,
-        // we MUST check if we have a TOTP Secret configured.
-        // If we do, we MUST proceed to Step 2 (VerifyTOTP) to upgrade to a Trading Token.
-        // The "Login Only" token (Step 1) causes 502 on WebSocket.
+        const tempToken = loginResponse.data.jwtToken;
+        logger.info('MStockVendor: Step 1 Success. Got Login Token.');
 
-        const msg = (loginResponse.message || '').toLowerCase();
-        const hasSecret = !!this.totpSecret;
+        // Step 2: Verify TOTP
+        logger.info(`MStockVendor: Step 2 - Verifying TOTP...`);
 
-        // Only exit early if we DO NOT have a secret AND the response implies success.
-        if (loginResponse.data.jwtToken && !msg.includes('otp') && !hasSecret) {
-          logger.info('MStockVendor: Login complete at Step 1 (No TOTP Secret configured).');
-          this.accessToken = loginResponse.data.jwtToken;
-          this.client.setAccessToken(this.accessToken);
-          return;
-        }
-
-        logger.info(
-          'MStockVendor: Step 1 Complete. Proceeding to TOTP Verification (Required for Trading Token)...'
-        );
-
-        const refreshToken = loginResponse.data.refreshToken;
-        if (!refreshToken) {
-          logger.warn(
-            'MStockVendor: No Refresh Token found in Step 1 response. Cannot verify TOTP.'
-          );
-          // Fallback to JWT if available, though it might fail WS
-          if (loginResponse.data.jwtToken) {
-            logger.warn('MStockVendor: Using partial JWT as fall back.');
-            this.accessToken = loginResponse.data.jwtToken;
-            this.client.setAccessToken(this.accessToken);
-            return;
-          }
-          throw new Error('Step 1 failed: No Refresh Token and No JWT.');
-        }
-
-        // Step 2: Generate TOTP
-        const totp = new OTPAuth.TOTP({
+        // Generate TOTP Code
+        const totpGen = new OTPAuth.TOTP({
           secret: OTPAuth.Secret.fromBase32(this.totpSecret),
           algorithm: 'SHA1',
           digits: 6,
           period: 30,
         });
-        const totpCode = totp.generate();
+        const code = totpGen.generate();
+        logger.info(`MStockVendor: Generated TOTP Code: ${code}`);
 
-        // Step 3: Verify TOTP to get Access Token
-        try {
-          const totpResponse = await this.client.verifyTOTP(refreshToken, totpCode);
-          if (totpResponse && totpResponse.data && totpResponse.data.jwtToken) {
-            this.accessToken = totpResponse.data.jwtToken;
-            this.client.setAccessToken(this.accessToken);
-            logger.info('MStockVendor: Step 2 Success. Access Token retrieved.');
-          } else {
-            throw new Error(`Step 2 VerifyTOTP failed: ${JSON.stringify(totpResponse)}`);
-          }
-        } catch (verErr) {
-          logger.error(`MStockVendor: VerifyTOTP Error Details: ${verErr.message}`);
+        const totpResponse = await this.client.verifyTOTP(tempToken, code);
 
-          // If TOTP is not enabled, use the token from Step 1 if available
-          if (verErr.message && verErr.message.toLowerCase().includes('totp')) {
-            logger.warn(
-              'MStockVendor: TOTP Error (Disabled/Invalid). Attempting fallback to Step 1 Token.'
-            );
-            if (loginResponse.data.jwtToken) {
-              this.accessToken = loginResponse.data.jwtToken;
-              this.client.setAccessToken(this.accessToken);
-            } else {
-              throw new Error('TOTP failed and no Step 1 Token available.');
-            }
-          } else {
-            throw verErr; // Re-throw other errors
-          }
+        if (!totpResponse || !totpResponse.data || !totpResponse.data.jwtToken) {
+          throw new Error(`Step 2 VerifyTOTP failed: ${JSON.stringify(totpResponse)}`);
         }
 
-        // UNWRAP TOKEN LOGIC:
-        if (this.accessToken) {
-          try {
-            const parts = this.accessToken.split('.');
-            logger.info(`MStockVendor: Token Parts Length: ${parts.length}`);
-
-            if (parts.length === 3) {
-              // Fix Base64Url to Base64
-              let base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
-              // Add padding
-              const pad = base64.length % 4;
-              if (pad) {
-                base64 += new Array(5 - pad).join('=');
-              }
-
-              const payloadStr = Buffer.from(base64, 'base64').toString();
-              // logger.info(`MStockVendor: Token Payload: ${payloadStr.substring(0, 100)}...`);
-
-              const payload = JSON.parse(payloadStr);
-
-              if (payload.ACCESS_TOKEN) {
-                logger.info(
-                  `MStockVendor: ✅ Found inner ACCESS_TOKEN. Length: ${payload.ACCESS_TOKEN.length}. Replacing outer token.`
-                );
-                this.accessToken = payload.ACCESS_TOKEN;
-                this.client.setAccessToken(this.accessToken);
-              } else {
-                logger.warn('MStockVendor: Inner ACCESS_TOKEN not found in payload.');
-                // Log keys to debug
-                logger.warn(`Payload Keys: ${Object.keys(payload).join(', ')}`);
-              }
-            }
-          } catch (parseErr) {
-            logger.warn(
-              `MStockVendor: Failed to parse Access Token for unwrapping: ${parseErr.message}`
-            );
-          }
-        }
+        // Use the FINAL Trading Token
+        logger.info('MStockVendor: Step 2 Success. Got Trading Token.');
+        this.accessToken = totpResponse.data.jwtToken;
+        this.client.setAccessToken(this.accessToken);
       } catch (error) {
         logger.error(`MStock Authentication Failed: ${error.message}`);
-        // If it's the "Invalid character 1" likely user input error, re-throw to log
         throw error;
       }
     } else {
       throw new Error(
-        'MStock: Missing credentials (API Key + AccessToken OR ClientCode/Pass/Secret)'
+        'MStock: Missing credentials (API Key + AccessToken OR ClientCode/Pass/Secret). Cannot Authenticate.'
       );
+    }
+
+    // UNWRAP TOKEN LOGIC (Shared):
+    // Check if the token (Manual or Auto-generated) is a wrapper token containing ACCESS_TOKEN
+    if (this.accessToken) {
+      try {
+        const parts = this.accessToken.split('.');
+        logger.info(`MStockVendor: Token Parts Length: ${parts.length}`);
+
+        if (parts.length === 3) {
+          // Fix Base64Url to Base64
+          let base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+          // Add padding
+          const pad = base64.length % 4;
+          if (pad) {
+            base64 += new Array(5 - pad).join('=');
+          }
+
+          const payloadStr = Buffer.from(base64, 'base64').toString();
+          // logger.info(`MStockVendor: Token Payload: ${payloadStr.substring(0, 50)}...`);
+
+          const payload = JSON.parse(payloadStr);
+
+          if (payload.ACCESS_TOKEN) {
+            logger.info(
+              `MStockVendor: ✅ Found inner ACCESS_TOKEN. Length: ${payload.ACCESS_TOKEN.length}.`
+            );
+            // DO NOT overwrite the main accessToken used for HTTP Client, as it breaks the API (401).
+            // The outer 'Trading Token' is required for MConnect HTTP calls.
+            // this.accessToken = payload.ACCESS_TOKEN;
+            // this.client.setAccessToken(this.accessToken);
+
+            // Store it separately if ever needed for WS (though WS likely takes the outer one too or is broken externally)
+            this.wsAccessToken = payload.ACCESS_TOKEN;
+          } else {
+            // It might be already unwrapped or a different token type
+            if (this.totpSecret && !this.accessToken.startsWith('ey')) {
+              // heuristic? No, just log warning if expected structure missing
+              logger.warn(
+                'MStockVendor: Inner ACCESS_TOKEN not found in payload (Typical for Login Tokens, not Trading Tokens).'
+              );
+            }
+          }
+        }
+      } catch (parseErr) {
+        logger.warn(
+          `MStockVendor: Failed to parse Access Token for unwrapping: ${parseErr.message}`
+        );
+      }
     }
   }
 
@@ -202,6 +165,14 @@ class MStockVendor extends BaseVendor {
     logger.info(
       `MStockVendor: Starting WebSocket (MTicker)... APIKey Len: ${this.apiKey.length}, Token Len: ${this.accessToken.length}`
     );
+
+    // USER REQUEST: Skip WebSocket if Market is Closed to avoid 502 Errors
+    const marketStatus = this.marketHours.getMarketStatus();
+    if (!marketStatus.isOpen) {
+      logger.info('MStockVendor: Market Closed (or Weekend). Skipping WebSocket connection.');
+      return;
+    }
+
     // Check for illegal characters
     if (this.apiKey.includes('#')) logger.warn("⚠️ API Key contains '#'");
     if (this.accessToken.includes('#')) logger.warn("⚠️ Access Token contains '#'");
@@ -238,9 +209,6 @@ class MStockVendor extends BaseVendor {
       // Event: Tick Received
       // onBroadcastReceived is called for EACH tick, not an array
       this.ticker.onBroadcastReceived = (tick) => {
-        // Log for debug (optional, maybe too verbose)
-        // logger.debug(`Tick: ${JSON.stringify(tick)}`);
-
         const normalized = this.mapper.map(tick);
         if (normalized && this.onTick) {
           this.onTick(normalized);
@@ -288,49 +256,66 @@ class MStockVendor extends BaseVendor {
     }
   }
 
-  async getQuotes() {
-    // Use SDK getQuote
-    // const quotes = await client.getQuote({...})
-    // Implementation omitted/simplified as we rely on WebSocket now
-    // calling getQuote manually is possible if needed
-    return [];
-  }
-
-  async getHistoricalData(symbol, interval, from, to) {
-    if (!this.client) return [];
-
-    const parts = symbol.split(':');
-    const exchange = parts.length === 2 ? parts[0] : 'NSE';
-    const token = parts.length === 2 ? parts[1] : symbol;
-
-    // SDK expects specific interval strings usually. Assuming input matches or mapping needed.
-    // e.g. 'ONE_MINUTE'
-    try {
-      const data = await this.client.getHistoricalData({
-        exchange,
-        symboltoken: token,
-        interval: interval, // TODO: Map '1m' to 'ONE_MINUTE' if SDK strictly requires enums
-        fromdate: from,
-        todate: to,
-      });
-      // Map data...
-      return data;
-    } catch (e) {
-      logger.error(`MStock Hist Data Error: ${e.message}`);
-      return [];
-    }
-  }
-
   isConnected() {
     return this.connected;
   }
 
   async disconnect() {
     if (this.ticker) {
-      this.ticker.close();
+      this.ticker.disconnect();
     }
     this.connected = false;
     logger.info('MStockVendor SDK Disconnected.');
+  }
+
+  // --- Helper Methods using HTTP Client (if needed) ---
+  // --- Helper Methods using HTTP Client ---
+  async getHistoricalData(params, retryCount = 0) {
+    if (!this.client) return { status: false, message: 'Client not initialized' };
+    const { ResponseBuilder } = require('../utils/response-builder');
+
+    try {
+      // Normalize Params (BaseVendor handles this, but safety check)
+      const response = await this.client.getHistoricalData(params);
+
+      if (response && response.status === true) {
+        return ResponseBuilder.success(response.data);
+      } else {
+        // Check for 401 / Invalid Request in partial failure
+        if (
+          (response.message && response.message.includes('401')) ||
+          (response.message && response.message.includes('Invalid request'))
+        ) {
+          throw new Error('401_AUTH_ERROR');
+        }
+        return ResponseBuilder.error(
+          response.message || 'MStock API Error',
+          response.errorcode,
+          response
+        );
+      }
+    } catch (e) {
+      // Auto-Recover from 401
+      if (
+        (e.message === '401_AUTH_ERROR' ||
+          e.message.includes('401') ||
+          e.message.includes('Invalid request')) &&
+        retryCount < 1
+      ) {
+        logger.warn(`MStockVendor: 401 Auth Error (Retry ${retryCount + 1}). Re-authenticating...`);
+        try {
+          // FORCE new login
+          await this.authenticate(true);
+          return await this.getHistoricalData(params, retryCount + 1);
+        } catch (authErr) {
+          logger.error(`MStockVendor: Re-auth failed: ${authErr.message}`);
+          return ResponseBuilder.error('Re-auth Failed', 'AUTH_FAIL');
+        }
+      }
+
+      logger.error(`MStock Hist Data Error: ${e.message}`);
+      return ResponseBuilder.error(e.message, 'SDK_ERR');
+    }
   }
 }
 

@@ -13,7 +13,7 @@ services:
     ports:
       - "2181:2181"
     volumes:
-      - zookeeper-data:/var/lib/zookeeper/data
+      - ./data/zookeeper:/var/lib/zookeeper/data
     networks:
       - trading-network
 
@@ -37,7 +37,7 @@ services:
       KAFKA_NUM_PARTITIONS: 50
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
     volumes:
-      - kafka-data:/var/lib/kafka/data
+      - ./data/kafka:/var/lib/kafka/data
     networks:
       - trading-network
 
@@ -65,7 +65,7 @@ services:
       - "6379:6379"
     command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
     volumes:
-      - redis-data:/data
+      - ./data/redis:/data
     networks:
       - trading-network
     healthcheck:
@@ -99,7 +99,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-trading123}
       POSTGRES_DB: ${POSTGRES_DB:-nifty50}
     volumes:
-      - timescaledb-data:/var/lib/postgresql/data
+      - ./data/timescaledb:/var/lib/postgresql/data
       - ./layer-3-storage/timescaledb/migrations:/docker-entrypoint-initdb.d
     networks:
       - trading-network
@@ -108,6 +108,27 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: pgadmin
+    ports:
+      - "5050:80"
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@admin.com}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin123}
+      PGADMIN_CONFIG_SERVER_MODE: "False"
+      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: "False"
+    depends_on:
+      - timescaledb
+    networks:
+      - trading-network
+    volumes:
+      - ./data/pgadmin:/var/lib/pgadmin
+      - ./infrastructure/pgadmin/servers.json:/pgadmin4/servers.json:ro
+      - ./infrastructure/pgadmin/pgpass:/pgpass:ro
+    entrypoint: >
+      /bin/sh -c " chmod 600 /pgpass; /entrypoint.sh "
 
   # ===========================================
   # MONITORING - Prometheus

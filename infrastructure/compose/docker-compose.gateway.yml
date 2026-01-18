@@ -1,0 +1,35 @@
+services:
+  # ===========================================
+  # PUBLIC EXPOSURE (Gateway + Tunnel)
+  # ===========================================
+
+  # Unified Gateway (Nginx)
+  gateway:
+    image: nginx:alpine
+    container_name: trading-gateway
+    ports:
+      - "8088:80"
+    volumes:
+      - ../gateway/nginx.conf:/etc/nginx/nginx.conf:ro
+    networks:
+      - trading-network
+    restart: unless-stopped
+
+  # Public Tunnel (Cloudflare)
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    container_name: trading-tunnel
+    command: tunnel --url http://gateway:80
+    depends_on:
+      - gateway
+    networks:
+      - trading-network
+    restart: unless-stopped
+
+# ===========================================
+# NETWORKS (External - shared with infra)
+# ===========================================
+networks:
+  trading-network:
+    external: true
+    name: compose_trading-network

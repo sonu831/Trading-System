@@ -1,0 +1,147 @@
+services:
+  # ===========================================
+  # APPLICATION LAYERS (L1-L6 + L7 API)
+  # ===========================================
+
+  # Layer 1: Ingestion
+  ingestion:
+    build:
+      context: ../../layer-1-ingestion
+      dockerfile: Dockerfile
+    container_name: ingestion
+    environment:
+      - KAFKA_BROKERS=kafka:29092
+      - REDIS_URL=redis://redis:6379
+      - MARKET_DATA_PROVIDER=${MARKET_DATA_PROVIDER:-kite}
+      - ZERODHA_API_KEY=${ZERODHA_API_KEY}
+      - ZERODHA_ACCESS_TOKEN=${ZERODHA_ACCESS_TOKEN}
+      - MSTOCK_API_KEY=${MSTOCK_API_KEY}
+      - MSTOCK_ACCESS_TOKEN=${MSTOCK_ACCESS_TOKEN}
+      - MSTOCK_CLIENT_CODE=${MSTOCK_CLIENT_CODE}
+      - MSTOCK_PASSWORD=${MSTOCK_PASSWORD}
+      - MSTOCK_TOTP_SECRET=${MSTOCK_TOTP_SECRET}
+      - FLATTRADE_USER_ID=${FLATTRADE_USER_ID}
+      - FLATTRADE_API_KEY=${FLATTRADE_API_KEY}
+      - FLATTRADE_ACTID=${FLATTRADE_ACTID}
+    volumes:
+      - ../../vendor:/app/vendor:ro
+    networks:
+      - trading-network
+    restart: unless-stopped
+
+  # Layer 1: FlatTrade Python Ingestion (Sidecar)
+  flattrade-ingestion:
+    build:
+      context: ../../layer-1-flattrade-python
+      dockerfile: Dockerfile
+    container_name: flattrade-ingestion
+    environment:
+      - KAFKA_BROKERS=kafka:29092
+      - FLATTRADE_USER_ID=${FLATTRADE_USER_ID}
+      - FLATTRADE_API_KEY=${FLATTRADE_API_KEY}
+      - FLATTRADE_API_SECRET=${FLATTRADE_API_SECRET}
+      - FLATTRADE_ACTID=${FLATTRADE_ACTID}
+      - FLATTRADE_PASSWORD=${FLATTRADE_PASSWORD}
+    networks:
+      - trading-network
+    restart: unless-stopped
+    profiles:
+      - flattrade
+
+  # Layer 2: Processing
+  processing:
+    build:
+      context: ../../layer-2-processing
+      dockerfile: Dockerfile
+    container_name: processing
+    environment:
+      - KAFKA_BROKERS=kafka:29092
+      - REDIS_URL=redis://redis:6379
+      - TIMESCALE_URL=postgresql://trading:trading123@timescaledb:5432/nifty50
+    networks:
+      - trading-network
+    restart: unless-stopped
+
+  # Layer 4: Analysis Engine (Go)
+  analysis:
+    build:
+      context: ../../layer-4-analysis
+      dockerfile: Dockerfile
+    container_name: analysis
+    ports:
+      - "8081:8081"
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - KAFKA_BROKERS=kafka:29092
+      - TIMESCALE_URL=postgresql://trading:trading123@timescaledb:5432/nifty50
+    networks:
+      - trading-network
+    restart: unless-stopped
+
+  # Layer 5: Aggregation (Go)
+  aggregation:
+    build:
+      context: ../../layer-5-aggregation
+      dockerfile: Dockerfile
+    container_name: aggregation
+    ports:
+      - "8080:8080"
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - TIMESCALE_URL=postgresql://trading:trading123@timescaledb:5432/nifty50
+    networks:
+      - trading-network
+    restart: unless-stopped
+
+  # Layer 6: Signal Generation
+  signal:
+    build:
+      context: ../../layer-6-signal
+      dockerfile: Dockerfile
+    container_name: signal
+    ports:
+      - "8082:8082"
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - TIMESCALE_URL=postgresql://trading:trading123@timescaledb:5432/nifty50
+    networks:
+      - trading-network
+    restart: unless-stopped
+
+  # Layer 7: API Server
+  backend-api:
+    build:
+      context: ../../layer-7-presentation/api
+      dockerfile: Dockerfile
+    container_name: backend-api
+    ports:
+      - "4000:4000"
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - TIMESCALE_URL=postgresql://trading:trading123@timescaledb:5432/nifty50
+    networks:
+      - trading-network
+    restart: unless-stopped
+
+  # Layer 7: Telegram Bot (Notifications)
+  telegram-bot:
+    build:
+      context: ../../layer-7-presentation/telegram-bot
+      dockerfile: Dockerfile
+    container_name: telegram-bot
+    environment:
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - REDIS_URL=redis://redis:6379
+    networks:
+      - trading-network
+    restart: unless-stopped
+    profiles:
+      - notify
+
+# ===========================================
+# NETWORKS (External - shared with infra)
+# ===========================================
+networks:
+  trading-network:
+    external: true
+    name: compose_trading-network

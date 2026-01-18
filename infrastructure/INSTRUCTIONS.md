@@ -33,19 +33,25 @@ infrastructure/
 We use **Kustomize** to deploy. This renders the templates and applies them to your cluster.
 
 ### 1. Preview Deployment
+
 Always check what will be applied:
+
 ```bash
 kubectl kustomize infrastructure/kubernetes/overlays/dev
 ```
 
 ### 2. Apply Deployment
+
 Deploy the entire system (Apps + Monitoring):
+
 ```bash
 kubectl apply -k infrastructure/kubernetes/overlays/dev
 ```
 
 ### 3. Verify Scaling
+
 Check if Horizontal Pod Autoscalers (HPA) are active:
+
 ```bash
 kubectl get hpa -n nifty50-system
 ```
@@ -53,6 +59,7 @@ kubectl get hpa -n nifty50-system
 ## 🔭 Monitoring & Observability
 
 The monitoring stack is fully declarative ("Configuration as Code").
+
 - **Dashboards**: Edit JSON files in `infrastructure/monitoring/grafana/dashboards/`.
 - **Alerts**: Configured in Grafana UI (or future provisioning).
 - **Pipelines**: Edit `observability.yaml` to change OTEL behavior.
@@ -61,12 +68,30 @@ For detailed monitoring guides, see [infrastructure/monitoring/README.md](monito
 
 ## 🐳 Local Development (Docker Compose)
 
-For quick local testing without Kubernetes:
+We use a **modular compose architecture** for flexibility and fast iteration.
+
+### 📁 Compose Files (`infrastructure/compose/`)
+
+| File                         | Purpose                        | Command        |
+| ---------------------------- | ------------------------------ | -------------- |
+| `docker-compose.infra.yml`   | Data stores (Kafka, Redis, DB) | `make infra`   |
+| `docker-compose.app.yml`     | Pipeline (L1-L6 + API)         | `make app`     |
+| `docker-compose.ui.yml`      | Dashboard + Gateway            | `make ui`      |
+| `docker-compose.observe.yml` | Prometheus, Grafana            | `make observe` |
+
+### 🚀 Quick Start
 
 ```bash
-# Build & Start
-docker-compose up --build -d
+# Full stack
+make up
 
-# View Logs
-docker-compose logs -f
+# Just the dashboard (fast rebuild)
+make ui
+
+# Stop everything
+make down
 ```
+
+### 📖 More Details
+
+See [compose/README.md](compose/README.md) for the full guide.

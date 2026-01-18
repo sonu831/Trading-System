@@ -5,6 +5,35 @@ All notable changes to the **Nifty 50 Trading System** project will be documente
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.3] - 2026-01-18
+
+### 🚀 Added
+
+- **Modular Infrastructure**:
+  - Split monolithic `docker-compose.yml` into domain-specific modules in `infrastructure/compose/`:
+    - `infra.yml`: Data stores (Kafka, Redis, TimescaleDB).
+    - `app.yml`: Application pipeline (Layers 1-6 + API).
+    - `ui.yml`: Dashboard only.
+    - `observe.yml`: Observability stack (Prometheus, Grafana).
+    - `gateway.yml`: Nginx Gateway + Cloudflare Tunnel.
+  - Added `make gateway`, `make share`, and `make share-url` for easy public exposure.
+- **Unified Gateway**:
+  - Implemented Nginx gateway on port `8088` to route traffic to Dashboard, API, and Grafana (via subpath).
+  - Added dynamic DNS resolution to Nginx (`127.0.0.11`) to handle startup dependency race conditions.
+
+### 🛠 Changed
+
+- **Developer Experience**:
+  - Streamlined `Makefile` with concise targets (`make up`, `make down`) and improved help text.
+  - Consolidated environment variables: `env_file` directives removed in favor of passing `--env-file .env` via Makefile to ensure consistent variable loading from project root.
+  - Updated Root `README.md` with comprehensive architecture diagram, quick start guide, and documentation index.
+
+### 🐛 Fixed
+
+- **Network Partitioning**:
+  - Resolved `502 Bad Gateway` and internal communication failures by standardizing all compose modules to use a single external network (`compose_trading-network`).
+- **Environment Loading**: Fixed issue where modular compose files couldn't locate `.env` file by enforcing explicit path loading.
+
 ## [0.2.2] - 2026-01-18
 
 ### 🚀 Added

@@ -1,285 +1,203 @@
-# ===========================================
-# Nifty 50 Trading System - Makefile
-# ===========================================
+# ===========================================================
+# 🚀 Nifty 50 Trading System - Makefile
+# ===========================================================
+# 
+# Quick Reference:
+#   make up       - Start full stack (infra + app + ui)
+#   make down     - Stop everything
+#   make ui       - Rebuild dashboard only (fast!)
+#   make logs     - Tail all container logs
+#
+# ===========================================================
 
-.PHONY: help infra infra-down layer1 layer2 batch feed dev test clean logs
+.PHONY: help up down infra app ui observe logs clean
 
-# Default target
+COMPOSE_DIR := infrastructure/compose
+
+# ===========================================================
+# HELP
+# ===========================================================
+
 help:
-	@echo "🚀 Nifty 50 Trading System - Available Commands"
+	@echo "🚀 Nifty 50 Trading System"
 	@echo ""
-	@echo "📦 INFRASTRUCTURE"
-	@echo "  make infra          - Start Kafka, Redis, TimescaleDB"
-	@echo "  make infra-all      - Start ALL infrastructure (incl. Prometheus, Grafana)"
-	@echo "  make infra-down     - Stop all infrastructure"
-	@echo "  make share          - Launch Unified Gateway & Public Tunnel"
-	@echo "  make share-url      - Display the Public Tunnel URL"
+	@echo "📦 STACKS (Docker)"
+	@echo "  make up             Start full stack"
+	@echo "  make down           Stop everything"
+	@echo "  make infra          Data stores only (Kafka, Redis, DB)"
+	@echo "  make app            Pipeline only (L1-L6 + API)"
+	@echo "  make ui             Dashboard only (fast rebuild)"
+	@echo "  make observe        Monitoring only (Prometheus, Grafana)"
 	@echo ""
-	@echo "🔧 LAYER 1: INGESTION"
-	@echo "  make layer1         - Start Layer 1 (npm run dev)"
-	@echo "  make layer1-install - Install Layer 1 dependencies"
-	@echo "  make batch          - Run Batch Historical Fetch (All 50 stocks)"
-	@echo "  make batch-symbol   - Run Batch for single stock (SYMBOL=RELIANCE)"
-	@echo "  make feed           - Feed historical data to Kafka"
+	@echo "🔧 LOCAL DEVELOPMENT"
+	@echo "  make layer1         Run Layer 1 locally (npm)"
+	@echo "  make layer2         Run Layer 2 locally (npm)"
+	@echo "  make layer4         Run Layer 4 locally (go)"
+	@echo "  make dev            Setup dev environment"
 	@echo ""
-	@echo "🏭 LAYER 2: PROCESSING"
-	@echo "  make layer2         - Start Layer 2 (npm run dev)"
-	@echo "  make layer2-install - Install Layer 2 dependencies"
+	@echo "📊 DATA & TESTING"
+	@echo "  make batch          Fetch historical data (all 50)"
+	@echo "  make feed           Feed data to Kafka"
+	@echo "  make test           Run all tests"
 	@echo ""
-	@echo "🐳 DOCKER"
-	@echo "  make docker-build   - Build all application Docker images"
-	@echo "  make docker-up      - Start full stack (infra + apps)"
-	@echo "  make docker-down    - Stop everything"
-	@echo "  make dashboard      - Rebuild and start the Dashboard UI"
+	@echo "🌐 SHARING"
+	@echo "  make gateway        Start Nginx gateway only"
+	@echo "  make share          Expose via public tunnel"
+	@echo "  make share-url      Show public URL"
+	@echo "  make share-down     Stop gateway and tunnel"
 	@echo ""
-	@echo "🧪 TESTING"
-	@echo "  make test           - Run all tests"
-	@echo "  make test-layer1    - Run Layer 1 tests"
-	@echo ""
-	@echo "🧹 CLEANUP"
-	@echo "  make clean          - Remove node_modules & build artifacts"
-	@echo "  make clean-data     - Remove local data (CAUTION: Deletes DB data)"
-	@echo ""
-	@echo "📊 MONITORING"
-	@echo "  make logs           - Tail all container logs"
-	@echo "  make logs-kafka     - Tail Kafka logs"
-	@echo ""
+	@echo "🧹 MAINTENANCE"
+	@echo "  make logs           Tail all logs"
+	@echo "  make clean          Remove build artifacts"
+	@echo "  make clean-data     Delete all data (CAUTION!)"
 
-# ===========================================
-# INFRASTRUCTURE
-# ===========================================
+# ===========================================================
+# DOCKER STACKS (Primary Commands)
+# ===========================================================
+
+# Common docker-compose options
+DC := docker-compose --env-file .env
+
+up: infra app ui
+	@echo "🚀 Full stack running!"
+	@echo "   Dashboard: http://localhost:3000"
+	@echo "   API:       http://localhost:4000"
+	@echo "   Grafana:   http://localhost:3001"
+
+down:
+	@echo "🛑 Stopping all containers..."
+	-$(DC) -f $(COMPOSE_DIR)/docker-compose.gateway.yml down
+	-$(DC) -f $(COMPOSE_DIR)/docker-compose.ui.yml down
+	-$(DC) -f $(COMPOSE_DIR)/docker-compose.app.yml --profile notify --profile flattrade down
+	-$(DC) -f $(COMPOSE_DIR)/docker-compose.observe.yml down
+	-$(DC) -f $(COMPOSE_DIR)/docker-compose.infra.yml down
+	@echo "✅ Stopped."
+
 
 infra:
-	@echo "� Starting Core Infrastructure (Kafka, Redis, TimescaleDB)..."
-	docker-compose up -d zookeeper kafka redis timescaledb
-	@echo "✅ Infrastructure started!"
-	@echo "   Kafka:       localhost:9092"
-	@echo "   Redis:       localhost:6379"
-	@echo "   TimescaleDB: localhost:5432"
+	@echo "🔧 Starting Infrastructure..."
+	$(DC) -f $(COMPOSE_DIR)/docker-compose.infra.yml up -d
+	@echo "✅ Kafka: 9092 | Redis: 6379 | DB: 5432"
 
-infra-all:
-	@echo "🚀 Starting ALL Infrastructure..."
-	docker-compose up -d zookeeper kafka redis timescaledb prometheus grafana kafka-ui redis-commander
-	@echo "✅ Full infrastructure started!"
-	@echo "   Kafka UI:    http://localhost:8080"
-	@echo "   Redis UI:    http://localhost:8081"
-	@echo "   Grafana:     http://localhost:3001"
-	@echo "   Prometheus:  http://localhost:9090"
+app:
+	@echo "🚀 Starting Pipeline (L1-L6 + API)..."
+	$(DC) -f $(COMPOSE_DIR)/docker-compose.app.yml up -d
+	@echo "✅ Pipeline running."
 
-infra-down:
-	@echo "🛑 Stopping infrastructure..."
-	docker-compose --profile app --profile flattrade-only down
-	@echo "✅ Infrastructure stopped."
+ui:
+	@echo "🖥️  Building Dashboard..."
+	$(DC) -f $(COMPOSE_DIR)/docker-compose.ui.yml up -d --build
+	@echo "✅ http://localhost:3000"
 
-# ===========================================
-# LAYER 1: INGESTION
-# ===========================================
+observe:
+	@echo "📊 Starting Observability..."
+	$(DC) -f $(COMPOSE_DIR)/docker-compose.observe.yml up -d
+	@echo "✅ Prometheus: 9090 | Grafana: 3001"
+
+gateway:
+	@echo "🌐 Starting Gateway..."
+	$(DC) -f $(COMPOSE_DIR)/docker-compose.gateway.yml up -d
+	@echo "✅ Gateway: http://localhost:8088"
+
+share: up gateway
+	@echo "🌐 Public tunnel starting..."
+	@sleep 5
+	@make share-url
+
+share-url:
+	@docker logs trading-tunnel 2>&1 | grep -o 'https://.*trycloudflare.com' || echo "⏳ Tunnel starting... try again in a few seconds"
+
+share-down:
+	@echo "🛑 Stopping gateway and tunnel..."
+	-$(DC) -f $(COMPOSE_DIR)/docker-compose.gateway.yml down
+	@echo "✅ Stopped."
+
+# ===========================================================
+# LOCAL DEVELOPMENT (Run outside Docker)
+# ===========================================================
 
 layer1:
-	@echo "� Starting Layer 1: Ingestion..."
 	cd layer-1-ingestion && npm run dev
 
-layer1-install:
-	@echo "📦 Installing Layer 1 dependencies..."
-	cd layer-1-ingestion && npm install
-
-batch:
-	@echo "📊 Running Batch Historical Fetch (All 50 Stocks)..."
-	cd layer-1-ingestion && node scripts/batch_nifty50.js
-
-batch-symbol:
-	@echo "📊 Running Batch for $(SYMBOL)..."
-	cd layer-1-ingestion && node scripts/batch_nifty50.js --symbol $(SYMBOL)
-
-feed: infra
-	@echo "Waiting for Kafka to stabilize..."
-	sleep 30
-	@echo "📤 Feeding Historical Data to Kafka..."
-	cd layer-1-ingestion && node scripts/feed_kafka.js
-
-# ===========================================
-# LAYER 2: PROCESSING
-# ===========================================
-
 layer2:
-	@echo "🏭 Starting Layer 2: Processing..."
 	cd layer-2-processing && npm run dev
 
-layer2-install:
-	@echo "📦 Installing Layer 2 dependencies..."
-	cd layer-2-processing && npm install
-
-# ===========================================
-# LAYER 4: ANALYSIS (Go)
-# ===========================================
-
 layer4:
-	@echo "📈 Starting Layer 4: Analysis..."
 	cd layer-4-analysis && go run cmd/main.go
 
-layer4-build:
-	@echo "🔨 Building Layer 4..."
-	cd layer-4-analysis && go build -o bin/analysis cmd/main.go
-
-# ===========================================
-# LAYER 5: AGGREGATION (Go)
-# ===========================================
-
 layer5:
-	@echo "📊 Starting Layer 5: Aggregation..."
 	cd layer-5-aggregation && go run cmd/main.go
 
-layer5-build:
-	@echo "🔨 Building Layer 5..."
-	cd layer-5-aggregation && go build -o bin/aggregation cmd/main.go
-
-# ===========================================
-# LAYER 6: SIGNAL GENERATION
-# ===========================================
-
 layer6:
-	@echo "🧠 Starting Layer 6: Signal Generation..."
 	cd layer-6-signal && npm run dev
 
-layer6-install:
-	@echo "📦 Installing Layer 6 dependencies..."
-	cd layer-6-signal && npm install
-
-# ===========================================
-# LAYER 7: PRESENTATION
-# ===========================================
-
 layer7-api:
-	@echo "🔌 Starting Layer 7: API..."
 	cd layer-7-presentation/api && npm run dev
 
 layer7-dashboard:
-	@echo "🖥️ Starting Layer 7: Dashboard..."
 	cd layer-7-presentation/dashboard && npm run dev
 
-layer7-install:
-	@echo "📦 Installing Layer 7 dependencies..."
-	cd layer-7-presentation/api && npm install
-	cd layer-7-presentation/dashboard && npm install
+dev: infra
+	@echo "✅ Dev environment ready. Run layers manually."
 
-# ===========================================
-# DOCKER (Full Stack)
-# ===========================================
+# ===========================================================
+# DATA OPERATIONS
+# ===========================================================
 
-docker-build:
-	@echo "� Building all Docker images..."
-	docker-compose build
+batch:
+	@echo "📊 Fetching historical data..."
+	cd layer-1-ingestion && node scripts/batch_nifty50.js
 
-docker-up:
-	@echo "🐳 Starting full stack (excluding flattrade-ingestion)..."
-	docker-compose --profile app up -d
+batch-symbol:
+	cd layer-1-ingestion && node scripts/batch_nifty50.js --symbol $(SYMBOL)
 
-docker-flattrade:
-	@echo "🚀 Starting Flattrade Ingestion (requires valid credentials)..."
-	docker-compose --profile flattrade-only up -d
+feed:
+	@echo "� Feeding data to Kafka..."
+	cd layer-1-ingestion && node scripts/feed_kafka.js
 
-docker-down:
-	@echo "� Stopping all containers..."
-	docker-compose --profile app --profile flattrade-only down
-
-# ===========================================
+# ===========================================================
 # TESTING
-# ===========================================
+# ===========================================================
 
 test:
-	@echo "🧪 Running all tests..."
 	cd layer-1-ingestion && npm test
 	cd layer-2-processing && npm test
 
 test-layer1:
-	@echo "🧪 Running Layer 1 tests..."
 	cd layer-1-ingestion && npm test
 
-test-integration:
-	@echo "🧪 Running integration tests..."
-	cd layer-1-ingestion && npm run test:integration
-
-# ===========================================
-# MONITORING & LOGS
-# ===========================================
+# ===========================================================
+# LOGS
+# ===========================================================
 
 logs:
 	docker-compose logs -f
 
-logs-kafka:
-	docker-compose logs -f kafka
+logs-%:
+	docker-compose logs -f $*
 
-logs-layer1:
-	docker-compose logs -f ingestion
-
-logs-layer2:
-	docker-compose logs -f processing
-
-logs-layer4:
-	docker-compose logs -f analysis
-
-logs-layer5:
-	docker-compose logs -f aggregation
-
-logs-layer6:
-	docker-compose logs -f signal
-
-# ===========================================
+# ===========================================================
 # CLEANUP
-# ===========================================
+# ===========================================================
 
 clean:
-	@echo "🧹 Cleaning build artifacts..."
-	rm -rf layer-1-ingestion/node_modules
-	rm -rf layer-2-processing/node_modules
-	rm -rf layer-1-ingestion/dist
-	rm -rf layer-2-processing/dist
-	@echo "✅ Cleaned!"
+	@echo "🧹 Cleaning..."
+	rm -rf layer-*/node_modules layer-*/dist
+	@echo "✅ Done."
 
 clean-data:
-	@echo "⚠️  WARNING: This will delete all local database data!"
-	@read -p "Are you sure? [y/N] " confirm && [ "$$confirm" = "y" ] || exit 1
-	rm -rf data/timescaledb/*
-	rm -rf data/redis/*
-	rm -rf data/kafka/*
-	rm -rf data/zookeeper/*
-	@echo "✅ Data cleaned!"
+	@echo "⚠️  This deletes ALL data!"
+	@read -p "Continue? [y/N] " c && [ "$$c" = "y" ] || exit 1
+	rm -rf data/*
+	@echo "✅ Data deleted."
 
-# ===========================================
-# QUICK SHORTCUTS
-# ===========================================
 
-# Start everything needed for development
-dev: infra layer1-install layer2-install
-	@echo "✅ Development environment ready!"
-	@echo "   Run 'make layer1' in Terminal 1"
-	@echo "   Run 'make layer2' in Terminal 2"
+# ===========================================================
+# LEGACY ALIASES (for backward compatibility)
+# ===========================================================
 
-# Full E2E test flow
-e2e: infra
-	@echo "⏳ Waiting for infrastructure to be ready..."
-	sleep 10
-	cd layer-1-ingestion && node scripts/batch_nifty50.js --symbol RELIANCE --days 1
-	cd layer-1-ingestion && node scripts/feed_kafka.js
-	@echo "✅ E2E test complete! Check TimescaleDB for data."
-
-dashboard:
-	@echo "🖥️  Rebuilding and Starting Dashboard..."
-	docker-compose --profile app up -d --build dashboard
-	@echo "✅ Dashboard is ready at http://localhost:3000"
-
-# ===========================================
-# PUBLIC SHARING (Tunnels)
-# ===========================================
-
-share:
-	@echo "🌐 Launching Unified Gateway & Public Tunnel..."
-	@echo "🛠  Rerebuilding Dashboard to apply relative path fixes..."
-	docker-compose -f docker-compose.yml -f docker-compose.expose.yml --profile app --profile expose up -d --build dashboard gateway tunnel
-	@echo "⏳ Waiting for tunnel to establish..."
-	@sleep 15
-	@make share-url
-
-share-url:
-	@echo "🔗 Your Public URL is:"
-	@docker logs trading-tunnel 2>&1 | grep -o 'https://.*trycloudflare.com' || echo "⚠️  Tunnel still starting, please wait and run 'make share-url' again."
+docker-up: up
+docker-down: down
+dashboard: ui
+infra-all: infra observe
+infra-down: down

@@ -1,0 +1,27 @@
+services:
+  # ===========================================
+  # FRONTEND (Dashboard Only)
+  # ===========================================
+
+  # Layer 7: Dashboard
+  dashboard:
+    build:
+      context: ../../layer-7-presentation/dashboard
+      dockerfile: Dockerfile
+    container_name: dashboard
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=/api/v1
+      - NEXT_PUBLIC_WS_URL=/
+    networks:
+      - trading-network
+    restart: unless-stopped
+
+# ===========================================
+# NETWORKS (External - shared with infra)
+# ===========================================
+networks:
+  trading-network:
+    external: true
+    name: compose_trading-network

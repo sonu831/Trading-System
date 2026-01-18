@@ -6,27 +6,57 @@
 [![Docker](https://img.shields.io/badge/Docker-Compose-blue)](./docker-compose.yml)
 [![License](https://img.shields.io/badge/License-Proprietary-red)]()
 
+---
+
 ## 📖 Overview
 
-This system is a comprehensive, microservices-based high-frequency trading (HFT) and analysis platform designed to ingest, process, analyze, and visualize Nifty 50 stock data in real-time. It leverages a modern tech stack including **Golang**, **Node.js**, **Kafka**, **Redis**, **TimeScaleDB**, and **Next.js**.
-
-The architecture follows a strictly layered approach (Layer 1 to Layer 7), ensuring separation of concerns, scalability, and fault tolerance.
+A comprehensive, microservices-based trading and analysis platform for **Nifty 50** stocks. Built with **Golang**, **Node.js**, **Kafka**, **Redis**, **TimescaleDB**, and **Next.js**.
 
 ---
 
-## 🏗 System Architecture
+## 🏗️ System Architecture
 
-The system is organized into 7 distinct layers:
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                        LAYER 7: PRESENTATION                        │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐              │
+│  │   Dashboard  │  │     API      │  │ Telegram Bot │              │
+│  │   (Next.js)  │  │  (Fastify)   │  │   (Node.js)  │              │
+│  └──────────────┘  └──────────────┘  └──────────────┘              │
+└─────────────────────────────────────────────────────────────────────┘
+                                ▲
+┌─────────────────────────────────────────────────────────────────────┐
+│  L6: SIGNAL     │  L5: AGGREGATION   │  L4: ANALYSIS               │
+│  (Node.js)      │  (Go)              │  (Go)                       │
+│  Buy/Sell Logic │  Market Breadth    │  RSI, EMA, MACD             │
+└─────────────────────────────────────────────────────────────────────┘
+                                ▲
+┌─────────────────────────────────────────────────────────────────────┐
+│                         LAYER 3: STORAGE                            │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐              │
+│  │    Redis     │  │ TimescaleDB  │  │    Kafka     │              │
+│  │   (Cache)    │  │ (Time-Series)│  │  (Streaming) │              │
+│  └──────────────┘  └──────────────┘  └──────────────┘              │
+└─────────────────────────────────────────────────────────────────────┘
+                                ▲
+┌─────────────────────────────────────────────────────────────────────┐
+│  L2: PROCESSING              │  L1: INGESTION                       │
+│  (Go)                        │  (Node.js)                           │
+│  OHLCV Aggregation           │  WebSocket → MStock/Flattrade        │
+└─────────────────────────────────────────────────────────────────────┘
+```
 
-| Layer  | Name             | Tech Stack         | Responsibility                                                                                                            |
-| ------ | ---------------- | ------------------ | ------------------------------------------------------------------------------------------------------------------------- |
-| **L1** | **Ingestion**    | Node.js            | Connects to Stock Broker (MStock) via WebSocket, fetches live ticks, and pushes raw data to Kafka.                        |
-| **L2** | **Processing**   | Go (Golang)        | Consumes raw Kafka ticks, aggregates them into 1-minute Candle bars (OHLCV), and stores them in TimeScaleDB.              |
-| **L3** | **Storage**      | Postgres/Timescale | The Database layer. Stores historical candle data (TimeScaleDB) and real-time state (Redis).                              |
-| **L4** | **Analysis**     | Go (Golang)        | The "Brain". Fetches candles, calculates Technical Indicators (RSI, EMA, MACD), and publishes metrics. Uses Worker Pools. |
-| **L5** | **Aggregation**  | Go (Golang)        | Aggregates individual stock analysis into Market Breadth, Sector Performance, and Sentiment Scores.                       |
-| **L6** | **Signal**       | Node.js            | Evaluates trading strategies against aggregated data to generate Buy/Sell signals.                                        |
-| **L7** | **Presentation** | Next.js / Fastify  | The Frontend Dashboard and API Gateway. Visualizes everything for the user.                                               |
+### Layer Summary
+
+| Layer  | Name         | Tech                  | Purpose                                            |
+| ------ | ------------ | --------------------- | -------------------------------------------------- |
+| **L1** | Ingestion    | Node.js               | WebSocket connection to broker, raw tick streaming |
+| **L2** | Processing   | Go                    | Tick → OHLCV candle aggregation                    |
+| **L3** | Storage      | Redis/Timescale/Kafka | Data persistence and messaging                     |
+| **L4** | Analysis     | Go                    | Technical indicators (RSI, EMA, MACD)              |
+| **L5** | Aggregation  | Go                    | Market breadth, sector analysis                    |
+| **L6** | Signal       | Node.js               | Trading strategy evaluation                        |
+| **L7** | Presentation | Next.js/Fastify       | Dashboard, API, Notifications                      |
 
 ---
 
@@ -34,70 +64,142 @@ The system is organized into 7 distinct layers:
 
 ### Prerequisites
 
-- Docker & Docker Compose
-- Make (optional, for convenience)
+- Docker & Docker Compose v2.20+
+- Make (optional)
 
-### Running the System
-
-The entire system is containerized. You can launch it with a single command:
+### Step 1: Setup Environment
 
 ```bash
-# Start all application services (L1-L7) and Infrastructure
-docker-compose --profile app up -d
+cp .env.example .env     # Copy template
+# Edit .env with your broker API credentials (see .env.example for details)
 ```
 
-### Accessing the Dashboard
+### Option 1: Full Stack (Recommended)
 
-Once started, the dashboard is available at:
-👉 **[http://localhost:3000](http://localhost:3000)**
+```bash
+make up          # Start everything
+make down        # Stop everything
+```
 
-### Accessing System Metrics
+### Option 2: Granular Control
 
-Technical metrics and health status are available at:
-👉 **[http://localhost:4000/api/v1/system-status](http://localhost:4000/api/v1/system-status)**
+```bash
+make infra       # Data stores only (Kafka, Redis, DB)
+make app         # Application pipeline (L1-L6 + API)
+make ui          # Dashboard only (fast rebuild!)
+make observe     # Monitoring (Prometheus, Grafana)
+```
+
+### Option 3: Direct Docker Compose
+
+```bash
+docker-compose up -d      # Start all (uses modular includes)
+docker-compose down       # Stop all
+```
+
+### Access Points
+
+| Service       | URL                   |
+| ------------- | --------------------- |
+| **Dashboard** | http://localhost:3000 |
+| **API**       | http://localhost:4000 |
+| **Grafana**   | http://localhost:3001 |
+| **Kafka UI**  | http://localhost:8090 |
+| **PgAdmin**   | http://localhost:5050 |
 
 ---
 
-## 🔧 Infrastructure Components
+## 📂 Project Structure
 
-- **Kafka**: The central nervous system. Used for streaming raw ticks from L1 to L2.
-  - _Port_: `9092`
-- **Redis**: High-speed cache and Pub/Sub mechanism. Used for inter-service communication (L4 -> L5 -> L7) and real-time UI updates.
-  - _Port_: `6379`
-- **TimeScaleDB**: Time-series optimized PostgreSQL. Stores historical candle data.
-  - _Port_: `5432`
+```
+Trading-System/
+├── layer-1-ingestion/       # WebSocket client (Node.js)
+├── layer-2-processing/      # Kafka consumer (Go)
+├── layer-3-storage/         # Database migrations
+├── layer-4-analysis/        # Technical analysis (Go)
+├── layer-5-aggregation/     # Market breadth (Go)
+├── layer-6-signal/          # Signal generation (Node.js)
+├── layer-7-presentation/
+│   ├── api/                 # REST API (Fastify)
+│   ├── dashboard/           # Frontend (Next.js)
+│   └── telegram-bot/        # Notifications
+├── infrastructure/
+│   ├── compose/             # Modular Docker Compose files
+│   ├── monitoring/          # Prometheus, Grafana configs
+│   └── gateway/             # Nginx reverse proxy
+├── vendor/                  # Shared data files
+└── Makefile                 # All commands
+```
 
-## 📊 Control & Observability
+---
 
-The system features advanced monitoring and control mechanisms:
+## 📖 Documentation Index
 
-- **Manual Backfill Control**: Trigger historical data synchronization on-demand via the dashboard or `POST /api/v1/system/backfill/trigger`.
-- **Granular Progress Tracking**: Live visibility into backfill stages (Initialization -> Data Fetching -> Kafka Feeding) at the individual stock level.
-- **Deep Network Telemetry**: Tracking of raw WebSocket packets, average bandwidth (KB/s), and external API latency for all market data vendors.
-- **IPC Metric Bridge**: Seamless aggregation of performance metrics from background worker processes into the main service registry.
+Each layer has its own documentation:
 
-## 👨‍💻 Developer Guide
+| Document                                                                   | Description                       |
+| -------------------------------------------------------------------------- | --------------------------------- |
+| [infrastructure/INSTRUCTIONS.md](infrastructure/INSTRUCTIONS.md)           | Infrastructure & deployment guide |
+| [infrastructure/compose/README.md](infrastructure/compose/README.md)       | Modular Docker Compose guide      |
+| [layer-1-ingestion/README.md](layer-1-ingestion/README.md)                 | Data ingestion layer              |
+| [layer-1-ingestion/INSTRUCTIONS.md](layer-1-ingestion/INSTRUCTIONS.md)     | L1 setup instructions             |
+| [layer-2-processing/README.md](layer-2-processing/README.md)               | Tick processing layer             |
+| [layer-3-storage/README.md](layer-3-storage/README.md)                     | Database schema                   |
+| [layer-4-analysis/README.md](layer-4-analysis/README.md)                   | Technical analysis engine         |
+| [layer-5-aggregation/INSTRUCTIONS.md](layer-5-aggregation/INSTRUCTIONS.md) | Aggregation layer                 |
+| [layer-6-signal/README.md](layer-6-signal/README.md)                       | Signal generation                 |
+| [layer-7-presentation/README.md](layer-7-presentation/README.md)           | Frontend & API                    |
 
-### Directory Structure
+---
 
-- `layer-1-ingestion/`: Node.js WebSocket client.
-- `layer-2-processing/`: Go Kafka consumer & aggregator.
-- `layer-4-analysis/`: Go technical analysis engine.
-- `layer-5-aggregation/`: Go market breadth engine.
-- `layer-6-signal/`: Node.js strategy engine.
-- `layer-7-presentation/`:
-  - `api/`: Fastify REST API.
-  - `dashboard/`: Next.js Frontend.
+## 🐳 Docker Compose Structure
 
-### Common Commands
+We use a **modular compose architecture** for flexibility:
+
+```yaml
+# docker-compose.yml (root) includes:
+include:
+  - infrastructure/compose/docker-compose.infra.yml # Data stores
+  - infrastructure/compose/docker-compose.observe.yml # Monitoring
+  - infrastructure/compose/docker-compose.app.yml # Pipeline
+  - infrastructure/compose/docker-compose.ui.yml # Frontend
+```
+
+See [infrastructure/compose/README.md](infrastructure/compose/README.md) for details.
+
+---
+
+## 🌐 Public Sharing
+
+Expose the system publicly using Cloudflare Tunnel:
 
 ```bash
-# Rebuild a specific service (e.g., Dashboard)
-docker-compose --profile app up -d --build dashboard
-
-# View logs for a service
-docker-compose logs -f analysis
+make share       # Start tunnel
+make share-url   # Get public URL
 ```
+
+See [EXPOSURE_GUIDE.md](EXPOSURE_GUIDE.md) for details.
+
+---
+
+## 📊 Observability
+
+- **Prometheus**: http://localhost:9090 (metrics)
+- **Grafana**: http://localhost:3001 (dashboards)
+- **System Status API**: http://localhost:4000/api/v1/system-status
+
+---
+
+## 🧪 Development
+
+```bash
+make dev         # Start infra for local dev
+make layer1      # Run L1 locally
+make test        # Run all tests
+make logs        # Tail all logs
+```
+
+---
 
 ## ⚖️ Legal Disclaimer
 

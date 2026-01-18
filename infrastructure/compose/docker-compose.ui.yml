@@ -6,7 +6,7 @@ services:
   # Layer 7: Dashboard
   dashboard:
     build:
-      context: ../../layer-7-presentation/dashboard
+      context: ../../layer-7-presentation/stock-analysis-portal
       dockerfile: Dockerfile
     container_name: dashboard
     ports:

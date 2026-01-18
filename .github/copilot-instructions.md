@@ -1,0 +1,104 @@
+# Stock Analysis By Gurus - AI Agent Instructions
+
+<!-- Use this file to provide workspace-specific custom instructions to Copilot and other AI agents. -->
+
+## Project Overview
+
+**Stock Analysis By Gurus** is a high-performance, event-driven trading system architecture designed to ingest, process, store, analyze, and visualize market data in real-time. The system is built on a 7-layer architecture pattern, emphasizing modularity, scalability, and observability.
+
+## 🏗 Architecture Layers
+
+The system is organized into 7 distinct layers. When generating code or navigating the codebase, always respect these boundaries:
+
+- **Layer 1: Ingestion** (`layer-1-ingestion/`) - Node.js
+  - **Responsibility**: Connect to market data vendors (MStock, Kite), handle WebSocket streams, and normalize raw ticks.
+  - **Output**: Pushes normalized ticks to Kafka topics (e.g., `market_ticks`).
+- **Layer 2: Processing** (`layer-2-processing/`) - Go
+  - **Responsibility**: Consumes raw ticks, aggregates them into OHLCV candles (1min, 5min, etc.), and handles basic cleaning.
+  - **Tech**: High-throughput Go consumers.
+- **Layer 3: Storage** (`layer-3-storage/`) - Infrastructure
+  - **Responsibility**: Persistence and Message Bus.
+  - **Components**: Redis (Real-time cache/PubSub), TimescaleDB (Historical Time-Series), Kafka (Event Bus).
+- **Layer 4: Analysis** (`layer-4-analysis/`) - Go
+  - **Responsibility**: Computes technical indicators (RSI, MACD, EMA) on completed candles.
+  - **Pattern**: Stream processing.
+- **Layer 5: Aggregation** (`layer-5-aggregation/`) - Go
+  - **Responsibility**: Computes market-wide metrics (Market Breadth, Sector Performance, Advance/Decline).
+- **Layer 6: Signal** (`layer-6-signal/`) - Node.js
+  - **Responsibility**: Evaluates trading strategies against analyzing data to generate Buy/Sell signals.
+- **Layer 7: Presentation** (`layer-7-presentation/`) - Next.js / Node.js
+  - **Responsibility**: User Interface (Stock Analysis Portal), API Gateway, and Notifications (Telegram).
+  - **Directory**: `layer-7-presentation/stock-analysis-portal` (Next.js App).
+
+## 🛠 Development Guidelines
+
+### General Principles
+
+- **Modularity**: Code should be decoupled. Use dependency injection where possible.
+- **Observability**: Every service must expose Prometheus metrics (on `/metrics` or via push gateway) and structural logs.
+- **Configuration**: All configuration must be externalized via Environment Variables (`.env`). NEVER hardcode secrets or hostnames.
+
+### Go Standards (Layers 2, 4, 5)
+
+- **Formatting**: `gofmt` is non-negotiable.
+- **Logging**: Use structured logging (e.g., `zerolog` or `slog`).
+  - Example: `log.Info().Str("symbol", "NIFTY").Float64("price", 100.0).Msg("processed tick")`
+- **Error Handling**: Wrap errors with context using `fmt.Errorf("context: %w", err)`.
+- **Project Structure**: Follow Standard Go Project Layout (`cmd/`, `internal/`, `pkg/`).
+
+### Node.js Standards (Layers 1, 6, 7)
+
+- **Style**: Functional, asynchronous code. Use `async/await` over callbacks.
+- **Formatting**: Use Prettier + ESLint.
+- **Imports**: Use ES Modules (`import`/`export`) where supported (UI), or CommonJS (`require`) for backend scripts if legacy.
+- **Logging**: Use a logger like `pino` or `winston` for JSON logs.
+
+### Infrastructure & Docker
+
+- **Compose**: Use the modular compose files in `infrastructure/compose/`.
+  - `make up` combines them automatically.
+- **Networking**: All services communicate on the external network `compose_trading-network`.
+  - Hostnames match service names: `kafka`, `redis`, `timescaledb`, `backend-api`.
+- **Ports**:
+  - **Dashboard**: 3000
+  - **API**: 4000
+  - **Gateway**: 8088 (Entry point)
+  - **Grafana**: 3001
+
+## 📝 Naming Conventions
+
+### Variables & Functions
+
+- **Go**: `PascalCase` for exported, `camelCase` for private.
+- **JS/TS**: `camelCase` for variables/functions, `PascalCase` for Components/Classes.
+- **Constants**: `UPPER_SNAKE_CASE` (e.g., `MAX_RETRIES`).
+
+### Files & Directories
+
+- **JS/TS Components**: `PascalCase.js` (e.g., `MarketOverview.js`).
+- **Utilities/Scripts**: `snake_case` or `camelCase` (consistent within layer).
+- **Go Files**: `snake_case.go`.
+
+## 📦 Dependencies
+
+- **Go**: `go.mod` must be tidy.
+- **Node**: `package.json` with locked versions.
+- **Global**: `Makefile` is the entry point for all operations.
+
+## 🧪 Testing
+
+- **Unit Tests**: Required for logic-heavy components (Indicators, Strategy).
+- **Integration**: Test Kafka consumers/producers using dockerized dependencies.
+- **Mocking**: Mock external vendor APIs (MStock/Kite) during tests.
+
+## 🔄 Git Workflow
+
+- **Commit Messages**: Follow Conventional Commits.
+  - `feat(layer1): add websocket reconnection logic`
+  - `fix(ui): resolve timestamp formatting issue`
+  - `chore(infra): update docker compose network`
+- **Branches**: `feature/description` or `fix/issue-description`.
+
+---
+
+_Generated by Antigravity Agent - 2026-01-18_

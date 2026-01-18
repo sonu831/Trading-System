@@ -1,4 +1,5 @@
 import React from 'react';
+import { formatTime } from '../../utils/format';
 
 const SignalsFeed = ({ signals }) => {
   return (
@@ -24,9 +25,7 @@ const SignalsFeed = ({ signals }) => {
           ) : (
             signals.map((signal, idx) => (
               <tr key={idx} className="hover:bg-gray-700 transition duration-150">
-                <td className="px-6 py-4 text-sm text-gray-300">
-                  {new Date(signal.timestamp).toLocaleTimeString()}
-                </td>
+                <td className="px-6 py-4 text-sm text-gray-300">{formatTime(signal.timestamp)}</td>
                 <td className="px-6 py-4 font-bold text-white">{signal.symbol}</td>
                 <td className="px-6 py-4">
                   <span

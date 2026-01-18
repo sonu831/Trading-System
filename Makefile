@@ -135,7 +135,7 @@ layer7-api:
 	cd layer-7-presentation/api && npm run dev
 
 layer7-dashboard:
-	cd layer-7-presentation/dashboard && npm run dev
+	cd layer-7-presentation/stock-analysis-portal && npm run dev
 
 dev: infra
 	@echo "✅ Dev environment ready. Run layers manually."

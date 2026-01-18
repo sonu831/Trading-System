@@ -1,7 +1,7 @@
 const express = require('express');
 const promClient = require('prom-client');
 const redis = require('./redis/client');
-const engine = require('./engine/decision-engine');
+const engine = require('./engine/decisionEngine');
 
 const app = express();
 const PORT = process.env.PORT || 8082; // Signal Layer Port

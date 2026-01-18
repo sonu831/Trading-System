@@ -1,6 +1,6 @@
 {
   "name": "layer-7-api",
-  "version": "1.0.0",
+  "version": "0.2.4",
   "description": "REST API for Nifty 50 Trading System",
   "main": "src/index.js",
   "scripts": {

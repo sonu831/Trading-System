@@ -5,6 +5,33 @@ All notable changes to the **Nifty 50 Trading System** project will be documente
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.4] - 2026-01-18
+
+### 🚀 Added
+
+- **Development Standards (Rulebook)**:
+  - Created `.github/copilot-instructions.md`: A comprehensive guide for AI agents and developers, defining:
+    - **Architecture Layers**: Clear boundaries for all 7 layers.
+    - **Naming Conventions**: Strict `camelCase` (JS), `snake_case` (Go/Scripts), and `kebab-case` (Infrastructure).
+    - **Rule Sets**: Mandatory structured logging, error wrapping, and security practices.
+- **Product Branding**:
+  - Renamed "Dashboard" to **Stock Analysis Portal** (`layer-7-presentation/stock-analysis-portal`) to align with the "Stock Analysis By Gurus" product identity.
+
+### 🏗️ Refactor
+
+- **Layer 2 (Processing)**:
+  - **Structured Logging**: Replaced generic `console.log` with **Pino** (`src/utils/logger.js`) for machine-readable JSON logs.
+  - **Naming Compliance**: Renamed services to `camelCase` (`redis-cache.js` -> `redisCache.js`) to match the new Rulebook.
+- **Layer 6 (Signal)**:
+  - Renamed `decision-engine.js` to `decisionEngine.js` for consistency.
+
+### 🐛 Fixed
+
+- **Frontend Timestamps**:
+  - Fixed "Invalid Date" errors by implementing a robust timestamp parser (`formatTime`) that handles nanosecond-precision ISO strings from the backend.
+- **Development Guidelines**:
+  - Standardized directory structures and updated `Makefile` references to the new `stock-analysis-portal` path.
+
 ## [0.2.3] - 2026-01-18
 
 ### 🚀 Added

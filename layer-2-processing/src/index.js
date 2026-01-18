@@ -11,17 +11,18 @@
 require('dotenv').config();
 const express = require('express');
 const client = require('prom-client');
+const logger = require('./utils/logger'); // Import Logger
 
 const { connectDB, pool } = require('./db/client');
 const { startConsumer, stopConsumer } = require('./kafka/consumer');
-const { insertCandle } = require('./services/candle-writer');
+const { insertCandle } = require('./services/candleWriter');
 const {
   connectRedis,
   setLatestPrice,
   setLatestCandle,
   disconnectRedis,
   setMetrics,
-} = require('./services/redis-cache');
+} = require('./services/redisCache');
 
 // Initialize Express for health checks & metrics
 const app = express();
@@ -115,10 +116,10 @@ async function handleMessage(message) {
 
       candlesProcessedCounter.inc({ symbol: message.symbol });
     } else {
-      console.warn(`⚠️ Unknown message type: ${message.type}`);
+      logger.warn({ type: message.type }, '⚠️ Unknown message type');
     }
   } catch (err) {
-    console.error(`❌ Failed to process message: ${err.message}`);
+    logger.error({ err }, '❌ Failed to process message');
   } finally {
     end();
   }
@@ -128,11 +129,11 @@ async function handleMessage(message) {
  * Main entry point
  */
 async function main() {
-  console.log('🚀 Starting Layer 2: Processing Service...');
+  logger.info('🚀 Starting Layer 2: Processing Service...');
 
   // 1. Start Express Server FIRST (so Prometheus can always scrape)
   app.listen(PORT, () => {
-    console.log(`📡 Health/Metrics server running on port ${PORT}`);
+    logger.info(`📡 Health/Metrics server running on port ${PORT}`);
   });
 
   try {
@@ -160,16 +161,16 @@ async function main() {
       });
     }, 5000);
 
-    console.log('✅ Layer 2 Processing Service is running.');
+    logger.info('✅ Layer 2 Processing Service is running.');
   } catch (err) {
-    console.error('❌ Failed to start Layer 2:', err.message);
+    logger.error({ err }, '❌ Failed to start Layer 2');
     // Don't exit - keep the container running so Prometheus can scrape it
   }
 }
 
 // Graceful shutdown
 async function shutdown() {
-  console.log('🛑 Shutting down gracefully...');
+  logger.info('🛑 Shutting down gracefully...');
   await stopConsumer();
   await disconnectRedis();
   await pool.end();

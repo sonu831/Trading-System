@@ -1,6 +1,6 @@
 {
   "name": "layer-6-signal",
-  "version": "1.0.0",
+  "version": "0.2.4",
   "description": "Signal generation layer for Nifty 50 Trading System",
   "main": "src/index.js",
   "scripts": {

@@ -1,6 +1,6 @@
 {
   "name": "nifty50-ingestion",
-  "version": "1.0.0",
+  "version": "0.2.4",
   "description": "Layer 1: Data Ingestion for Nifty 50 Trading System",
   "main": "src/index.js",
   "scripts": {

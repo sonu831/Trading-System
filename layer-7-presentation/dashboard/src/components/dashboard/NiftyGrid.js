@@ -9,20 +9,22 @@ const NiftyGrid = React.memo(({ marketView }) => {
   );
 
   return (
-    <div className="p-4">
-      <div className="flex justify-between items-center mb-4">
-        <h2 className="text-lg font-bold text-white">Nifty 50 Live Watch</h2>
+    <div className="p-2 md:p-4">
+      <div className="flex flex-col sm:flex-row justify-between items-center gap-3 mb-4">
+        <h2 className="text-lg font-bold text-white text-center sm:text-left">
+          Nifty 50 Live Watch
+        </h2>
         <input
           type="text"
           placeholder="Search Symbol..."
-          className="bg-gray-900 border border-gray-600 rounded px-3 py-1 text-sm text-white focus:outline-none focus:border-blue-500"
+          className="w-full sm:w-auto bg-gray-900 border border-gray-600 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
         />
       </div>
 
-      <div className="overflow-x-auto">
-        <table className="w-full text-left">
+      <div className="overflow-x-auto no-scrollbar">
+        <table className="min-w-[600px] w-full text-left">
           <thead className="bg-gray-900 text-gray-400 uppercase text-xs font-semibold">
             <tr>
               <th className="px-4 py-3 rounded-tl-lg">Symbol</th>

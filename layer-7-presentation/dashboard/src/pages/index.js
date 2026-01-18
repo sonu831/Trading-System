@@ -63,29 +63,29 @@ export default function Home() {
           <TopMovers marketView={marketView} />
 
           {/* Main Content Tabs */}
-          <div className="flex space-x-1 mb-4 border-b border-gray-700">
+          <div className="flex overflow-x-auto no-scrollbar mb-4 border-b border-gray-700 whitespace-nowrap">
             <button
               onClick={() => setActiveTab('GRID')}
-              className={`px-6 py-3 text-sm font-medium border-b-2 transition ${activeTab === 'GRID' ? 'border-blue-500 text-blue-400 bg-gray-800 rounded-t-lg' : 'border-transparent text-gray-400 hover:text-gray-200'}`}
+              className={`px-4 md:px-6 py-3 text-sm font-medium border-b-2 transition ${activeTab === 'GRID' ? 'border-blue-500 text-blue-400 bg-gray-800 rounded-t-lg' : 'border-transparent text-gray-400 hover:text-gray-200'}`}
             >
               Nifty 50 Grid
             </button>
             <button
               onClick={() => setActiveTab('SIGNALS')}
-              className={`px-6 py-3 text-sm font-medium border-b-2 transition ${activeTab === 'SIGNALS' ? 'border-purple-500 text-purple-400 bg-gray-800 rounded-t-lg' : 'border-transparent text-gray-400 hover:text-gray-200'}`}
+              className={`px-4 md:px-6 py-3 text-sm font-medium border-b-2 transition ${activeTab === 'SIGNALS' ? 'border-purple-500 text-purple-400 bg-gray-800 rounded-t-lg' : 'border-transparent text-gray-400 hover:text-gray-200'}`}
             >
               Live Signals ({signals.length})
             </button>
             <a
               href="/system"
-              className="px-6 py-3 text-sm font-medium border-b-2 border-transparent text-gray-400 hover:text-gray-200"
+              className="px-4 md:px-6 py-3 text-sm font-medium border-b-2 border-transparent text-gray-400 hover:text-gray-200"
             >
               System Visualizer
             </a>
           </div>
 
           {/* Tab Content */}
-          <div className="bg-gray-800 rounded-xl shadow-lg border border-gray-700 min-h-[500px]">
+          <div className="bg-gray-800 rounded-xl shadow-lg border border-gray-700 min-h-[400px] md:min-h-[500px]">
             {activeTab === 'GRID' && <NiftyGrid marketView={marketView} />}
             {activeTab === 'SIGNALS' && <SignalsFeed signals={signals} />}
           </div>

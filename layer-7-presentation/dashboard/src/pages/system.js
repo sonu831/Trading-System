@@ -172,7 +172,7 @@ const LayerCard = ({ layer, data }) => (
     </div>
 
     {/* Metrics Grid */}
-    <div className="grid grid-cols-2 gap-2 text-xs">
+    <div className="grid grid-cols-1 xs:grid-cols-2 gap-2 text-xs">
       {data?.metrics &&
         Object.entries(data.metrics).map(([key, value]) => {
           // Special handling for key names
@@ -263,43 +263,51 @@ export default function SystemPipeline() {
 
   return (
     <main className="min-h-screen bg-dark-900 text-gray-100 p-2 md:p-8 font-sans">
-      <header className="mb-10 flex flex-col md:flex-row justify-between items-center bg-dark-800 p-6 rounded-xl border border-dark-700">
-        <div>
-          <h1 className="text-3xl font-bold text-white">System Pipeline Overview</h1>
-          <p className="text-gray-400">Real-time Architecture Visualization</p>
+      <header className="mb-6 md:mb-10 flex flex-col lg:flex-row justify-between items-center bg-dark-800 p-4 md:p-6 rounded-xl border border-dark-700 gap-6">
+        <div className="text-center lg:text-left">
+          <h1 className="text-2xl md:text-3xl font-bold text-white">System Pipeline Overview</h1>
+          <p className="text-gray-400 text-sm md:text-base">Real-time Architecture Visualization</p>
         </div>
-        <div className="flex gap-4 mt-4 md:mt-0">
+        <div className="flex flex-wrap justify-center gap-3 md:gap-4 w-full lg:w-auto">
           <button
             onClick={handleTriggerBackfill}
             disabled={systemData?.layers?.layer1?.backfill?.status === 'running'}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg font-bold transition ${
+            className={`flex items-center justify-center gap-2 px-3 md:px-4 py-2 rounded-lg font-bold transition text-sm md:text-base flex-1 sm:flex-initial ${
               systemData?.layers?.layer1?.backfill?.status === 'running'
                 ? 'bg-gray-700 text-gray-400 cursor-not-allowed'
                 : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-900/20'
             }`}
           >
             <Activity size={18} />
-            <span>Trigger Backfill</span>
+            <span>
+              {systemData?.layers?.layer1?.backfill?.status === 'running'
+                ? 'Backfilling...'
+                : 'Trigger Backfill'}
+            </span>
           </button>
-          <a
-            href="http://localhost:3001"
-            target="_blank"
-            className="bg-dark-700 hover:bg-dark-600 px-4 py-2 rounded-lg flex items-center gap-2 transition"
-          >
-            <span>Grafana</span>
-            <span className="text-xs bg-green-900 text-green-300 px-1 rounded">3001</span>
-          </a>
-          <a
-            href="http://localhost:8080"
-            target="_blank"
-            className="bg-dark-700 hover:bg-dark-600 px-4 py-2 rounded-lg flex items-center gap-2 transition"
-          >
-            <span>Kafka UI</span>
-            <span className="text-xs bg-green-900 text-green-300 px-1 rounded">8080</span>
-          </a>
+
+          <div className="flex gap-2 w-full sm:w-auto overflow-x-auto no-scrollbar pb-1 sm:pb-0">
+            <a
+              href="/grafana/"
+              target="_blank"
+              className="bg-dark-700 hover:bg-dark-600 px-3 md:px-4 py-2 rounded-lg flex items-center gap-2 transition text-sm whitespace-nowrap"
+            >
+              <span>Grafana</span>
+              <span className="text-[10px] bg-green-900 text-green-300 px-1 rounded">3001</span>
+            </a>
+            <a
+              href="/kafka/"
+              target="_blank"
+              className="bg-dark-700 hover:bg-dark-600 px-3 md:px-4 py-2 rounded-lg flex items-center gap-2 transition text-sm whitespace-nowrap"
+            >
+              <span>Kafka</span>
+              <span className="text-[10px] bg-green-900 text-green-300 px-1 rounded">8080</span>
+            </a>
+          </div>
+
           <a
             href="/"
-            className="bg-primary hover:bg-blue-600 px-6 py-2 rounded-lg font-bold text-white transition"
+            className="bg-primary hover:bg-blue-600 px-4 md:px-6 py-2 rounded-lg font-bold text-white transition text-center text-sm md:text-base w-full sm:w-auto"
           >
             Dashboard
           </a>
@@ -308,25 +316,28 @@ export default function SystemPipeline() {
 
       {/* Backfill Notification */}
       {systemData?.layers?.layer1?.backfill?.status === 'running' && (
-        <div className="max-w-4xl mx-auto mb-8 bg-indigo-900/30 border border-indigo-500/50 p-6 rounded-xl relative overflow-hidden">
-          <div className="flex justify-between items-center mb-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-indigo-600 rounded-lg animate-pulse">
+        <div className="max-w-4xl mx-auto mb-8 bg-indigo-900/30 border border-indigo-500/50 p-4 md:p-6 rounded-xl relative overflow-hidden">
+          <div className="flex flex-col sm:row justify-between items-center sm:items-start gap-4 mb-4">
+            <div className="flex items-center gap-3 w-full sm:w-auto">
+              <div className="p-2 bg-indigo-600 rounded-lg animate-pulse shrink-0">
                 <Icons.Ingestion />
               </div>
               <div>
-                <h3 className="font-bold text-white">Historical Data Backfill in Progress</h3>
-                <p className="text-indigo-300 text-sm">
-                  {systemData.layers.layer1.backfill.details ||
-                    'System is catching up on missed market data'}
+                <h3 className="font-bold text-white text-sm md:text-base">
+                  Historical Backfill in Progress
+                </h3>
+                <p className="text-indigo-300 text-xs md:text-sm line-clamp-1">
+                  {systemData.layers.layer1.backfill.details || 'Syncing indices...'}
                 </p>
               </div>
             </div>
-            <div className="text-right">
-              <div className="text-2xl font-bold text-white">
+            <div className="flex sm:block items-end justify-between w-full sm:w-auto border-t border-indigo-500/20 pt-3 sm:pt-0 sm:border-0 border-dashed">
+              <div className="text-2xl font-bold text-white sm:text-right">
                 {systemData.layers.layer1.backfill.progress}%
               </div>
-              <div className="text-xs text-indigo-400 uppercase tracking-widest">Complete</div>
+              <div className="text-[10px] text-indigo-400 uppercase tracking-widest sm:text-right">
+                Complete
+              </div>
             </div>
           </div>
           <div className="w-full bg-dark-900 rounded-full h-2.5 overflow-hidden">
@@ -370,9 +381,9 @@ export default function SystemPipeline() {
         </div>
       )}
 
-      <div className="max-w-4xl mx-auto space-y-6">
+      <div className="max-w-4xl mx-auto space-y-4 md:space-y-6">
         {/* L1 -> L2 */}
-        <div className="grid md:grid-cols-2 gap-8 relative">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-8 relative">
           <LayerCard layer="Ingestion" data={{ id: 1, ...systemData?.layers?.layer1 }} />
           <LayerCard layer="Processing" data={{ id: 2, ...systemData?.layers?.layer2 }} />
         </div>
@@ -381,10 +392,10 @@ export default function SystemPipeline() {
 
         {/* L3 Storage */}
         <div className="bg-dark-800 p-6 rounded-xl border border-dark-700">
-          <h3 className="text-gray-400 uppercase text-xs font-bold mb-4 tracking-wider">
+          <h3 className="text-gray-400 uppercase text-[10px] font-bold mb-4 tracking-wider text-center md:text-left">
             Layer 3: Storage Foundation
           </h3>
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4">
             <div className="bg-red-900/20 border border-red-900/50 p-4 rounded-lg text-center">
               <div className="text-red-400 font-bold mb-1">Redis</div>
               <div className="text-xs text-gray-400">{systemData?.infra?.redis}</div>
@@ -437,7 +448,7 @@ export default function SystemPipeline() {
           <div className="absolute top-0 right-0 bg-red-600 text-white text-xs font-bold px-3 py-1 rounded-bl-xl">
             CRITICAL PATH
           </div>
-          <div className="grid md:grid-cols-2 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-8">
             <LayerCard layer="Analysis" data={{ id: 4, ...systemData?.layers?.layer4 }} />
             <LayerCard layer="Aggregation" data={{ id: 5, ...systemData?.layers?.layer5 }} />
           </div>
@@ -450,7 +461,7 @@ export default function SystemPipeline() {
         <FlowArrow />
 
         {/* L6 Signal -> L7 Presentation */}
-        <div className="grid md:grid-cols-2 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-8">
           <LayerCard layer="Signal" data={{ id: 6, ...systemData?.layers?.layer6 }} />
           <LayerCard layer="Presentation" data={{ id: 7, ...systemData?.layers?.layer7 }} />
         </div>

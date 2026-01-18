@@ -30,6 +30,7 @@ help:
 	@echo "  make docker-build   - Build all application Docker images"
 	@echo "  make docker-up      - Start full stack (infra + apps)"
 	@echo "  make docker-down    - Stop everything"
+	@echo "  make dashboard      - Rebuild and start the Dashboard UI"
 	@echo ""
 	@echo "🧪 TESTING"
 	@echo "  make test           - Run all tests"
@@ -261,6 +262,11 @@ e2e: infra
 	cd layer-1-ingestion && node scripts/batch_nifty50.js --symbol RELIANCE --days 1
 	cd layer-1-ingestion && node scripts/feed_kafka.js
 	@echo "✅ E2E test complete! Check TimescaleDB for data."
+
+dashboard:
+	@echo "🖥️  Rebuilding and Starting Dashboard..."
+	docker-compose --profile app up -d --build dashboard
+	@echo "✅ Dashboard is ready at http://localhost:3000"
 
 # ===========================================
 # PUBLIC SHARING (Tunnels)

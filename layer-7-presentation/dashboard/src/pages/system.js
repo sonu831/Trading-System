@@ -14,7 +14,7 @@ import {
 } from 'lucide-react'; // Simulating icons with text if package missing, but let's assume lucide-react or similar is not avail.
 // Using unicode/svg components below.
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || '/api/v1';
 
 // Icons as SVG components
 const Icons = {

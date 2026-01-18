@@ -10,7 +10,7 @@ import SkeletonLoader from '../components/dashboard/SkeletonLoader';
 import SignalsFeed from '../components/dashboard/SignalsFeed';
 import MarketTrendChart from '../components/charts/MarketTrendChart';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || '/api/v1';
 
 export default function Home() {
   const [marketView, setMarketView] = useState(null);

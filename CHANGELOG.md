@@ -19,6 +19,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Global Dashboard Enhancements**:
     - Added localized progress bars to the **Layer 1 (Ingestion)** card.
     - Added visual feedback (pulse effects) to **TimescaleDB** and **Kafka** cards to indicate active historical data feeding.
+- **Unified Gateway & Public Exposure**:
+  - Created **Nginx Gateway** (`infrastructure/gateway/nginx.conf`) to serve all services (Dashboard, Grafana, API, Kafka UI) under a single port/domain.
+  - Added `docker-compose.expose.yml` for simplified external access with support for **Cloudflare Tunnels**.
+  - Enabled **Relative API Routing** in the Dashboard to allow seamless operation across different public URLs.
+  - Provided a comprehensive **Public Exposure Guide** (`EXPOSURE_GUIDE.md`).
 - **Grafana "Control Tower" v2**:
   - Reorganized dashboard rows to prioritize **Data Ingestion Network Health**.
   - Added **Vendor-Neutral** panels for API Traffic and Latency (pre-configured for multi-vendor support).

@@ -390,11 +390,11 @@ services:
       - app
 
   # Layer 7: API Server
-  api:
+  backend-api:
     build:
       context: ./layer-7-presentation/api
       dockerfile: Dockerfile
-    container_name: api
+    container_name: backend-api
     ports:
       - "4000:4000"
     environment:

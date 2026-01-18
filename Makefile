@@ -12,6 +12,8 @@ help:
 	@echo "  make infra          - Start Kafka, Redis, TimescaleDB"
 	@echo "  make infra-all      - Start ALL infrastructure (incl. Prometheus, Grafana)"
 	@echo "  make infra-down     - Stop all infrastructure"
+	@echo "  make share          - Launch Unified Gateway & Public Tunnel"
+	@echo "  make share-url      - Display the Public Tunnel URL"
 	@echo ""
 	@echo "🔧 LAYER 1: INGESTION"
 	@echo "  make layer1         - Start Layer 1 (npm run dev)"
@@ -259,3 +261,19 @@ e2e: infra
 	cd layer-1-ingestion && node scripts/batch_nifty50.js --symbol RELIANCE --days 1
 	cd layer-1-ingestion && node scripts/feed_kafka.js
 	@echo "✅ E2E test complete! Check TimescaleDB for data."
+
+# ===========================================
+# PUBLIC SHARING (Tunnels)
+# ===========================================
+
+share:
+	@echo "🌐 Launching Unified Gateway & Public Tunnel..."
+	@echo "🛠  Rerebuilding Dashboard to apply relative path fixes..."
+	docker-compose -f docker-compose.yml -f docker-compose.expose.yml --profile app --profile expose up -d --build dashboard gateway tunnel
+	@echo "⏳ Waiting for tunnel to establish..."
+	@sleep 15
+	@make share-url
+
+share-url:
+	@echo "🔗 Your Public URL is:"
+	@docker logs trading-tunnel 2>&1 | grep -o 'https://.*trycloudflare.com' || echo "⚠️  Tunnel still starting, please wait and run 'make share-url' again."

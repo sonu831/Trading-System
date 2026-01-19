@@ -8,6 +8,9 @@ fastify.register(require('@fastify/cors'), {
   origin: true, // Allow all for dev
 });
 
+// Register backfill routes
+fastify.register(require('./routes/backfill'));
+
 const PORT = process.env.PORT || 4000;
 
 const promClient = require('prom-client');
@@ -159,6 +162,7 @@ fastify.post('/api/v1/system/backfill/trigger', async (request, reply) => {
       'system:commands',
       JSON.stringify({
         command: 'START_BACKFILL',
+        params: request.body, // Pass { fromDate, toDate, symbol }
         timestamp: Date.now(),
       })
     );

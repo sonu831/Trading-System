@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { BackfillModal, BackfillProgress } from '@/components/features/Backfill';
 import {
   Activity,
   Server,
@@ -11,8 +12,7 @@ import {
   ExternalLink,
   ArrowRight,
   ArrowDown,
-} from 'lucide-react'; // Simulating icons with text if package missing, but let's assume lucide-react or similar is not avail.
-// Using unicode/svg components below.
+} from 'lucide-react';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || '/api/v1';
 
@@ -175,7 +175,6 @@ const LayerCard = ({ layer, data }) => (
     <div className="grid grid-cols-1 xs:grid-cols-2 gap-2 text-xs">
       {data?.metrics &&
         Object.entries(data.metrics).map(([key, value]) => {
-          // Special handling for key names
           const label = key.replace('websocket_', '').replace('_kb', ' (KB)').replace('_', ' ');
           return (
             <div key={key} className="bg-dark-900 p-2 rounded">
@@ -237,6 +236,7 @@ const FlowArrow = () => (
 
 export default function SystemPipeline() {
   const [systemData, setSystemData] = useState(null);
+  const [isBackfillOpen, setIsBackfillOpen] = useState(false);
 
   useEffect(() => {
     const fetchStatus = async () => {
@@ -252,15 +252,6 @@ export default function SystemPipeline() {
     return () => clearInterval(interval);
   }, []);
 
-  const handleTriggerBackfill = async () => {
-    try {
-      await axios.post(`${API_URL}/system/backfill/trigger`);
-      // Refresh will happen via the regular interval
-    } catch (err) {
-      alert('Failed to trigger backfill: ' + (err.response?.data?.error || err.message));
-    }
-  };
-
   return (
     <main className="min-h-screen bg-dark-900 text-gray-100 p-2 md:p-8 font-sans">
       <header className="mb-6 md:mb-10 flex flex-col lg:flex-row justify-between items-center bg-dark-800 p-4 md:p-6 rounded-xl border border-dark-700 gap-6">
@@ -270,7 +261,7 @@ export default function SystemPipeline() {
         </div>
         <div className="flex flex-wrap justify-center gap-3 md:gap-4 w-full lg:w-auto">
           <button
-            onClick={handleTriggerBackfill}
+            onClick={() => setIsBackfillOpen(true)}
             disabled={systemData?.layers?.layer1?.backfill?.status === 'running'}
             className={`flex items-center justify-center gap-2 px-3 md:px-4 py-2 rounded-lg font-bold transition text-sm md:text-base flex-1 sm:flex-initial ${
               systemData?.layers?.layer1?.backfill?.status === 'running'
@@ -282,7 +273,7 @@ export default function SystemPipeline() {
             <span>
               {systemData?.layers?.layer1?.backfill?.status === 'running'
                 ? 'Backfilling...'
-                : 'Trigger Backfill'}
+                : 'Backfill Manager'}
             </span>
           </button>
 
@@ -314,75 +305,29 @@ export default function SystemPipeline() {
         </div>
       </header>
 
+      {/* ... Content ... */}
+      {/* Keeping previous content structure but omitted for brevity in thought process, must include in full replacement */}
+      {/* Re-rendering full content below */}
+
+      {/* Backfill Notification */}
       {/* Backfill Notification */}
       {systemData?.layers?.layer1?.backfill?.status === 'running' && (
-        <div className="max-w-4xl mx-auto mb-8 bg-indigo-900/30 border border-indigo-500/50 p-4 md:p-6 rounded-xl relative overflow-hidden">
-          <div className="flex flex-col sm:row justify-between items-center sm:items-start gap-4 mb-4">
-            <div className="flex items-center gap-3 w-full sm:w-auto">
-              <div className="p-2 bg-indigo-600 rounded-lg animate-pulse shrink-0">
-                <Icons.Ingestion />
-              </div>
-              <div>
-                <h3 className="font-bold text-white text-sm md:text-base">
-                  Historical Backfill in Progress
-                </h3>
-                <p className="text-indigo-300 text-xs md:text-sm line-clamp-1">
-                  {systemData.layers.layer1.backfill.details || 'Syncing indices...'}
-                </p>
-              </div>
-            </div>
-            <div className="flex sm:block items-end justify-between w-full sm:w-auto border-t border-indigo-500/20 pt-3 sm:pt-0 sm:border-0 border-dashed">
-              <div className="text-2xl font-bold text-white sm:text-right">
-                {systemData.layers.layer1.backfill.progress}%
-              </div>
-              <div className="text-[10px] text-indigo-400 uppercase tracking-widest sm:text-right">
-                Complete
-              </div>
-            </div>
-          </div>
-          <div className="w-full bg-dark-900 rounded-full h-2.5 overflow-hidden">
-            <div
-              className="bg-indigo-500 h-full transition-all duration-1000 ease-out"
-              style={{ width: `${systemData.layers.layer1.backfill.progress}%` }}
-            ></div>
-          </div>
+        <div className="max-w-4xl mx-auto">
+          <BackfillProgress
+            status="running"
+            progress={systemData.layers.layer1.backfill.progress}
+            details={systemData.layers.layer1.backfill.details}
+          />
         </div>
       )}
 
       {systemData?.layers?.layer1?.backfill?.status === 'completed' && (
-        <div className="max-w-4xl mx-auto mb-8 bg-green-900/20 border border-green-500/30 p-4 rounded-xl flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="text-green-500">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-6 w-6"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M5 13l4 4L19 7"
-                />
-              </svg>
-            </div>
-            <span className="text-green-200">Historical Backfill Completed Successfully</span>
-          </div>
-          <button
-            onClick={async () => {
-              // One-time clear of the completed status if we wanted to
-            }}
-            className="text-gray-500 hover:text-white text-xs"
-          >
-            Dismiss
-          </button>
+        <div className="max-w-4xl mx-auto">
+          <BackfillProgress status="completed" />
         </div>
       )}
 
       <div className="max-w-4xl mx-auto space-y-4 md:space-y-6">
-        {/* L1 -> L2 */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-8 relative">
           <LayerCard layer="Ingestion" data={{ id: 1, ...systemData?.layers?.layer1 }} />
           <LayerCard layer="Processing" data={{ id: 2, ...systemData?.layers?.layer2 }} />
@@ -390,7 +335,6 @@ export default function SystemPipeline() {
 
         <FlowArrow />
 
-        {/* L3 Storage */}
         <div className="bg-dark-800 p-6 rounded-xl border border-dark-700">
           <h3 className="text-gray-400 uppercase text-[10px] font-bold mb-4 tracking-wider text-center md:text-left">
             Layer 3: Storage Foundation
@@ -414,9 +358,6 @@ export default function SystemPipeline() {
                 )}
               </div>
               <div className="text-xs text-gray-400">{systemData?.infra?.timescaledb}</div>
-              {systemData?.layers?.layer1?.backfill?.status === 'running' && (
-                <div className="text-[8px] text-green-500 mt-1 font-bold">SYNCING HISTORY</div>
-              )}
             </div>
             <div
               className={`bg-orange-900/20 border border-orange-900/50 p-4 rounded-lg text-center transition-all ${
@@ -432,16 +373,12 @@ export default function SystemPipeline() {
                 )}
               </div>
               <div className="text-xs text-gray-400">{systemData?.infra?.kafka}</div>
-              {systemData?.layers?.layer1?.backfill?.progress > 50 && (
-                <div className="text-[8px] text-orange-500 mt-1 font-bold">FEEDING TOPIC</div>
-              )}
             </div>
           </div>
         </div>
 
         <FlowArrow />
 
-        {/* L4 Analysis -> L5 Aggregation */}
         <div
           className={`bg-dark-800 p-8 rounded-xl border-2 border-red-500/30 relative overflow-hidden transition duration-500 ${systemData?.layers?.layer4?.status === 'ONLINE' ? 'shadow-[0_0_30px_rgba(239,68,68,0.15)]' : ''}`}
         >
@@ -460,12 +397,13 @@ export default function SystemPipeline() {
 
         <FlowArrow />
 
-        {/* L6 Signal -> L7 Presentation */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-8">
           <LayerCard layer="Signal" data={{ id: 6, ...systemData?.layers?.layer6 }} />
           <LayerCard layer="Presentation" data={{ id: 7, ...systemData?.layers?.layer7 }} />
         </div>
       </div>
+
+      <BackfillModal isOpen={isBackfillOpen} onClose={() => setIsBackfillOpen(false)} />
     </main>
   );
 }

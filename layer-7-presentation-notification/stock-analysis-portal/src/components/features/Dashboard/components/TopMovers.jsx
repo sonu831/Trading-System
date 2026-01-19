@@ -1,18 +1,36 @@
 import React from 'react';
-import Carousel from './Carousel';
+import PropTypes from 'prop-types';
+import { Carousel } from '@/components/ui';
 
-const StockCard = ({ title, symbol, value, subValue, type }) => (
-  <div className="min-w-[160px] bg-gray-750 p-3 rounded-lg border border-gray-600 flex flex-col snap-center hover:bg-gray-700 transition cursor-pointer">
-    <div className="text-xs text-gray-400 mb-1">{title}</div>
-    <div className="font-bold text-white text-lg">{symbol}</div>
-    <div
-      className={`font-mono text-sm font-bold ${type === 'bull' ? 'text-green-400' : type === 'bear' ? 'text-red-400' : 'text-blue-400'}`}
-    >
-      {value}
+const StockCard = ({ title, symbol, value, subValue, type }) => {
+  const getValueColor = () => {
+    switch (type) {
+      case 'bull':
+        return 'text-success';
+      case 'bear':
+        return 'text-error';
+      default:
+        return 'text-info';
+    }
+  };
+
+  return (
+    <div className="min-w-[160px] bg-background p-3 rounded-lg border border-border flex flex-col snap-center hover:bg-surface-hover transition cursor-pointer group">
+      <div className="text-xs text-text-tertiary mb-1 group-hover:text-text-secondary">{title}</div>
+      <div className="font-bold text-text-primary text-lg">{symbol}</div>
+      <div className={`font-mono text-sm font-bold ${getValueColor()}`}>{value}</div>
+      <div className="text-xs text-text-tertiary mt-1">{subValue}</div>
     </div>
-    <div className="text-xs text-gray-500 mt-1">{subValue}</div>
-  </div>
-);
+  );
+};
+
+StockCard.propTypes = {
+  title: PropTypes.string,
+  symbol: PropTypes.string,
+  value: PropTypes.string,
+  subValue: PropTypes.string,
+  type: PropTypes.oneOf(['bull', 'bear', 'neutral']),
+};
 
 const TopMovers = ({ marketView }) => {
   if (!marketView || !marketView.all_stocks) return null;
@@ -81,6 +99,19 @@ const TopMovers = ({ marketView }) => {
       ))}
     </Carousel>
   );
+};
+
+TopMovers.propTypes = {
+  marketView: PropTypes.shape({
+    all_stocks: PropTypes.arrayOf(
+      PropTypes.shape({
+        symbol: PropTypes.string,
+        change_pct: PropTypes.number,
+        ltp: PropTypes.number,
+      })
+    ),
+    sector_performance: PropTypes.object,
+  }),
 };
 
 export default TopMovers;

@@ -348,6 +348,46 @@ async function startRedis() {
     }
   });
 
+  // New: Enhanced backfill status notifications
+  subscriber.subscribe('backfill:status', (message) => {
+    try {
+      const data = JSON.parse(message);
+      let text = '';
+
+      if (data.type === 'START') {
+        text =
+          `🚀 *Backfill Job Started*\n\n` +
+          `📊 *Job ID*: \`${data.jobId}\`\n` +
+          `📦 *Symbols*: ${data.symbols}\n` +
+          `📅 *Range*: ${data.fromDate} to ${data.toDate}\n` +
+          `⏱ *Interval*: ${data.interval}\n\n` +
+          `_Processing historical data..._`;
+      } else if (data.type === 'COMPLETE') {
+        text =
+          `✅ *Backfill Job Complete*\n\n` +
+          `📊 *Job ID*: \`${data.jobId}\`\n` +
+          `📦 *Symbols*: ${data.symbols}\n` +
+          `📅 *Range*: ${data.fromDate} to ${data.toDate}\n` +
+          `✅ *Success*: ${data.successCount} symbols\n` +
+          `❌ *Failed*: ${data.failCount} symbols\n` +
+          `📈 *Total Candles*: ${data.totalCandles}\n` +
+          `💾 *DB Rows*: ${data.dbRowsInserted}\n` +
+          `⏱ *Duration*: ${data.durationSeconds}s\n\n` +
+          `_Data ready for analysis!_`;
+      } else if (data.type === 'ERROR') {
+        text =
+          `❌ *Backfill Job Failed*\n\n` +
+          `📊 *Job ID*: \`${data.jobId}\`\n` +
+          `🔴 *Error*: ${data.error}\n\n` +
+          `_Please check logs for details._`;
+      }
+
+      if (text) broadcast(text);
+    } catch {
+      logger.error('Invalid backfill:status msg');
+    }
+  });
+
   subscriber.subscribe('signals:new', (message) => {
     try {
       const signal = JSON.parse(message);

@@ -1,14 +1,14 @@
 import React from 'react';
 
 const SkeletonPulse = ({ className }) => (
-  <div className={`animate-pulse bg-gray-700/50 rounded ${className}`}></div>
+  <div className={`animate-pulse bg-surface-hover rounded ${className}`}></div>
 );
 
-const SkeletonLoader = () => {
+const DashboardSkeleton = () => {
   return (
     <div className="space-y-6 animate-pulse">
       {/* Header Skeleton */}
-      <div className="flex flex-col md:flex-row justify-between items-center bg-gray-800 p-4 rounded-xl border border-gray-700">
+      <div className="flex flex-col md:flex-row justify-between items-center bg-surface p-4 rounded-xl border border-border">
         <div className="space-y-2">
           <SkeletonPulse className="h-8 w-64" />
           <SkeletonPulse className="h-4 w-48" />
@@ -21,12 +21,12 @@ const SkeletonLoader = () => {
 
       {/* Market Overview Skeleton */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="bg-gray-800 p-6 rounded-xl border border-gray-700 h-40">
+        <div className="bg-surface p-6 rounded-xl border border-border h-40">
           <SkeletonPulse className="h-4 w-32 mb-4" />
           <SkeletonPulse className="h-12 w-20 mb-2" />
           <SkeletonPulse className="h-4 w-24" />
         </div>
-        <div className="bg-gray-800 p-6 rounded-xl border border-gray-700 h-40">
+        <div className="bg-surface p-6 rounded-xl border border-border h-40">
           <SkeletonPulse className="h-4 w-32 mb-4" />
           <div className="flex justify-between items-end mb-2">
             <SkeletonPulse className="h-8 w-16" />
@@ -37,11 +37,11 @@ const SkeletonLoader = () => {
       </div>
 
       {/* Carousel Skeleton */}
-      <div className="bg-gray-800 p-4 rounded-xl border border-gray-700">
+      <div className="bg-surface p-4 rounded-xl border border-border">
         <SkeletonPulse className="h-4 w-40 mb-4" />
         <div className="flex space-x-4 overflow-hidden">
           {[1, 2, 3, 4, 5].map((i) => (
-            <div key={i} className="min-w-[160px] h-24 bg-gray-700/30 rounded-lg p-3">
+            <div key={i} className="min-w-[160px] h-24 bg-background rounded-lg p-3">
               <SkeletonPulse className="h-3 w-20 mb-2" />
               <SkeletonPulse className="h-6 w-16 mb-2" />
               <SkeletonPulse className="h-4 w-12" />
@@ -51,7 +51,7 @@ const SkeletonLoader = () => {
       </div>
 
       {/* Grid Skeleton */}
-      <div className="bg-gray-800 rounded-xl border border-gray-700 p-4">
+      <div className="bg-surface rounded-xl border border-border p-4">
         <div className="grid grid-cols-5 gap-4 mb-4">
           {[1, 2, 3, 4, 5].map((i) => (
             <SkeletonPulse key={i} className="h-8 w-full" />
@@ -67,4 +67,4 @@ const SkeletonLoader = () => {
   );
 };
 
-export default SkeletonLoader;
+export default DashboardSkeleton;

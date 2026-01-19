@@ -3,10 +3,17 @@ const nextConfig = {
   reactStrictMode: true,
   output: 'standalone',
   async rewrites() {
+    // Use localhost for local dev, backend-api for Docker
+    const apiHost = process.env.NODE_ENV === 'development' ? 'localhost:4000' : 'backend-api:4000';
+
     return [
       {
         source: '/api/v1/:path*',
-        destination: 'http://backend-api:4000/api/v1/:path*', // Proxy to Backend API
+        destination: `http://${apiHost}/api/v1/:path*`, // Proxy to Backend API
+      },
+      {
+        source: '/api/backfill/:path*',
+        destination: `http://${apiHost}/api/backfill/:path*`, // Backfill routes
       },
       {
         source: '/grafana/:path*',

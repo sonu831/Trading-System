@@ -234,7 +234,7 @@ async function initialize() {
       }
     };
 
-    const runBackfill = async () => {
+    const runBackfill = async (startParams = {}) => {
       if (isBackfilling) {
         logger.warn('⚠️ Backfill already in progress. Skipping...');
         return;
@@ -242,14 +242,30 @@ async function initialize() {
       isBackfilling = true;
       try {
         const startTime = Date.now();
-        await updateBackfillStatus('running', 5, 'Starting Backfill Process...');
+        const { fromDate, toDate, symbol } = startParams;
+        const symbolMsg = symbol ? `Symbol: ${symbol}` : 'All Symbols';
+        const dateMsg = fromDate && toDate ? `(${fromDate} to ${toDate})` : '(Last 5 Days)';
+
+        await updateBackfillStatus('running', 5, `Starting Backfill... ${symbolMsg} ${dateMsg}`);
 
         // 1. Run Batch Fetch
-        logger.info('⏳ Step 1: Fetching Historical Data (Last 5 Days)...');
-        await updateBackfillStatus('running', 10, 'Fetching Historical Data...');
+        logger.info(`⏳ Step 1: Fetching Historical Data... ${symbolMsg} ${dateMsg}`);
+        await updateBackfillStatus('running', 10, `Fetching Data... ${symbolMsg}`);
 
         const batchScript = path.resolve(__dirname, '../scripts/batch_nifty50.js');
-        await runScriptWithIPC(batchScript, ['--days', '5']);
+
+        // Construct Arguments based on params
+        const scriptArgs = [];
+        if (symbol) {
+          scriptArgs.push('--symbol', symbol);
+        }
+        if (fromDate && toDate) {
+          scriptArgs.push('--from', fromDate, '--to', toDate);
+        } else {
+          scriptArgs.push('--days', '5');
+        }
+
+        await runScriptWithIPC(batchScript, scriptArgs);
 
         await updateBackfillStatus('running', 50, 'Step 1 Complete: Data Downloaded');
 
@@ -283,10 +299,12 @@ async function initialize() {
       await commandClient.connect();
       await commandClient.subscribe('system:commands', async (message) => {
         try {
-          const { command } = JSON.parse(message);
+          const { command, params } = JSON.parse(message);
           if (command === 'START_BACKFILL') {
-            logger.info('📥 Received START_BACKFILL command. Triggering backfill...');
-            runBackfill();
+            logger.info(
+              `📥 Received START_BACKFILL command. Triggering backfill with params: ${JSON.stringify(params)}`
+            );
+            runBackfill(params);
           }
         } catch (e) {
           logger.error('Command Parse Error', e);

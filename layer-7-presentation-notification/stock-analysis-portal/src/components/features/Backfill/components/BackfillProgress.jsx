@@ -1,8 +1,11 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 
-const BackfillProgress = ({ status, progress, details, onClose }) => {
-  if (status === 'running') {
+const BackfillProgress = ({ status, progress, details, logs, onClose }) => {
+  const isRunning = status === 'running' || status === 1;
+  const isCompleted = status === 'completed' || status === 2;
+
+  if (isRunning) {
     return (
       <div className="bg-indigo-900/10 border border-indigo-500/20 p-4 rounded-xl relative overflow-hidden mb-6 shadow-[0_0_15px_rgba(99,102,241,0.1)]">
         <div className="flex flex-col sm:flex-row justify-between items-center sm:items-start gap-4 mb-3">
@@ -44,6 +47,23 @@ const BackfillProgress = ({ status, progress, details, onClose }) => {
           </div>
         </div>
 
+        {/* Real-time Logs Terminal */}
+        <div className="mb-4 bg-gray-950 rounded-lg border border-gray-800 p-3 font-mono text-[10px] md:text-xs h-32 overflow-y-auto shadow-inner custom-scrollbar">
+          {logs && logs.length > 0 ? (
+            logs.map((log, index) => (
+              <div
+                key={index}
+                className="text-gray-300 border-b border-gray-900/50 pb-0.5 mb-0.5 last:border-0"
+              >
+                <span className="text-indigo-400 mr-2">➜</span>
+                {log}
+              </div>
+            ))
+          ) : (
+            <div className="text-gray-500 italic text-center mt-10">Waiting for log stream...</div>
+          )}
+        </div>
+
         <div className="w-full bg-background/50 rounded-full h-2.5 overflow-hidden shadow-inner border border-black/5 dark:border-white/5">
           <div
             className="bg-gradient-to-r from-indigo-500 to-purple-500 h-full transition-all duration-1000 ease-out shadow-[0_0_10px_rgba(99,102,241,0.4)] relative"
@@ -56,7 +76,7 @@ const BackfillProgress = ({ status, progress, details, onClose }) => {
     );
   }
 
-  if (status === 'completed') {
+  if (isCompleted) {
     return (
       <div className="bg-success/10 border border-success/30 p-4 rounded-xl flex items-center justify-between mb-6 shadow-sm">
         <div className="flex items-center gap-3">
@@ -99,9 +119,10 @@ const BackfillProgress = ({ status, progress, details, onClose }) => {
 };
 
 BackfillProgress.propTypes = {
-  status: PropTypes.string,
+  status: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
   progress: PropTypes.number,
   details: PropTypes.string,
+  logs: PropTypes.array,
   onClose: PropTypes.func,
 };
 

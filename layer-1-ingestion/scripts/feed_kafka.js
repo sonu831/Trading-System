@@ -5,7 +5,9 @@ const { DateTime } = require('luxon');
 require('dotenv').config({ path: path.resolve(__dirname, '../../.env') });
 
 // Configuration
-const KAFKA_BROKER = process.env.KAFKA_BROKER || 'localhost:9092';
+const KAFKA_BROKERS = process.env.KAFKA_BROKERS
+  ? process.env.KAFKA_BROKERS.split(',')
+  : ['localhost:9092'];
 const TOPIC = 'market_data_feed';
 const DATA_DIR = path.resolve(__dirname, '../data/historical');
 
@@ -15,7 +17,7 @@ let redisClient = null;
 
 const kafka = new Kafka({
   clientId: 'layer-1-history-feeder',
-  brokers: [KAFKA_BROKER],
+  brokers: KAFKA_BROKERS,
   retry: {
     initialRetryTime: 100,
     retries: 2,
@@ -26,7 +28,7 @@ const producer = kafka.producer();
 
 async function main() {
   console.log('🚀 Starting Historical Data Feeder...');
-  console.log(`🔌 Kafka Broker: ${KAFKA_BROKER}`);
+  console.log(`🔌 Kafka Brokers: ${KAFKA_BROKERS.join(',')}`);
   console.log(`📂 Data Dir: ${DATA_DIR}`);
 
   try {
@@ -47,7 +49,7 @@ async function main() {
     const updateStatus = async (progress, details) => {
       if (redisClient) {
         const statusObj = {
-          status: 'running',
+          status: 1, // 1: Running
           progress: Math.round(progress),
           details: details,
           job_type: 'historical_backfill',

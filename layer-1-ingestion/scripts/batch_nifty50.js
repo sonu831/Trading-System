@@ -125,16 +125,33 @@ async function main() {
     interval: INTERVAL,
   });
 
-  const updateStatus = async (progress, details, status = 'running') => {
+  const logToRedis = async (message) => {
+    if (redisClient) {
+      try {
+        const logEntry = `[${new Date().toLocaleTimeString()}] ${message}`;
+        // Push to list and trim to last 50 entries
+        await redisClient.lPush('system:layer1:logs', logEntry);
+        await redisClient.lTrim('system:layer1:logs', 0, 49);
+      } catch (e) {
+        console.warn('Failed to push log to Redis', e);
+      }
+    }
+  };
+
+  const updateStatus = async (progress, details, status = 1) => {
     if (redisClient) {
       const statusObj = {
-        status: status,
+        status: status, // 0:Idle, 1:Run, 2:Done, 3:Fail
+        progress: Math.round(progress),
         progress: Math.round(progress),
         details: details,
         job_type: 'historical_backfill',
         timestamp: Date.now(),
       };
       await redisClient.set('system:layer1:backfill', JSON.stringify(statusObj));
+
+      // Auto-log details if provided
+      if (details) await logToRedis(details);
     }
   };
 
@@ -249,10 +266,12 @@ async function main() {
 
         fs.writeFileSync(filePath, JSON.stringify(fileData, null, 2));
         console.log(`   ✅ Saved ${formattedCandles.length} candles to ${filename}`);
+        await logToRedis(`✅ ${symbol}: Saved ${formattedCandles.length} candles`);
         totalCandles += formattedCandles.length;
         successCount++;
       } else {
         console.error(`   ❌ Failed to fetch data: ${response.message || 'Unknown Error'}`);
+        await logToRedis(`❌ ${symbol}: Failed - ${response.message || 'Unknown Error'}`);
         failCount++;
       }
     } catch (e) {
@@ -287,7 +306,7 @@ async function main() {
   console.log('==========================================');
 
   await vendor.disconnect();
-  await updateStatus(100, 'Backfill Complete', 'completed');
+  await updateStatus(100, 'Backfill Complete', 2);
 
   // Send COMPLETE notification with full stats
   await sendNotification('COMPLETE', {

@@ -204,7 +204,7 @@ async function initialize() {
     const updateBackfillStatus = async (status, progress = 0, details = '') => {
       try {
         const statusObj = {
-          status,
+          status, // 0:Idle, 1:Run, 2:Done, 3:Fail
           progress,
           details,
           job_type: 'historical_backfill',
@@ -213,11 +213,11 @@ async function initialize() {
         await redisClient.set('system:layer1:backfill', JSON.stringify(statusObj));
 
         // Update Prometheus
-        if (status === 'running') {
+        if (status === 1 || status === 'running') {
           metrics.batchJobStatus.set({ job_type: 'historical_backfill' }, 1);
-        } else if (status === 'completed') {
+        } else if (status === 2 || status === 'completed') {
           metrics.batchJobStatus.set({ job_type: 'historical_backfill' }, 2);
-        } else if (status === 'failed') {
+        } else if (status === 3 || status === 'failed') {
           metrics.batchJobStatus.set({ job_type: 'historical_backfill' }, 3);
         } else {
           metrics.batchJobStatus.set({ job_type: 'historical_backfill' }, 0);
@@ -246,11 +246,11 @@ async function initialize() {
         const symbolMsg = symbol ? `Symbol: ${symbol}` : 'All Symbols';
         const dateMsg = fromDate && toDate ? `(${fromDate} to ${toDate})` : '(Last 5 Days)';
 
-        await updateBackfillStatus('running', 5, `Starting Backfill... ${symbolMsg} ${dateMsg}`);
+        await updateBackfillStatus(1, 5, `Starting Backfill... ${symbolMsg} ${dateMsg}`);
 
         // 1. Run Batch Fetch
         logger.info(`⏳ Step 1: Fetching Historical Data... ${symbolMsg} ${dateMsg}`);
-        await updateBackfillStatus('running', 10, `Fetching Data... ${symbolMsg}`);
+        await updateBackfillStatus(1, 10, `Fetching Data... ${symbolMsg}`);
 
         const batchScript = path.resolve(__dirname, '../scripts/batch_nifty50.js');
 
@@ -267,11 +267,11 @@ async function initialize() {
 
         await runScriptWithIPC(batchScript, scriptArgs);
 
-        await updateBackfillStatus('running', 50, 'Step 1 Complete: Data Downloaded');
+        await updateBackfillStatus(1, 50, 'Step 1 Complete: Data Downloaded');
 
         // 2. Feed Kafka
         logger.info('⏳ Step 2: Feeding Data to Kafka...');
-        await updateBackfillStatus('running', 55, 'Feeding Data to Kafka...');
+        await updateBackfillStatus(1, 55, 'Feeding Data to Kafka...');
         const feedScript = path.resolve(__dirname, '../scripts/feed_kafka.js');
         await runScriptWithIPC(feedScript);
 
@@ -281,10 +281,10 @@ async function initialize() {
           duration
         );
 
-        await updateBackfillStatus('completed', 100, 'Backfill Complete');
+        await updateBackfillStatus(2, 100, 'Backfill Complete');
         logger.info('✅ Backfill Complete.');
       } catch (err) {
-        await updateBackfillStatus('failed', 0, err.message);
+        await updateBackfillStatus(3, 0, err.message);
         logger.error(`❌ Backfill Failed: ${err.message}`);
       } finally {
         isBackfilling = false;

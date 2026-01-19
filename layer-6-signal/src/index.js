@@ -73,6 +73,22 @@ async function start() {
       res.json({ status: 'UP', redis: redis.isConnected });
     });
 
+    // Initialize Redis for System Metrics
+    const redisClient = redis.createClient({
+      url: process.env.REDIS_URL || 'redis://localhost:6379',
+    });
+    redisClient.on('error', (err) => logger.error('Redis Client Error', err));
+    await redisClient.connect();
+
+    // Auto-fix WRONGTYPE error by deleting locally
+    try {
+      await redisClient.del('system:layer6:metrics');
+    } catch (e) {
+      /* ignore */
+    }
+
+    logger.info('✅ Redis Metric Publisher connected');
+
     // Start Metrics Loop
     setInterval(async () => {
       try {

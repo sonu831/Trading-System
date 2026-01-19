@@ -5,6 +5,33 @@ All notable changes to the **Nifty 50 Trading System** project will be documente
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2026-01-20
+
+### 🚀 Added
+
+- **Telegram Bot "Guru Ji 3.0"**:
+  - **Interactive Menu**: Added `Markup.keyboard` for `/start`, `/help`, and `hi` greetings. Users now see a clickable button grid instead of plain text.
+  - **`/backfill` Command**: Now parses arguments (e.g., `/backfill 30d 1m`) to specify days and candle interval. Returns detailed Job ID, range, and symbols.
+  - **`/livestatus` Command**: Opens a real-time "Live Console" that streams backfill progress by editing a single message every 3 seconds. Auto-closes on job completion.
+  - **Post-Backfill Inline Buttons**: When a backfill completes, the notification includes inline buttons for `/ownanalysis`, `/movers`, `/high`, `/low`, `/feed`.
+  - **Enhanced `/stop`**: Now intelligently stops active `/livestatus` streams or unsubscribes from alerts.
+  - **Callback Query Handlers**: Added `bot.action` handlers for all inline button types.
+
+- **Real-time Log Stream (UI)**:
+  - **Backend**: `batch_nifty50.js` now pushes detailed log messages to `system:layer1:logs` Redis List.
+  - **API**: `/api/v1/system-status` exposes these logs.
+  - **Frontend**: `BackfillProgress.jsx` displays a scrolling terminal-like window with real-time logs.
+
+- **Standardized Backfill Status Codes**:
+  - Backend scripts (`batch_nifty50.js`, `feed_kafka.js`, `index.js`) now emit integer status codes (`0:Idle`, `1:Run`, `2:Done`, `3:Fail`) for Grafana compatibility.
+  - Frontend components (`BackfillProgress.jsx`, `BackfillPanel.jsx`) updated to interpret both string and numeric statuses.
+
+### 🐛 Fixed
+
+- **Kafka Connection Refused**: Fixed `feed_kafka.js` defaulting to `localhost:9092`. Now correctly reads `KAFKA_BROKERS` env var (resolves to `kafka:29092` in Docker).
+- **WRONGTYPE Redis Error**: Cleared and auto-fixed stale `system:layerX:metrics` keys that caused type conflicts between Hash and String operations.
+- **Ingestion Container Stale Code**: Forced explicit Docker rebuild to ensure code changes are baked into images.
+
 ## [0.3.0] - 2026-01-19
 
 ### 🚀 Added

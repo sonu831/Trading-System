@@ -109,32 +109,21 @@ fastify.get('/api/v1/system-status', async (req, reply) => {
       /* ignore */
     }
 
+    const logs = await redis.getList('system:layer1:logs', 0, 49);
+
     const l1 = (await getMetric('system:layer1:metrics')) || {
       type: 'Stream',
       source: 'MStock',
       status: 'Unknown',
     };
     const backfill = await getMetric('system:layer1:backfill');
-    const l2 = (await getMetric('system:layer2:metrics')) || { candles_processed: candleCount };
-    const l4 = (await getMetric('system:layer4:metrics')) || {
-      stocks_analyzed: 50,
-      latency: '10ms',
-      goroutines: 0,
-    };
-    const l5 = (await getMetric('system:layer5:metrics')) || { sectors: 12, goroutines: 0 };
-    const l6 = (await getMetric('system:layer6:metrics')) || { signals_total: signalCount };
-
+    // ...
     // Layer 7 (Self)
-    const mem = process.memoryUsage();
-    const l7 = {
-      active: true,
-      heap_used: (mem.heapUsed / 1024 / 1024).toFixed(2) + 'MB',
-      uptime: process.uptime().toFixed(0) + 's',
-    };
+    // ...
 
     return {
       layers: {
-        layer1: { name: 'Ingestion', status: 'ONLINE', metrics: l1, backfill },
+        layer1: { name: 'Ingestion', status: 'ONLINE', metrics: l1, backfill, logs },
         layer2: { name: 'Processing', status: 'ONLINE', metrics: l2 },
         layer3: {
           name: 'Storage',

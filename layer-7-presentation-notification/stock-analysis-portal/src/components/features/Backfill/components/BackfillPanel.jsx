@@ -155,17 +155,20 @@ export default function BackfillPanel() {
 
         <Button
           type="submit"
-          disabled={loading || (backfillStatus && backfillStatus.status === 'running')}
+          disabled={
+            loading ||
+            (backfillStatus && (backfillStatus.status === 'running' || backfillStatus.status === 1))
+          }
           loading={loading}
           className={`w-full transition-opacity ${
-            backfillStatus && backfillStatus.status === 'running'
+            backfillStatus && (backfillStatus.status === 'running' || backfillStatus.status === 1)
               ? 'bg-surface border border-border text-text-tertiary cursor-not-allowed'
               : 'bg-gradient-to-r from-primary to-accent hover:opacity-90'
           }`}
         >
           {loading
             ? 'Starting...'
-            : backfillStatus && backfillStatus.status === 'running'
+            : backfillStatus && (backfillStatus.status === 'running' || backfillStatus.status === 1)
               ? '⏳ Backfill in Progress...'
               : '🚀 Start Backfill'}
         </Button>

@@ -59,7 +59,7 @@ help:
 # Common docker-compose options
 DC := docker-compose --env-file .env
 
-up: infra app ui
+up: infra app notify ui observe
 	@echo "🚀 Full stack running!"
 	@echo "   Dashboard: http://localhost:3000"
 	@echo "   API:       http://localhost:4000"

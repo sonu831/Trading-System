@@ -241,16 +241,18 @@ async function main() {
   await updateStatus(50, 'Step 1 Complete: Data Downloaded');
 
   // Publish Notification
-  const stats = {
-    symbol: TARGET_SYMBOL || 'Nifty 50 Batch',
-    start_date: params.fromdate,
-    end_date: params.todate,
-    count: successCount,
-    duration: (DateTime.now().diff(end).as('seconds') * -1).toFixed(2),
-  };
-  await redisClient.publish('notifications:backfill', JSON.stringify(stats));
+  if (redisClient) {
+    const stats = {
+      symbol: TARGET_SYMBOL || 'Nifty 50 Batch',
+      start_date: params.fromdate,
+      end_date: params.todate,
+      count: successCount,
+      duration: (DateTime.now().diff(end).as('seconds') * -1).toFixed(2),
+    };
+    await redisClient.publish('notifications:backfill', JSON.stringify(stats));
 
-  await redisClient.quit();
+    await redisClient.quit();
+  }
   process.exit(0);
 }
 

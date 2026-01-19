@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node src/index.js",
     "dev": "nodemon src/index.js",
-    "dev:local": "INGESTION_PORT=3010 nodemon src/index.js",
+    "dev:local": "INGESTION_PORT=3005 KAFKA_BROKERS=localhost:9092 REDIS_URL=redis://localhost:6379 npm start",
     "test": "jest",
     "test:integration": "jest --config jest.integration.config.js",
     "test:coverage": "jest --coverage",

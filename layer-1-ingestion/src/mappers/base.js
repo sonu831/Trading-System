@@ -1,28 +1,34 @@
 /**
  * Base Mapper Interface
- * Defines how vendor-specific data is converted to internal Tick schema
+ * standardizes all vendor ticks into the InternalTick schema
  */
+const { SymbolRegistry } = require('../utils/symbol-registry');
+
 class BaseMapper {
-  /**
-   * @param {Object} options - Configuration options (e.g. symbol mappings)
-   */
-  constructor(options = {}) {
-    this.options = options;
+  constructor(vendorName) {
+    this.vendorName = vendorName;
+    // Ensure Registry is loaded (idempotent)
+    SymbolRegistry.load();
   }
 
   /**
-   * Maps a vendor specific tick/quote to internal schema
-   * @param {Object} data - Raw data from vendor
-   * @returns {Object|null} Normalized Tick object
+   * Map raw vendor data to InternalTick
+   * @param {Object} data - Raw vendor string/object
+   * @returns {Object|null} InternalTick or null
    */
   map(data) {
-    throw new Error('Method map() must be implemented');
+    throw new Error('map() must be implemented');
   }
 
   /**
-   * Common utility to safely parse numbers
-   * @param {any} val
-   * @returns {number}
+   * Resolve System Symbol from Vendor Token
+   */
+  getSymbol(token) {
+    return SymbolRegistry.getSymbol(this.vendorName, token);
+  }
+
+  /**
+   * Helper: Parse float safely
    */
   parseNumber(val) {
     const num = parseFloat(val);

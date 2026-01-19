@@ -148,13 +148,14 @@ async function initialize() {
     }
 
     // Initialize Market Data Vendor via Factory
-    marketDataVendor = VendorFactory.createVendor({
-      apiKey: process.env.ZERODHA_API_KEY, // Or MStock vars (Env will drive this)
-      accessToken: process.env.ZERODHA_ACCESS_TOKEN, // Or MStock vars
+    const { VendorManager } = require('./vendors/manager');
+    marketDataVendor = new VendorManager({
+      // apiKey: process.env.ZERODHA_API_KEY, // Passed via Env to factory
       symbols: subscriptionList,
       onTick: handleTick,
     });
 
+    marketDataVendor.init();
     await marketDataVendor.connect();
 
     logger.info(`🎯 Subscribed to ${subscriptionList.length} Nifty 50 symbols (Stream Mode)`);

@@ -27,9 +27,13 @@ services:
       GF_SECURITY_ADMIN_USER: ${GRAFANA_USER:-admin}
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin123}
       GF_USERS_ALLOW_SIGN_UP: 'false'
-      # Subpath routing for public exposure via gateway
-      GF_SERVER_ROOT_URL: '%(protocol)s://%(domain)s:%(http_port)s/grafana/'
-      GF_SERVER_SERVE_FROM_SUB_PATH: 'true'
+      # Direct access on port 3001
+      GF_SERVER_DOMAIN: 'localhost'
+      GF_SERVER_ROOT_URL: 'http://localhost:3001/'
+      GF_SERVER_SERVE_FROM_SUB_PATH: 'false'
+      # Fix CORS origin issues
+      GF_SECURITY_ALLOW_EMBEDDING: 'true'
+      GF_AUTH_ANONYMOUS_ENABLED: 'false'
 
     volumes:
       - grafana-data:/var/lib/grafana
@@ -44,7 +48,7 @@ services:
   otel-collector:
     image: otel/opentelemetry-collector:latest
     container_name: otel-collector
-    command: ['--config=/etc/otel-collector-config.yaml']
+    command: [ '--config=/etc/otel-collector-config.yaml' ]
     volumes:
       - ../monitoring/otel-collector-config.yaml:/etc/otel-collector-config.yaml
     ports:
@@ -89,6 +93,29 @@ services:
       DATA_SOURCE_NAME: 'postgresql://trading:trading123@timescaledb:5432/nifty50?sslmode=disable'
     ports:
       - '9187:9187'
+    networks:
+      - trading-network
+
+  # ===========================================
+  # LOGGING STACK (Loki + Promtail)
+  # ===========================================
+
+  loki:
+    image: grafana/loki:latest
+    container_name: loki
+    ports:
+      - "3100:3100"
+    command: -config.file=/etc/loki/local-config.yaml
+    networks:
+      - trading-network
+
+  promtail:
+    image: grafana/promtail:latest
+    container_name: promtail
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock # Scrape container logs
+      - ../monitoring/promtail-config.yaml:/etc/promtail/config.yaml
+    command: -config.file=/etc/promtail/config.yaml
     networks:
       - trading-network
 

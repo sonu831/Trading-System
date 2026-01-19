@@ -10,8 +10,8 @@ const { CompositeVendor } = require('./composite');
 const { logger } = require('../utils/logger');
 
 class VendorFactory {
-  static createVendor(options) {
-    const provider = process.env.MARKET_DATA_PROVIDER || 'kite';
+  static createVendor(options, explicitProvider = null) {
+    const provider = explicitProvider || process.env.MARKET_DATA_PROVIDER || 'kite';
 
     logger.info(`🏭 Initializing Market Data Provider: ${provider.toUpperCase()}`);
 

@@ -29,9 +29,11 @@ class MStockVendor extends BaseVendor {
     this.client = new MConnect('https://api.mstock.trade', this.apiKey);
     this.ticker = null;
     this.connected = false;
+    this.intentionalDisconnect = false;
   }
 
   async connect() {
+    this.intentionalDisconnect = false;
     try {
       await this.authenticate();
       if (this.ticker) {
@@ -222,18 +224,63 @@ class MStockVendor extends BaseVendor {
 
       // Event: Error
       this.ticker.onError = (err) => {
-        logger.error(`❌ MStock MTicker Error: ${err}`);
+        const msg = err instanceof Error ? err.message : JSON.stringify(err);
+        logger.error(`❌ MStock MTicker Error: ${msg}`);
       };
 
       // Event: Close
       this.ticker.onClose = () => {
         logger.warn('⚠️ MStock MTicker Closed');
         this.connected = false;
+
+        if (!this.intentionalDisconnect && !this.isReconnecting) {
+          logger.warn('🔄 Unexpected Disconnect. Staring Reconnect Timer (5s)...');
+          this.isReconnecting = true;
+          setTimeout(() => this.reconnect(), 5000);
+        }
       };
 
       this.ticker.connect();
     } catch (err) {
       logger.error(`Failed to init MTicker: ${err.message}`);
+      // Retry init if it failed synchronously
+      if (!this.intentionalDisconnect && !this.isReconnecting) {
+        this.isReconnecting = true;
+        setTimeout(() => this.reconnect(), 10000); // Use reconnect() to ensure auth is fresh
+      }
+    }
+  }
+
+  async reconnect() {
+    if (this.intentionalDisconnect) return;
+
+    try {
+      logger.info('🔄 MStockVendor: Reconnecting (Step 1: Cleanup)...');
+      // Ensure previous ticker is dead
+      if (this.ticker) {
+        try {
+          this.ticker.disconnect();
+        } catch (e) {
+          /* ignore */
+        }
+        this.ticker = null;
+      }
+
+      logger.info('🔄 MStockVendor: Reconnecting (Step 2: Re-Auth)...');
+      // Force Re-Authentication (Generation of new Token)
+      await this.authenticate(true);
+
+      if (this.accessToken) {
+        logger.info('🔄 MStockVendor: Reconnecting (Step 3: Start WS)...');
+        await this.startWebSocket();
+      } else {
+        throw new Error('Re-Auth failed to produce valid token');
+      }
+    } catch (err) {
+      logger.error(`❌ Reconnection Failed: ${err.message}. Retrying in 10s...`);
+      setTimeout(() => this.reconnect(), 10000);
+    } finally {
+      this.isReconnecting = false;
     }
   }
 
@@ -266,6 +313,7 @@ class MStockVendor extends BaseVendor {
   }
 
   async disconnect() {
+    this.intentionalDisconnect = true;
     if (this.ticker) {
       this.ticker.disconnect();
     }

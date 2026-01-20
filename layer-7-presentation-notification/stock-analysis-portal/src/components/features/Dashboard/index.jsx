@@ -19,7 +19,23 @@ const DashboardView = ({ marketView, signals, loading }) => {
   return (
     <div className="space-y-6">
       {/* Live Market Overview */}
-      <MarketOverview marketView={marketView} />
+      {!marketView || !marketView.all_stocks || marketView.all_stocks.length === 0 ? (
+        <div className="bg-surface border border-dashed border-border rounded-xl p-8 text-center mb-6">
+          <div className="text-4xl mb-4">📡</div>
+          <h3 className="text-lg font-bold text-text-primary mb-2">Waiting for Market Data...</h3>
+          <p className="text-text-tertiary text-sm max-w-md mx-auto">
+            The system is online but hasn't processed any market data yet.
+            <br />
+            Run <code className="bg-background px-1 py-0.5 rounded text-accent">
+              make feed
+            </code> or{' '}
+            <code className="bg-background px-1 py-0.5 rounded text-accent">make batch</code> to
+            ingest data.
+          </p>
+        </div>
+      ) : (
+        <MarketOverview marketView={marketView} />
+      )}
 
       {/* Top Movers Carousel */}
       <TopMovers marketView={marketView} />

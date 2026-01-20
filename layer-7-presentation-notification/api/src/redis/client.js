@@ -43,7 +43,14 @@ class RedisClient {
   async getList(key, start = 0, stop = -1) {
     if (!this.isConnected) await this.connect();
     const list = await this.publisher.lRange(key, start, stop);
-    return list.map((item) => JSON.parse(item));
+    return list.map((item) => {
+      try {
+        return JSON.parse(item);
+      } catch (e) {
+        // Fallback for legacy plain text logs
+        return { message: item, timestamp: new Date().toISOString(), type: 'raw' };
+      }
+    });
   }
 }
 

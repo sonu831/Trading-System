@@ -75,6 +75,11 @@ class RedisClient {
     await this.publisher.lTrim(key, 0, maxLength - 1);
   }
 
+  async getListLength(key) {
+    if (!this.isConnected) await this.connect();
+    return await this.publisher.lLen(key);
+  }
+
   async disconnect() {
     await this.subscriber.disconnect();
     await this.publisher.disconnect();

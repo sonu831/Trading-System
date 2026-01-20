@@ -10,7 +10,7 @@ set -e
 REGION="us-east-1"
 INSTANCE_TYPE="t3.micro"
 AMI_ID="ami-0c7217cdde317cfec" # Ubuntu 22.04 LTS in us-east-1 (Verify if needed, using standard Ubuntu)
-KEY_NAME="trading-key"
+KEY_NAME="trading-key-final"
 SEC_GROUP="TradingSG"
 PROJECT_NAME="nifty50-trading"
 
@@ -43,6 +43,43 @@ if [ "$SG_ID" == "None" ]; then
 fi
 echo "Using SG: ${SG_ID}"
 
+# 2.5 Configure IAM Role & Instance Profile (Required for SSM)
+echo "[2.5/4] Checking IAM Role & Instance Profile..."
+ROLE_NAME="TradingBotSSMRole"
+PROFILE_NAME="TradingBotSSMProfile"
+
+# Check if Role exists
+ROLE_ARN=$(aws iam get-role --role-name ${ROLE_NAME} --query "Role.Arn" --output text 2>/dev/null || echo "None")
+if [ "$ROLE_ARN" == "None" ]; then
+    echo "Creating IAM Role ${ROLE_NAME}..."
+    TRUST_POLICY='{
+      "Version": "2012-10-17",
+      "Statement": [
+        {
+          "Effect": "Allow",
+          "Principal": { "Service": "ec2.amazonaws.com" },
+          "Action": "sts:AssumeRole"
+        }
+      ]
+    }'
+    aws iam create-role --role-name ${ROLE_NAME} --assume-role-policy-document "${TRUST_POLICY}" >/dev/null
+    aws iam attach-role-policy --role-name ${ROLE_NAME} --policy-arn arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+    # Wait for propagation
+    sleep 5
+fi
+
+# Check if Profile exists
+PROFILE_ARN=$(aws iam get-instance-profile --instance-profile-name ${PROFILE_NAME} --query "InstanceProfile.Arn" --output text 2>/dev/null || echo "None")
+if [ "$PROFILE_ARN" == "None" ]; then
+    echo "Creating Instance Profile ${PROFILE_NAME}..."
+    aws iam create-instance-profile --instance-profile-name ${PROFILE_NAME} >/dev/null
+    aws iam add-role-to-instance-profile --instance-profile-name ${PROFILE_NAME} --role-name ${ROLE_NAME}
+    # Wait for propagation
+    echo "Waiting for IAM propagation..."
+    sleep 10
+fi
+
+
 # 3. Launch or Retrieve Spot Instance
 echo "[2/4] Checking for existing instance..."
 EXISTING_ID=$(aws ec2 describe-instances \
@@ -62,6 +99,7 @@ else
         --instance-type ${INSTANCE_TYPE} \
         --key-name ${KEY_NAME} \
         --security-group-ids ${SG_ID} \
+        --iam-instance-profile Name=${PROFILE_NAME} \
         --instance-market-options '{"MarketType":"spot","SpotOptions":{"SpotInstanceType":"one-time"}}' \
         --block-device-mappings '[{"DeviceName":"/dev/sda1","Ebs":{"VolumeSize":20,"DeleteOnTermination":true,"VolumeType":"gp3"}}]' \
         --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=${PROJECT_NAME}-spot}]" \
@@ -122,6 +160,12 @@ ssh -o StrictHostKeyChecking=no -i ${KEY_NAME}.pem ubuntu@${PUBLIC_IP} << 'EOF'
 
     # 4. Start Docker Compose
     echo "Starting Containers..."
+    
+    # Extract Version and add to .env
+    VERSION=$(grep '"tag":' version.json | awk -F '"' '{print $4}')
+    echo "APP_VERSION=$VERSION" >> .env
+    echo "Deploying Version: $VERSION"
+
     # Use the optimized prod file
     sudo docker compose -f docker-compose.prod.yml up -d --build
 

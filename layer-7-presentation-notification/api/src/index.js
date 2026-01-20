@@ -116,14 +116,23 @@ fastify.get('/api/v1/system-status', async (req, reply) => {
       source: 'MStock',
       status: 'Unknown',
     };
-    const backfill = await getMetric('system:layer1:backfill');
-    // ...
-    // Layer 7 (Self)
-    // ...
+    const l2 = (await getMetric('system:layer2:metrics')) || { status: 'Unknown' };
+    const l4 = (await getMetric('system:layer4:metrics')) || { status: 'Unknown' };
+    const l5 = (await getMetric('system:layer5:metrics')) || { status: 'Unknown' };
+    const l6 = (await getMetric('system:layer6:metrics')) || { status: 'Unknown' };
+    const l7 = (await getMetric('layer7_api_http_request_duration_seconds')) || {
+      status: 'Unknown',
+    };
 
     return {
       layers: {
-        layer1: { name: 'Ingestion', status: 'ONLINE', metrics: l1, backfill, logs },
+        layer1: {
+          name: 'Ingestion',
+          status: 'ONLINE',
+          metrics: l1,
+          backfill: await getMetric('system:layer1:backfill'),
+          logs,
+        },
         layer2: { name: 'Processing', status: 'ONLINE', metrics: l2 },
         layer3: {
           name: 'Storage',

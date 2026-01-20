@@ -128,7 +128,10 @@ async function main() {
   const logToRedis = async (message) => {
     if (redisClient) {
       try {
-        const logEntry = `[${new Date().toLocaleTimeString()}] ${message}`;
+        const logEntry = JSON.stringify({
+          timestamp: new Date().toISOString(),
+          message: message,
+        });
         // Push to list and trim to last 50 entries
         await redisClient.lPush('system:layer1:logs', logEntry);
         await redisClient.lTrim('system:layer1:logs', 0, 49);

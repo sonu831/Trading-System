@@ -40,4 +40,4 @@ services:
 networks:
   trading-network:
     external: true
-    name: compose_trading-network
+    name: local-trading-network

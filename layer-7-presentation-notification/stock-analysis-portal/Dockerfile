@@ -3,7 +3,7 @@ FROM node:18-alpine AS base
 # Install dependencies only when needed
 FROM base AS deps
 WORKDIR /app
-COPY package.json ./
+COPY package.json package-lock.json ./
 RUN npm install --frozen-lockfile || npm install
 
 # Rebuild the source code only when needed

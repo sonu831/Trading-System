@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Updated `Dockerfile` in `stock-analysis-portal` to explicitly copy `package-lock.json`. This fixes the `MODULE_NOT_FOUND` error caused by non-deterministic `npm install`.
 - **CI/CD Credentials**:
   - Resolved "Credentials could not be loaded" error in GitHub Actions (`.github/workflows/deploy.yml`).
-  - Removed conflicting OIDC `permissions` block and strictly enforced secret-based authentication (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`).
+  - Removed conflicting OIDC `permissions` block and strictly enforced secret-based authentication (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`)
 
 ## [0.5.0] - 2026-01-20
 

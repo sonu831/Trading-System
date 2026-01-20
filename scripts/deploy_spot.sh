@@ -164,7 +164,7 @@ ssh -o StrictHostKeyChecking=no -i ${KEY_NAME}.pem ubuntu@${PUBLIC_IP} << 'EOF'
     echo "APP_VERSION=$VERSION" >> .env
     echo "Deploying Version: $VERSION"
 
-    sudo docker compose -f docker-compose.yml up -d --build
+    sudo docker compose -f docker-compose.prod.yml up -d --build
     sudo docker system prune -f
 EOF
 

@@ -34,11 +34,14 @@ SG_ID=$(aws ec2 describe-security-groups --region ${REGION} --group-names ${SEC_
 if [ "$SG_ID" == "None" ]; then
     echo "Creating Security Group ${SEC_GROUP}..."
     SG_ID=$(aws ec2 create-security-group --region ${REGION} --group-name ${SEC_GROUP} --description "Trading Bot SG" --query GroupId --output text)
-    aws ec2 authorize-security-group-ingress --region ${REGION} --group-id ${SG_ID} --protocol tcp --port 22 --cidr 0.0.0.0/0
-    aws ec2 authorize-security-group-ingress --region ${REGION} --group-id ${SG_ID} --protocol tcp --port 80 --cidr 0.0.0.0/0
-    aws ec2 authorize-security-group-ingress --region ${REGION} --group-id ${SG_ID} --protocol tcp --port 3000 --cidr 0.0.0.0/0
-    aws ec2 authorize-security-group-ingress --region ${REGION} --group-id ${SG_ID} --protocol tcp --port 4000 --cidr 0.0.0.0/0
 fi
+
+echo "Ensuring Security Group Rules for ${SG_ID}..."
+# Use || true to prevent failure if rules already exist
+aws ec2 authorize-security-group-ingress --region ${REGION} --group-id ${SG_ID} --protocol tcp --port 22 --cidr 0.0.0.0/0 2>/dev/null || true
+aws ec2 authorize-security-group-ingress --region ${REGION} --group-id ${SG_ID} --protocol tcp --port 80 --cidr 0.0.0.0/0 2>/dev/null || true
+aws ec2 authorize-security-group-ingress --region ${REGION} --group-id ${SG_ID} --protocol tcp --port 3000 --cidr 0.0.0.0/0 2>/dev/null || true
+aws ec2 authorize-security-group-ingress --region ${REGION} --group-id ${SG_ID} --protocol tcp --port 4000 --cidr 0.0.0.0/0 2>/dev/null || true
 
 # 2.5 Configure IAM Role & Instance Profile
 echo "[2.5/4] Checking IAM Role & Instance Profile..."

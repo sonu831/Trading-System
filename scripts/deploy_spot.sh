@@ -42,7 +42,8 @@ aws ec2 authorize-security-group-ingress --region ${REGION} --group-id ${SG_ID} 
 aws ec2 authorize-security-group-ingress --region ${REGION} --group-id ${SG_ID} --protocol tcp --port 80 --cidr 0.0.0.0/0 2>/dev/null || true
 aws ec2 authorize-security-group-ingress --region ${REGION} --group-id ${SG_ID} --protocol tcp --port 3000 --cidr 0.0.0.0/0 2>/dev/null || true
 aws ec2 authorize-security-group-ingress --region ${REGION} --group-id ${SG_ID} --protocol tcp --port 4000 --cidr 0.0.0.0/0 2>/dev/null || true
-
+# --- ADD THIS LINE FOR GRAFANA ---
+aws ec2 authorize-security-group-ingress --region ${REGION} --group-id ${SG_ID} --protocol tcp --port 3001 --cidr 0.0.0.0/0 2>/dev/null || true
 # 2.5 Configure IAM Role & Instance Profile
 echo "[2.5/4] Checking IAM Role & Instance Profile..."
 ROLE_NAME="TradingBotSSMRole"

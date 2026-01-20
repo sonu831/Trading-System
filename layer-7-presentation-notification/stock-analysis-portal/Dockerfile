@@ -13,6 +13,10 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN npm run build
 
+# --- ADD THIS LINE HERE ---
+# Ensure public folder exists (even if empty) so the next stage doesn't crash
+RUN mkdir -p public
+
 # Production image, copy all the files and run next
 FROM base AS runner
 WORKDIR /app

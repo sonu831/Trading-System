@@ -1,0 +1,16 @@
+# ==============================================================================
+# Terraform Variables - Override these values
+# ==============================================================================
+# Copy this file to terraform.tfvars and fill in your values:
+#   cp terraform.tfvars.example terraform.tfvars
+# ==============================================================================
+
+aws_region  = "us-east-1"
+environment = "prod"
+
+# Database credentials (CHANGE THESE!)
+db_username = "trading"
+db_password = "YourSecurePassword123!"  # Min 8 chars, use a strong password
+
+# Restrict access (recommended for production)
+# allowed_cidr_blocks = ["YOUR_IP/32"]

@@ -23,9 +23,15 @@ spec:
             - containerPort: 3000
           env:
             - name: KAFKA_BROKERS
-              value: 'kafka:9092'
+              valueFrom:
+                configMapKeyRef:
+                  name: trading-config
+                  key: KAFKA_BROKERS
             - name: REDIS_HOST
-              value: 'redis'
+              valueFrom:
+                configMapKeyRef:
+                  name: trading-config
+                  key: REDIS_HOST
           resources:
             requests:
               memory: '256Mi'

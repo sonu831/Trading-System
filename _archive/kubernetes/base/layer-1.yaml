@@ -23,7 +23,10 @@ spec:
             - containerPort: 3000
           env:
             - name: KAFKA_BROKERS
-              value: 'kafka:9092'
+              valueFrom:
+                configMapKeyRef:
+                  name: trading-config
+                  key: KAFKA_BROKERS
           resources:
             requests:
               memory: '128Mi'

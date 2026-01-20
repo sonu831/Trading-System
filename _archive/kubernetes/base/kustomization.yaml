@@ -11,6 +11,11 @@ resources:
   - observability.yaml
 
 configMapGenerator:
+  - name: trading-config
+    literals:
+      - KAFKA_BROKERS=kafka:9092
+      - REDIS_HOST=redis
+      - API_URL=http://layer-7-api:4000
   - name: grafana-datasources
     files:
       - ../../monitoring/grafana/provisioning/datasources/datasource.yaml

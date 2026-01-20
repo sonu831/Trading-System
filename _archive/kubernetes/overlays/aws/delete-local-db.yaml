@@ -1,0 +1,13 @@
+$patch: delete
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: layer-3-redis
+  namespace: nifty50-system
+---
+$patch: delete
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: layer-3-timescale
+  namespace: nifty50-system

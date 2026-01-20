@@ -46,3 +46,14 @@ coverage/
 # Temp
 tmp/
 temp/
+
+# Deployment Secrets & Artifacts
+*.pem
+project.zip
+project.tar.gz
+
+# Terraform
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.backup

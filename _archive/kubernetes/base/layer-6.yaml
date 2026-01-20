@@ -21,7 +21,10 @@ spec:
           image: layer-6-signal:latest
           env:
             - name: REDIS_HOST
-              value: 'redis'
+              valueFrom:
+                configMapKeyRef:
+                  name: trading-config
+                  key: REDIS_HOST
           resources:
             requests:
               memory: '128Mi'

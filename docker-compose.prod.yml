@@ -1,0 +1,198 @@
+version: '3.8'
+
+# ==============================================================================
+# 💰 LOW-COST PRODUCTION DEPLOYMENT (t3.micro friendly)
+# ==============================================================================
+# Risks:
+# - Low Memory: Kafka heap limited to 256MB.
+# - No redundancy: Single instances of everything.
+# - Local Storage: If the instance dies, data in Docker volumes persists on EBS but needs re-mounting.
+
+services:
+
+  # --------------------------------------------------------
+  # INFRASTRUCTURE
+  # --------------------------------------------------------
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+      # Critical for low memory
+      KAFKA_HEAP_OPTS: "-Xmx128M -Xms128M"
+    ports:
+      - "2181:2181"
+    restart: always
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      # Use the EC2 public DNS or IP if accessing externally, but for internal docker net keep it simple
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      # CRITICAL MEMORY LIMITS
+      KAFKA_HEAP_OPTS: "-Xmx256M -Xms256M"
+    restart: always
+
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes --maxmemory 64mb --maxmemory-policy allkeys-lru
+    restart: always
+
+  timescaledb:
+    image: timescale/timescaledb:latest-pg15
+    container_name: timescaledb
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-trading}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-trading123}
+      POSTGRES_DB: ${POSTGRES_DB:-nifty50}
+    # Limit Shared Buffers for low memory
+    command: postgres -c shared_buffers=64MB -c max_connections=50
+    volumes:
+      - timescaledb_data:/var/lib/postgresql/data
+    restart: always
+
+  # --------------------------------------------------------
+  # APPLICATION LAYERS
+  # --------------------------------------------------------
+
+  # L1: Ingestion
+  ingestion:
+    build:
+      context: ./layer-1-ingestion
+    container_name: ingestion
+    environment:
+      - KAFKA_BROKERS=kafka:29092
+      - REDIS_URL=redis://redis:6379
+      # Pass other keys from .env
+      - ZERODHA_API_KEY=${ZERODHA_API_KEY}
+      - ZERODHA_ACCESS_TOKEN=${ZERODHA_ACCESS_TOKEN}
+      - MARKET_DATA_PROVIDER=${MARKET_DATA_PROVIDER:-kite}
+    depends_on:
+      - kafka
+      - redis
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 150M
+
+  # L2: Processing
+  processing:
+    build:
+      context: ./layer-2-processing
+    container_name: processing
+    environment:
+      - KAFKA_BROKERS=kafka:29092
+      - REDIS_URL=redis://redis:6379
+      - TIMESCALE_URL=postgresql://trading:trading123@timescaledb:5432/nifty50
+    depends_on:
+      - kafka
+      - redis
+      - timescaledb
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 150M
+
+  # L4: Analysis
+  analysis:
+    build:
+      context: ./layer-4-analysis
+    container_name: analysis
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - KAFKA_BROKERS=kafka:29092
+    depends_on:
+      - kafka
+      - redis
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 150M
+
+  # L5: Aggregation
+  aggregation:
+    build:
+      context: ./layer-5-aggregation
+    container_name: aggregation
+    environment:
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - redis
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 100M
+
+  # L6: Signal
+  signal:
+    build:
+      context: ./layer-6-signal
+    container_name: signal
+    environment:
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - redis
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 100M
+
+  # L7: API
+  backend-api:
+    build:
+      context: ./layer-7-presentation-notification/api
+    container_name: backend-api
+    ports:
+      - "4000:4000"
+    environment:
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - redis
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 150M
+
+  # L7: Dashboard
+  dashboard:
+    build:
+      context: ./layer-7-presentation-notification/stock-analysis-portal
+    container_name: dashboard
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=/api/v1
+      - NEXT_PUBLIC_WS_URL=/
+    depends_on:
+      - backend-api
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 200M
+
+volumes:
+  timescaledb_data:

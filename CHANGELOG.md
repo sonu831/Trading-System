@@ -5,6 +5,29 @@ All notable changes to the **Nifty 50 Trading System** project will be documente
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] - 2026-01-20
+
+### 🚀 Added
+
+- **Extreme Cost Optimization**:
+  - Pivoted from EKS ($75+/mo) to a single **AWS EC2 Spot Instance (t3.micro)** (~$3/mo).
+  - Created **`docker-compose.prod.yml`** with strict memory limits (Kafka 256MB, Redis 64MB) to fit within 1GB RAM.
+- **Automated Deployment**:
+  - **`scripts/deploy_spot.sh`**: Idempotent script that handles server provisioning (20GB disk), swap creation, and "Zero-Touch" deployment.
+  - **Mac Compatibility**: Switched from `tar` to `zip` for deployment artifacts to eliminate `._` metadata file errors during Linux builds.
+- **CI/CD Pipeline**:
+  - Added **Github Actions Workflow** (`.github/workflows/deploy.yml`) to auto-deploy changes on push to `main`.
+- **Documentation**:
+  - Added **`DEPLOYMENT.md`** guide for Manual and CI/CD deployment setup.
+
+### 🗑️ Infrastructure Cleanup
+
+- **Removed Legacy Infrastructure**:
+  - Archived complex Terraform (EKS/VPC) and Kubernetes manifests to **`_archive/`**.
+  - Deleted unused `infrastructure/` directory to simplify project root.
+- **Simplified Workflow**:
+  - Restored **Local Granularity**: `Makefile` and `docker-compose.yml` now support module-based local development (`make infra`, `make app`) while `deploy_spot.sh` uses the unified production config.
+
 ## [0.4.0] - 2026-01-20
 
 ### 🚀 Added

@@ -20,6 +20,12 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: us-east-1
 
+    # --- THIS IS THE NEW STEP ---
+      - name: Create .env file from Secrets
+        run: |
+          echo "${{ secrets.ENV_FILE_PROD }}" > .env
+      # ----------------------------      
+
       - name: Setup SSH Key
         run: |
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > trading-key-final.pem

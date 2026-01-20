@@ -1,25 +1,30 @@
-version: '3.8'
-
 # ==============================================================================
-# 💰 LOW-COST PRODUCTION DEPLOYMENT (t3.micro friendly)
+# 💰 COMPLETE PRODUCTION DEPLOYMENT (t3.micro friendly)
 # ==============================================================================
-# Risks:
-# - Low Memory: Kafka heap limited to 256MB.
-# - No redundancy: Single instances of everything.
-# - Local Storage: If the instance dies, data in Docker volumes persists on EBS but needs re-mounting.
+# A SINGLE, SELF-CONTAINED file for AWS deployment.
+# Includes: Infrastructure, Application, Dashboard, Notifications, Gateway
+#
+# Usage:
+#   sudo docker compose -f docker-compose.prod.yml up -d --build
+#
+# Memory Budget (~1GB total for t3.micro with 2GB swap):
+#   - Infrastructure: ~450MB (Kafka 256M, Zookeeper 128M, Redis 64M)
+#   - Application:    ~750MB (L1-L6 + API + Dashboard)
+#   - Notifications:  ~100MB (Telegram + Email)
+# ==============================================================================
 
 services:
 
-  # --------------------------------------------------------
+  # ============================================================================
   # INFRASTRUCTURE
-  # --------------------------------------------------------
+  # ============================================================================
+
   zookeeper:
     image: confluentinc/cp-zookeeper:7.5.0
     container_name: zookeeper
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
-      # Critical for low memory
       KAFKA_HEAP_OPTS: "-Xmx128M -Xms128M"
     ports:
       - "2181:2181"
@@ -36,12 +41,10 @@ services:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
-      # Use the EC2 public DNS or IP if accessing externally, but for internal docker net keep it simple
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
-      # CRITICAL MEMORY LIMITS
       KAFKA_HEAP_OPTS: "-Xmx256M -Xms256M"
     restart: always
 
@@ -62,17 +65,16 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-trading}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-trading123}
       POSTGRES_DB: ${POSTGRES_DB:-nifty50}
-    # Limit Shared Buffers for low memory
     command: postgres -c shared_buffers=64MB -c max_connections=50
     volumes:
       - timescaledb_data:/var/lib/postgresql/data
     restart: always
 
-  # --------------------------------------------------------
-  # APPLICATION LAYERS
-  # --------------------------------------------------------
+  # ============================================================================
+  # APPLICATION LAYERS (L1-L6)
+  # ============================================================================
 
-  # L1: Ingestion
+  # Layer 1: Ingestion
   ingestion:
     build:
       context: ./layer-1-ingestion
@@ -80,10 +82,14 @@ services:
     environment:
       - KAFKA_BROKERS=kafka:29092
       - REDIS_URL=redis://redis:6379
-      # Pass other keys from .env
+      - MARKET_DATA_PROVIDER=${MARKET_DATA_PROVIDER:-mstock}
       - ZERODHA_API_KEY=${ZERODHA_API_KEY}
       - ZERODHA_ACCESS_TOKEN=${ZERODHA_ACCESS_TOKEN}
-      - MARKET_DATA_PROVIDER=${MARKET_DATA_PROVIDER:-kite}
+      - MSTOCK_API_KEY=${MSTOCK_API_KEY}
+      - MSTOCK_ACCESS_TOKEN=${MSTOCK_ACCESS_TOKEN}
+      - MSTOCK_CLIENT_CODE=${MSTOCK_CLIENT_CODE}
+      - MSTOCK_PASSWORD=${MSTOCK_PASSWORD}
+      - MSTOCK_TOTP_SECRET=${MSTOCK_TOTP_SECRET}
     depends_on:
       - kafka
       - redis
@@ -93,7 +99,7 @@ services:
         limits:
           memory: 150M
 
-  # L2: Processing
+  # Layer 2: Processing
   processing:
     build:
       context: ./layer-2-processing
@@ -112,7 +118,7 @@ services:
         limits:
           memory: 150M
 
-  # L4: Analysis
+  # Layer 4: Analysis (Go)
   analysis:
     build:
       context: ./layer-4-analysis
@@ -120,6 +126,7 @@ services:
     environment:
       - REDIS_URL=redis://redis:6379
       - KAFKA_BROKERS=kafka:29092
+      - TIMESCALE_URL=postgresql://trading:trading123@timescaledb:5432/nifty50
     depends_on:
       - kafka
       - redis
@@ -129,13 +136,14 @@ services:
         limits:
           memory: 150M
 
-  # L5: Aggregation
+  # Layer 5: Aggregation (Go)
   aggregation:
     build:
       context: ./layer-5-aggregation
     container_name: aggregation
     environment:
       - REDIS_URL=redis://redis:6379
+      - TIMESCALE_URL=postgresql://trading:trading123@timescaledb:5432/nifty50
     depends_on:
       - redis
     restart: always
@@ -144,7 +152,7 @@ services:
         limits:
           memory: 100M
 
-  # L6: Signal
+  # Layer 6: Signal Generation
   signal:
     build:
       context: ./layer-6-signal
@@ -159,7 +167,11 @@ services:
         limits:
           memory: 100M
 
-  # L7: API
+  # ============================================================================
+  # LAYER 7: PRESENTATION & NOTIFICATION
+  # ============================================================================
+
+  # API Server
   backend-api:
     build:
       context: ./layer-7-presentation-notification/api
@@ -168,15 +180,17 @@ services:
       - "4000:4000"
     environment:
       - REDIS_URL=redis://redis:6379
+      - TIMESCALE_URL=postgresql://trading:trading123@timescaledb:5432/nifty50
     depends_on:
       - redis
+      - timescaledb
     restart: always
     deploy:
       resources:
         limits:
           memory: 150M
 
-  # L7: Dashboard
+  # Dashboard (Next.js)
   dashboard:
     build:
       context: ./layer-7-presentation-notification/stock-analysis-portal
@@ -195,5 +209,62 @@ services:
         limits:
           memory: 200M
 
+  # Telegram Bot (Guru Ji)
+  telegram-bot:
+    build:
+      context: ./layer-7-presentation-notification/telegram-bot
+    container_name: telegram-bot
+    environment:
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - REDIS_URL=redis://redis:6379
+      - API_URL=http://backend-api:4000
+    depends_on:
+      - redis
+      - backend-api
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 50M
+
+  # Email Service
+  email-service:
+    build:
+      context: ./layer-7-presentation-notification/email-service
+    container_name: email-service
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - SMTP_HOST=${SMTP_HOST:-}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_USER=${SMTP_USER:-}
+      - SMTP_PASS=${SMTP_PASS:-}
+      - ADMIN_EMAIL=${ADMIN_EMAIL:-}
+    depends_on:
+      - redis
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 50M
+
+  # ============================================================================
+  # GATEWAY (Nginx Reverse Proxy)
+  # ============================================================================
+
+  gateway:
+    image: nginx:alpine
+    container_name: trading-gateway
+    ports:
+      - "80:80"
+    volumes:
+      - ./infrastructure/gateway/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - dashboard
+      - backend-api
+    restart: always
+
+# ============================================================================
+# VOLUMES
+# ============================================================================
 volumes:
   timescaledb_data:

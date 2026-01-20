@@ -70,6 +70,50 @@ services:
       - timescaledb_data:/var/lib/postgresql/data
     restart: always
 
+  # Admin UIs (Optional - can be removed to save memory)
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: kafka-ui
+    ports:
+      - "8090:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
+      KAFKA_CLUSTERS_0_ZOOKEEPER: zookeeper:2181
+    depends_on:
+      - kafka
+    restart: always
+    profiles:
+      - admin
+
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: redis-commander
+    environment:
+      REDIS_HOSTS: local:redis:6379
+    ports:
+      - "8085:8081"
+    depends_on:
+      - redis
+    restart: always
+    profiles:
+      - admin
+
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: pgadmin
+    ports:
+      - "5050:80"
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@admin.com}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin123}
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+    depends_on:
+      - timescaledb
+    restart: always
+    profiles:
+      - admin
+
   # ============================================================================
   # APPLICATION LAYERS (L1-L6)
   # ============================================================================
@@ -263,8 +307,145 @@ services:
       - backend-api
     restart: always
 
+  # ============================================================================
+  # OBSERVABILITY (Prometheus, Grafana, Loki)
+  # ============================================================================
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./infrastructure/monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.enable-lifecycle'
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 150M
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "3001:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin123}
+      GF_USERS_ALLOW_SIGN_UP: 'false'
+      GF_SERVER_DOMAIN: 'localhost'
+      GF_SERVER_ROOT_URL: 'http://localhost:3001/'
+      GF_SECURITY_ALLOW_EMBEDDING: 'true'
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./infrastructure/monitoring/grafana/provisioning:/etc/grafana/provisioning
+      - ./infrastructure/monitoring/grafana/dashboards:/var/lib/grafana/dashboards
+    depends_on:
+      - prometheus
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 150M
+
+  loki:
+    image: grafana/loki:latest
+    container_name: loki
+    ports:
+      - "3100:3100"
+    command: -config.file=/etc/loki/local-config.yaml
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 100M
+
+  promtail:
+    image: grafana/promtail:latest
+    container_name: promtail
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./infrastructure/monitoring/promtail-config.yaml:/etc/promtail/config.yaml
+    command: -config.file=/etc/promtail/config.yaml
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 50M
+
+  # Exporters
+  redis-exporter:
+    image: oliver006/redis_exporter:latest
+    container_name: redis-exporter
+    environment:
+      REDIS_ADDR: redis://redis:6379
+    ports:
+      - "9121:9121"
+    depends_on:
+      - redis
+    restart: always
+
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:latest
+    container_name: postgres-exporter
+    environment:
+      DATA_SOURCE_NAME: 'postgresql://trading:trading123@timescaledb:5432/nifty50?sslmode=disable'
+    ports:
+      - "9187:9187"
+    depends_on:
+      - timescaledb
+    restart: always
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:latest
+    container_name: cadvisor
+    privileged: true
+    ports:
+      - "8083:8080"
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+    restart: always
+
+  otel-collector:
+    image: otel/opentelemetry-collector:latest
+    container_name: otel-collector
+    command: [ '--config=/etc/otel-collector-config.yaml' ]
+    volumes:
+      - ./infrastructure/monitoring/otel-collector-config.yaml:/etc/otel-collector-config.yaml
+    ports:
+      - "4317:4317"
+      - "4318:4318"
+    restart: always
+    profiles:
+      - full
+
+  # ============================================================================
+  # PUBLIC TUNNEL (Cloudflare - Optional)
+  # ============================================================================
+
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    container_name: trading-tunnel
+    command: tunnel --url http://gateway:80
+    depends_on:
+      - gateway
+    restart: always
+    profiles:
+      - tunnel
+
 # ============================================================================
 # VOLUMES
 # ============================================================================
 volumes:
   timescaledb_data:
+  prometheus_data:
+  grafana_data:

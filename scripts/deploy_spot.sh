@@ -163,7 +163,7 @@ ssh -o StrictHostKeyChecking=no -i ${KEY_NAME}.pem ubuntu@${PUBLIC_IP} << 'EOF'
     echo "APP_VERSION=$VERSION" >> .env
     echo "Deploying Version: $VERSION"
 
-    sudo docker compose -f docker-compose.prod.yml up -d --build
+    sudo docker compose -f docker-compose.yml up -d --build
     sudo docker system prune -f
 EOF
 
@@ -171,6 +171,7 @@ echo "----------------------------------------------------------------"
 echo "✅ Deployment Complete!"
 echo "Dashboard: http://${PUBLIC_IP}:3000"
 echo "API:       http://${PUBLIC_IP}:4000"
+echo "Grafana:   http://${PUBLIC_IP}:3001"
 echo "SSH:       ssh -i ${KEY_NAME}.pem ubuntu@${PUBLIC_IP}"
 echo "----------------------------------------------------------------"
 rm project.zip

@@ -26,5 +26,6 @@ include:
   - infrastructure/compose/docker-compose.observe.yml
   - infrastructure/compose/docker-compose.app.yml
   - infrastructure/compose/docker-compose.ui.yml
+  - infrastructure/compose/docker-compose.notify.yml
   # Optional: Uncomment to include gateway/tunnel
   # - infrastructure/compose/docker-compose.gateway.yml

@@ -22,8 +22,8 @@ jobs:
 
       - name: Setup SSH Key
         run: |
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > trading-key.pem
-          chmod 400 trading-key.pem
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > trading-key-final.pem
+          chmod 400 trading-key-final.pem
 
       - name: Run Deployment Script
         run: |

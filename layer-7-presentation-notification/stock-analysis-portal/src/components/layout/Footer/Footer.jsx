@@ -10,6 +10,11 @@ const Footer = () => {
         "This Application is designed by Yogendra and Utkarsh. Unauthorized reproduction or copying
         of these unique ideas will lead to legal action."
       </p>
+      {process.env.NEXT_PUBLIC_APP_VERSION && (
+        <p className="mt-4 text-xs font-mono opacity-50">
+          v{process.env.NEXT_PUBLIC_APP_VERSION}
+        </p>
+      )}
     </footer>
   );
 };

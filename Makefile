@@ -22,8 +22,11 @@ help:
 	@echo "🚀 Nifty 50 Trading System"
 	@echo ""
 	@echo "📦 STACKS (Docker)"
-	@echo "  make up             Start full stack"
+	@echo "  make up             Start full stack (local infra)"
 	@echo "  make down           Stop everything"
+	@echo "  make up-aws         Start with AWS managed services"
+	@echo "  make down-aws       Stop AWS deployment"
+	@echo "  make up-prod        Start production (self-contained)"
 	@echo "  make infra          Data stores only (Kafka, Redis, DB)"
 	@echo "  make app            Pipeline only (L1-L6 + API)"
 	@echo "  make ui             Dashboard only (fast rebuild)"
@@ -59,7 +62,7 @@ help:
 # Common docker-compose options
 DC := docker-compose --env-file .env
 
-up: infra app notify ui observe
+up: infra observe notify app ui 
 	@echo "🚀 Full stack running!"
 	@echo "   Dashboard: http://localhost:3000"
 	@echo "   API:       http://localhost:4000"
@@ -74,6 +77,26 @@ down:
 	-$(DC) -f $(COMPOSE_DIR)/docker-compose.observe.yml down
 	-$(DC) -f $(COMPOSE_DIR)/docker-compose.infra.yml down
 	@echo "✅ Stopped."
+
+# AWS Managed Services (Stateless Deployment)
+up-aws:
+	@echo "☁️  Starting with AWS Managed Services..."
+	@if [ ! -f .env.aws ]; then echo "❌ .env.aws not found! Copy from .env.aws.example"; exit 1; fi
+	docker-compose --env-file .env.aws -f docker-compose.aws.yml up -d --build
+	@echo "✅ App running with AWS infrastructure!"
+	@echo "   Dashboard: http://localhost:3000"
+	@echo "   API:       http://localhost:4000"
+
+down-aws:
+	@echo "🛑 Stopping AWS deployment..."
+	docker-compose --env-file .env.aws -f docker-compose.aws.yml down
+	@echo "✅ Stopped."
+
+# Production (Self-contained)
+up-prod:
+	@echo "🚀 Starting Production Stack..."
+	docker-compose -f docker-compose.prod.yml up -d --build
+	@echo "✅ Production running!"
 
 
 infra:

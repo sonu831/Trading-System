@@ -410,12 +410,25 @@
       "id": 24,
       "targets": [
         {
-          "expr": "rate(http_request_duration_seconds_count{job='telegram-bot'}[1m])",
-          "legendFormat": "Bot Events"
+          "expr": "rate(telegram_updates_received_total[1m]) * 60",
+          "legendFormat": "Updates/min"
+        },
+        {
+          "expr": "rate(telegram_commands_received_total[1m]) * 60",
+          "legendFormat": "Commands/min"
+        },
+        {
+          "expr": "rate(telegram_messages_sent_total[1m]) * 60",
+          "legendFormat": "Sent/min"
         }
       ],
-      "title": "Bot Activity",
-      "type": "timeseries"
+      "title": "🤖 Bot Activity",
+      "type": "timeseries",
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "drawStyle": "line", "lineInterpolation": "smooth", "fillOpacity": 20 }
+        }
+      }
     },
     {
       "datasource": { "uid": "prometheus-datasource" },

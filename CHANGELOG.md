@@ -5,6 +5,24 @@ All notable changes to the **Nifty 50 Trading System** project will be documente
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0] - 2026-01-21
+
+### 🚀 Added
+
+- **Comprehensive Telegram Bot Monitoring**:
+  - Instrumented bot with **Prometheus** metrics (commands, latency, users, errors).
+  - Created **"Telegram Bot - Guru Ji"** Grafana dashboard with real-time stats.
+  - Added **"Top Command"** card and **"Command Usage Statistics"** bar chart to track popularity.
+  - Integrated **Loki Logs** panel directly into the dashboard for real-time diagnostic visibility.
+- **Improved Root Observability**:
+  - Updated `system-overview.json` dashboard with accurate real-time bot activity tracking via specific Prometheus queries.
+
+### 🐛 Fixed
+
+- **Mac M1/ARM64 Compatibility**: Resolved Loki logging driver failures in the `ingestion` service by switching to Promtail-based log collection.
+- **Metric Collection Reliability**: Fixed a critical bug in the `trackCommand` wrapper that was preventing command metrics from being incremented correctly.
+- **Infrastructure Stability**: Added orchestration health checks and dependency wait-times for Kafka/Zookeeper in `docker-compose.infra.yml`.
+
 ## [0.5.1] - 2026-01-20
 
 ### 🐛 Fixed

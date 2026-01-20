@@ -1,5 +1,6 @@
 const express = require('express');
 const promClient = require('prom-client');
+const { createClient } = require('redis');
 const redis = require('./redis/client');
 const engine = require('./engine/decisionEngine');
 const logger = require('./utils/logger');
@@ -74,7 +75,7 @@ async function start() {
     });
 
     // Initialize Redis for System Metrics
-    const redisClient = redis.createClient({
+    const redisClient = createClient({
       url: process.env.REDIS_URL || 'redis://localhost:6379',
     });
     redisClient.on('error', (err) => logger.error('Redis Client Error', err));
@@ -93,9 +94,8 @@ async function start() {
     setInterval(async () => {
       try {
         const mem = process.memoryUsage();
-        const count = (await redis.get('signals:history'))?.length || 0;
-        // Note: signals:history is a list, get might not work if get uses GET. List needs LPOS or LLEN.
-        // RedisClient.get uses GET. So I can't check list length with it easily without adding lLen.
+        // Use getListLength for lists, not get
+        const count = await redis.getListLength('signals:history');
         // However, promClient has 'signalsGenerated'. I can read that.
 
         await redis.set('system:layer6:metrics', {

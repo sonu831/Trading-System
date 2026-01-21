@@ -1,8 +1,17 @@
-# 🏗️ Trading System - AWS Infrastructure
+# 🏗️ Trading System -## Hosting Recommendations (Trading Performance)
 
-This Terraform configuration provisions AWS managed services for production deployment.
+For this 7-layer application, we recommend the following tiers based on your needs:
 
-## What Gets Created
+| Tier              | Instance Type | Ideal For                        | Cost (Spot)   |
+| :---------------- | :------------ | :------------------------------- | :------------ |
+| **🚀 Power User** | `c6i.xlarge`  | **High-Frequency / Low-Latency** | **~$43 / mo** |
+| **⚖️ Balanced**   | `m6i.large`   | General Production (8GB RAM)     | ~$26 / mo     |
+| **💸 Budget**     | `t3.medium`   | Testing / Development            | ~$12 / mo     |
+
+> [!IMPORTANT]
+> **Power User Setup**: Uses Compute-Optimized `c6i` instances to ensure the Signal Engine (L6) and Analysis (L4) processes data with zero CPU bottleneck. We also recommend **40GB GP3 Storage** with 3000 IOPS for high-speed database writes.
+
+## What Gets Created (Hybrid Tier)
 
 | Resource          | Type           | Cost (us-east-1) |
 | ----------------- | -------------- | ---------------- |

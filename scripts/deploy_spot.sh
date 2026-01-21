@@ -2,15 +2,15 @@
 set -e
 
 # ==============================================================================
-# 💸 ROBUST CHEAP EC2 SPOT DEPLOYMENT (us-east-1)
+# 🚀 HIGH-PERFORMANCE "POWER USER" SPOT DEPLOYMENT (us-east-1)
 # ==============================================================================
-# Provisions a Spot Instance.
-# FALLBACK STRATEGY: Tries t3.micro -> t3a.micro -> t2.micro if capacity fails.
+# Primary: c6i.xlarge (4 vCPU, 8GB RAM) - Compute Optimized for Signal Engine.
+# Fallbacks: c6a.xlarge, m6i.large, t3.medium
 # ==============================================================================
 
 REGION="us-east-1"
-# List of instance types to try in order of preference
-INSTANCE_CANDIDATES=("t3.micro" "t3a.micro" "t2.micro")
+# List of instance types to try in order of preference (Fastest first)
+INSTANCE_CANDIDATES=("c6i.xlarge" "c6a.xlarge" "m6i.large" "t3.medium")
 AMI_ID="resolve:ssm:/aws/service/canonical/ubuntu/server/22.04/stable/current/amd64/hvm/ebs-gp2/ami-id"
 KEY_NAME="trading-key-final"
 SEC_GROUP="TradingSG"
@@ -94,7 +94,7 @@ else
             --security-group-ids ${SG_ID} \
             --iam-instance-profile Name=${PROFILE_NAME} \
             --instance-market-options '{"MarketType":"spot","SpotOptions":{"SpotInstanceType":"one-time"}}' \
-            --block-device-mappings '[{"DeviceName":"/dev/sda1","Ebs":{"VolumeSize":20,"DeleteOnTermination":true,"VolumeType":"gp3"}}]' \
+            --block-device-mappings '[{"DeviceName":"/dev/sda1","Ebs":{"VolumeSize":40,"DeleteOnTermination":true,"VolumeType":"gp3","Iops":3000}}]' \
             --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=${PROJECT_NAME}-spot}]" \
             --query 'Instances[0].InstanceId' \
             --output text 2>&1)

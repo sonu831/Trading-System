@@ -5,6 +5,19 @@ All notable changes to the **Nifty 50 Trading System** project will be documente
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.1] - 2026-01-21
+
+### 📚 Documentation
+
+- **Comprehensive Architecture Documentation**:
+  - Created `docs/ARCHITECTURE_DEEP_DIVE.md` with detailed documentation for all 7 layers.
+  - Added interactive **Draw.io architecture diagram** with complete system overview, data flows, and internal components.
+  - Documented multi-vendor "Octopus Pattern" for Layer 1 (MStock, Flattrade, Zerodha, Batch APIs).
+  - Documented TimescaleDB schema with hypertables, continuous aggregates (5m, 15m views), and compression policies.
+  - Added data volume calculations (22.5M rows for 5 years, ~2-3GB with compression).
+  - Included future AI/ML integration points for Layer 4 (pattern detection) and Layer 6 (decision engine).
+  - Added AWS hybrid architecture documentation with VPC, RDS, and ElastiCache setup.
+
 ## [0.6.0] - 2026-01-21
 
 ### 🚀 Added

@@ -18,6 +18,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Included future AI/ML integration points for Layer 4 (pattern detection) and Layer 6 (decision engine).
   - Added AWS hybrid architecture documentation with VPC, RDS, and ElastiCache setup.
 
+### 🗄️ Database
+
+- **Extended Database Schema (v2)**:
+  - Created `layer-3-storage/timescaledb/migrations/002_extended_schema.sql` with 22 tables across 6 domains.
+  - Added continuous aggregates: `candles_1h`, `candles_1d` for automatic rollups.
+  - Added **Data Watermark System**: `data_availability` table to prevent duplicate ingestion.
+  - Added **Reference Data**: `instruments`, `sectors`, `trading_calendar` tables.
+  - Added **User Data**: `users`, `user_alerts`, `user_watchlists` tables.
+  - Added **Billing**: `plans`, `subscriptions`, `payments`, `invoices` tables for future monetization.
+  - Added **System**: `backfill_jobs`, `system_config`, `audit_log` tables.
+
 ## [0.6.0] - 2026-01-21
 
 ### 🚀 Added

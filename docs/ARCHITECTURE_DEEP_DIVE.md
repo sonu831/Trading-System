@@ -203,6 +203,21 @@ With TimescaleDB compression (~10x): ~2-3 GB storage
 | `signals:active`            | LIST   | Pending signals         |
 | `market_view:latest`        | HASH   | Current market summary  |
 
+### Database Schema (v2)
+
+The database now includes **22 tables across 6 domains**:
+
+| Domain        | Tables                                                         |
+| ------------- | -------------------------------------------------------------- |
+| **Market**    | candles_1m, candles_5m/15m/1h/1d, options_chain                |
+| **Reference** | instruments, sectors, trading_calendar                         |
+| **Analysis**  | signals, market_breadth, sector_strength, technical_indicators |
+| **User**      | users, user_alerts, user_watchlists, user_subscribers          |
+| **Billing**   | plans, subscriptions, payments, invoices                       |
+| **System**    | data_availability, backfill_jobs, system_config, audit_log     |
+
+> **Migration file**: `layer-3-storage/timescaledb/migrations/002_extended_schema.sql`
+
 ### Pub/Sub Channels
 
 | Channel            | Publisher | Subscribers |

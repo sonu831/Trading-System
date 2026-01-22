@@ -110,17 +110,32 @@ services:
       - trading-network
     restart: unless-stopped
 
-  # Layer 7: API Server
+  # Layer 7: Core Interface (API)
   backend-api:
     build:
-      context: ../../layer-7-presentation-notification/api
+      context: ../../layer-7-core-interface/api
       dockerfile: Dockerfile
     container_name: backend-api
+    # Ports exposed only internally to Gateway (or debugging)
     ports:
       - '4000:4000'
     environment:
       - REDIS_URL=redis://redis:6379
       - TIMESCALE_URL=postgresql://trading:trading123@timescaledb:5432/nifty50
+    networks:
+      - trading-network
+    restart: unless-stopped
+
+  # Layer 8: API Gateway
+  gateway:
+    build:
+      context: ../../infrastructure/gateway
+      dockerfile: Dockerfile
+    container_name: gateway
+    ports:
+      - '80:80'
+    depends_on:
+      - backend-api
     networks:
       - trading-network
     restart: unless-stopped

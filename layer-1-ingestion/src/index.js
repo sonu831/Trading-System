@@ -98,12 +98,26 @@ async function initialize() {
     await redisClient.connect();
     logger.info('✅ Redis Metric Publisher connected');
 
+    const logToRedis = async (message) => {
+      try {
+        const timestamp = new Date().toLocaleTimeString();
+        const logEntry = `[${timestamp}] ${message}`;
+        await redisClient.lPush('system:layer1:logs', logEntry);
+        await redisClient.lTrim('system:layer1:logs', 0, 49);
+      } catch (e) {
+        logger.error('Failed to log to Redis', e);
+      }
+    };
+
+    await logToRedis('🚀 Layer 1 Ingestion Service Started');
+
     // Start Metrics Publishing Loop
     setInterval(async () => {
       try {
         const mem = process.memoryUsage();
         const packetsVal = await metrics.websocketPackets.get();
         const bytesVal = await metrics.websocketDataBytes.get();
+        const ticksVal = await metrics.ticksCounter.get();
 
         const l1Metrics = {
           heap_used: (mem.heapUsed / 1024 / 1024).toFixed(2) + 'MB',
@@ -115,14 +129,23 @@ async function initialize() {
           timestamp: Date.now(),
         };
         await redisClient.set('system:layer1:metrics', JSON.stringify(l1Metrics));
+
+        // Periodically log tick summary to Redis
+        const totalTicks = ticksVal?.values.reduce((sum, v) => sum + v.value, 0) || 0;
+        if (totalTicks > 0) {
+          await logToRedis(
+            `📊 Ingestion Health: ${totalTicks.toLocaleString()} total ticks received`
+          );
+        }
       } catch (e) {
         logger.error('Metric Publish Error', e);
       }
-    }, 5000);
+    }, 10000); // 10 seconds
 
     // Initialize Normalizer
     normalizer = new Normalizer();
     logger.info('✅ Normalizer initialized');
+    await logToRedis('✅ Normalizer initialized');
 
     // Load Subscription List from Global Shared Map
     let subscriptionList = [];
@@ -147,6 +170,10 @@ async function initialize() {
       subscriptionList = symbols.nifty50.map((s) => `NSE:${s.token}`); // Legacy fallback (might be Kite tokens!)
     }
 
+    // Initialize Market Hours (MUST be before VendorManager for status checks)
+    const { MarketHours } = require('./utils/market-hours');
+    const marketHours = new MarketHours();
+
     // Initialize Market Data Vendor via Factory
     const { VendorManager } = require('./vendors/manager');
     marketDataVendor = new VendorManager({
@@ -158,11 +185,10 @@ async function initialize() {
     marketDataVendor.init();
     await marketDataVendor.connect();
 
+    const marketStatus = marketHours.isMarketOpen();
+    const statusText = marketStatus ? 'Market is OPEN - Stream active' : 'Market is CLOSED - Idle';
+    await logToRedis(`📡 Connected to MStock. ${statusText}`);
     logger.info(`🎯 Subscribed to ${subscriptionList.length} Nifty 50 symbols (Stream Mode)`);
-
-    // --- Auto-Switch to Historical Backfill if Market is Closed ---
-    const { MarketHours } = require('./utils/market-hours');
-    // ...
 
     const runScriptWithIPC = (scriptPath, args = []) => {
       return new Promise((resolve, reject) => {
@@ -198,7 +224,6 @@ async function initialize() {
       });
     };
 
-    const marketHours = new MarketHours();
     let isBackfilling = false;
 
     const updateBackfillStatus = async (status, progress = 0, details = '') => {

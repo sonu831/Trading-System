@@ -5,6 +5,41 @@ All notable changes to the **Nifty 50 Trading System** project will be documente
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.2] - 2026-01-22
+
+### 🚀 Added
+
+- **Database Backup & Restore Commands**:
+  - Added `make backup` command to create timestamped TimescaleDB backups in `./backups/`.
+  - Added `make restore` command with interactive backup selection or latest auto-restore.
+  - Backups are SQL dumps that persist across container restarts.
+
+- **Container Resources Grafana Dashboard**:
+  - Created comprehensive `container-resources.json` dashboard with CPU and Memory monitoring.
+  - **Application Layers (L1-L7)**: Individual gauge panels for Ingestion, Processing, Analysis, Aggregation, Signal, API, Dashboard, and Telegram Bot.
+  - **Infrastructure**: Kafka, Redis, TimescaleDB, Prometheus, Grafana, Loki, and pgAdmin memory gauges.
+  - Time-series charts showing resource usage trends over time.
+  - All panels display friendly container names instead of Docker IDs.
+
+- **Prometheus cAdvisor Relabeling**:
+  - Added `metric_relabel_configs` to extract `container_id` label from cAdvisor metrics.
+  - Enables container-level resource filtering in Grafana queries.
+
+### 🐛 Fixed
+
+- **Layer 1 Ingestion Crash**:
+  - Fixed `ReferenceError: marketHours is not defined` by moving `MarketHours` import before its first usage in VendorManager initialization.
+
+- **pgAdmin Permission Issues**:
+  - Changed from bind mount (`./data/pgadmin`) to named Docker volume (`pgadmin_data`).
+  - Resolves macOS permission errors (`EACCES: permission denied`) that caused the container to crash-loop.
+  - Data persists across `docker-compose down` but is managed internally by Docker.
+
+### 🛠 Changed
+
+- **Makefile Enhancement**:
+  - Added `💾 DATABASE` section to help menu with backup/restore documentation.
+
 ## [0.6.1] - 2026-01-21
 
 ### 📚 Documentation

@@ -42,6 +42,17 @@ scrape_configs:
   - job_name: 'cadvisor'
     static_configs:
       - targets: ['cadvisor:8080']
+    metric_relabel_configs:
+      # Extract a short readable ID from the full Docker path
+      # Transforms /docker/abc123def456... -> abc123def456 (first 12 chars)
+      - source_labels: [id]
+        regex: '/docker/([a-f0-9]{12}).*'
+        target_label: container_id
+        replacement: '${1}'
+      # Only keep Docker container metrics (filter out system-level)
+      - source_labels: [id]
+        regex: '/docker/.+'
+        action: keep
 
   - job_name: 'redis-exporter'
     static_configs:

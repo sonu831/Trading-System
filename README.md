@@ -183,10 +183,24 @@ See [EXPOSURE_GUIDE.md](EXPOSURE_GUIDE.md) for details.
 
 ---
 
+## 💾 Database Backup & Restore
+
+```bash
+make backup      # Create timestamped backup to ./backups/
+make restore     # Restore from latest or selected backup
+```
+
+Backups are SQL dumps stored in `./backups/` and persist across container restarts.
+
+---
+
 ## 📊 Observability
 
 - **Prometheus**: http://localhost:9090 (metrics)
 - **Grafana**: http://localhost:3001 (dashboards)
+  - **System Overview**: Pipeline health and metrics
+  - **Container Resources**: CPU/Memory per layer
+  - **Telegram Bot**: Bot command analytics
 - **System Status API**: http://localhost:4000/api/v1/system-status
 
 ---

@@ -143,7 +143,7 @@ services:
     networks:
       - trading-network
     volumes:
-      - ../../data/pgadmin:/var/lib/pgadmin
+      - pgadmin_data:/var/lib/pgadmin
       - ../pgadmin/servers.json:/pgadmin4/servers.json:ro
       - ../pgadmin/pgpass:/pgpass:ro
     entrypoint: >
@@ -156,3 +156,6 @@ networks:
   trading-network:
     driver: bridge
     name: local-trading-network
+
+volumes:
+  pgadmin_data:

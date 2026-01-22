@@ -13,80 +13,82 @@ This document outlines the complete database architecture for the Nifty 50 Tradi
 **Key Decisions:**
 
 - **Database**: TimescaleDB (PostgreSQL extension optimized for time-series)
-- **Base Granularity**: **1-second tick data** (highest resolution)
-- **Derived Views**: 1m, 5m, 15m, 1h, 1d, weekly (continuous aggregates)
+- **Base Granularity**: **1-minute candle data** (broker minimum supported interval)
+- **Derived Views**: 5m, 15m, 30m, 1h, 1d, weekly (continuous aggregates)
 - **Architecture**: One database with multiple logical schemas
 - **Tables**: 22 tables across 6 domains
 - **Storage Projection**:
-  - **5 Years**: ~10-15 GB (with compression)
-  - **10 Years**: ~20-30 GB (with compression)
+  - **5 Years**: ~2-3 GB (with compression)
+  - **10 Years**: ~3-5 GB (with compression)
+
+> **Note:** Broker API (MStock) minimum interval is `minute`. Real-time WebSocket ticks are aggregated to 1-minute candles in Layer 2 Processing.
 
 ---
 
-## 📈 Data Volume Analysis (1-Second Base)
+## 📈 Data Volume Analysis (1-Minute Base)
 
 ### Trading Parameters
 
-| Parameter          | Value                                     |
-| ------------------ | ----------------------------------------- |
-| Trading Hours      | 9:15 AM - 3:30 PM IST                     |
-| Trading Duration   | 6h 15m = 375 minutes = **22,500 seconds** |
-| Trading Days/Month | ~20 days                                  |
-| Trading Days/Year  | ~240 days                                 |
-| Stocks Tracked     | 50 (Nifty 50, expandable to 100+)         |
+| Parameter          | Value                             |
+| ------------------ | --------------------------------- |
+| Trading Hours      | 9:15 AM - 3:30 PM IST             |
+| Trading Duration   | 6h 15m = **375 minutes**          |
+| Trading Days/Month | ~20 days                          |
+| Trading Days/Year  | ~240 days                         |
+| Stocks Tracked     | 50 (Nifty 50, expandable to 100+) |
 
 ### Volume Projections (50 Stocks)
 
-| Timeframe           | Rows/Day      | Rows/Month | Rows/Year | 5 Years          | 10 Years        |
-| ------------------- | ------------- | ---------- | --------- | ---------------- | --------------- |
-| **1-second (BASE)** | **1,125,000** | **22.5M**  | **270M**  | **1.35 Billion** | **2.7 Billion** |
-| 1-minute (view)     | 18,750        | 375,000    | 4.5M      | 22.5M            | 45M             |
-| 5-minute (view)     | 3,750         | 75,000     | 900,000   | 4.5M             | 9M              |
-| 15-minute (view)    | 1,250         | 25,000     | 300,000   | 1.5M             | 3M              |
-| 1-hour (view)       | 312           | 6,240      | 74,880    | 374,400          | 748,800         |
-| 1-day (view)        | 50            | 1,000      | 12,000    | 60,000           | 120,000         |
-| Weekly (view)       | 50            | 200        | 2,400     | 12,000           | 24,000          |
+| Timeframe           | Rows/Day   | Rows/Month  | Rows/Year | 5 Years   | 10 Years       |
+| ------------------- | ---------- | ----------- | --------- | --------- | -------------- |
+| **1-minute (BASE)** | **18,750** | **375,000** | **4.5M**  | **22.5M** | **45 Million** |
+| 5-minute (view)     | 3,750      | 75,000      | 900,000   | 4.5M      | 9M             |
+| 15-minute (view)    | 1,250      | 25,000      | 300,000   | 1.5M      | 3M             |
+| 30-minute (view)    | 625        | 12,500      | 150,000   | 750,000   | 1.5M           |
+| 1-hour (view)       | 312        | 6,240       | 74,880    | 374,400   | 748,800        |
+| 1-day (view)        | 50         | 1,000       | 12,000    | 60,000    | 120,000        |
+| Weekly (view)       | 50         | 200         | 2,400     | 12,000    | 24,000         |
 
-### Storage Estimates (1-Second Base Data)
+### Storage Estimates (1-Minute Base Data)
 
 | Duration     | Raw Size | With Compression (90%) | Notes                   |
 | ------------ | -------- | ---------------------- | ----------------------- |
-| **1 Year**   | ~20 GB   | **~2-3 GB**            | Production minimum      |
-| **5 Years**  | ~100 GB  | **~10-15 GB**          | Recommended retention   |
-| **10 Years** | ~200 GB  | **~20-30 GB**          | Full historical archive |
+| **1 Year**   | ~350 MB  | **~35-50 MB**          | Production minimum      |
+| **5 Years**  | ~1.7 GB  | **~200-300 MB**        | Recommended retention   |
+| **10 Years** | ~3.5 GB  | **~350-500 MB**        | Full historical archive |
 
 ### Scalability Projections
 
 | Stocks             | 5 Years (Compressed) | 10 Years (Compressed) | Notes                |
 | ------------------ | -------------------- | --------------------- | -------------------- |
-| 50 (Nifty 50)      | ~10-15 GB            | ~20-30 GB             | Current scope        |
-| 100 (Nifty 100)    | ~20-30 GB            | ~40-60 GB             | 2x scaling           |
-| 200 (Nifty 200)    | ~40-60 GB            | ~80-120 GB            | Enterprise scale     |
-| 500 (FnO Universe) | ~100-150 GB          | ~200-300 GB           | Full market coverage |
+| 50 (Nifty 50)      | ~200-300 MB          | ~350-500 MB           | Current scope        |
+| 100 (Nifty 100)    | ~400-600 MB          | ~700 MB - 1 GB        | 2x scaling           |
+| 200 (Nifty 200)    | ~800 MB - 1.2 GB     | ~1.5-2 GB             | Enterprise scale     |
+| 500 (FnO Universe) | ~2-3 GB              | ~4-5 GB               | Full market coverage |
 
 ### Storage Infrastructure Requirements
 
-| Scale                 | Storage Type           | Recommended | Monthly Cost (AWS) |
-| --------------------- | ---------------------- | ----------- | ------------------ |
-| 50 stocks / 5 years   | SSD (GP3)              | 50 GB       | ~$5                |
-| 50 stocks / 10 years  | SSD (GP3)              | 100 GB      | ~$10               |
-| 200 stocks / 10 years | SSD (GP3)              | 500 GB      | ~$50               |
-| 500 stocks / 10 years | SSD (GP3) + S3 tiering | 1 TB + Cold | ~$100              |
+| Scale                 | Storage Type | Recommended | Monthly Cost (AWS) |
+| --------------------- | ------------ | ----------- | ------------------ |
+| 50 stocks / 5 years   | SSD (GP3)    | 20 GB       | ~$2                |
+| 50 stocks / 10 years  | SSD (GP3)    | 20 GB       | ~$2                |
+| 200 stocks / 10 years | SSD (GP3)    | 50 GB       | ~$5                |
+| 500 stocks / 10 years | SSD (GP3)    | 100 GB      | ~$10               |
 
 ### Data Flow: Base → Derived Views
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                        1-SECOND TICKS (BASE TABLE)                           │
-│                     2.7 Billion rows / 10 years (~20-30 GB)                  │
+│                     1-MINUTE CANDLES (BASE HYPERTABLE)                       │
+│                     45 Million rows / 10 years (~350-500 MB)                 │
 └─────────────────────────────────────────────────────────────────────────────┘
                                     │
                                     ▼ (Continuous Aggregates - Auto-computed)
         ┌───────────────────────────┼───────────────────────────┐
         ▼                           ▼                           ▼
 ┌───────────────┐           ┌───────────────┐           ┌───────────────┐
-│  candles_1m   │           │  candles_5m   │           │  candles_15m  │
-│   45M rows    │           │    9M rows    │           │    3M rows    │
+│  candles_5m   │           │  candles_15m  │           │  candles_30m  │
+│    9M rows    │           │    3M rows    │           │   1.5M rows   │
 └───────────────┘           └───────────────┘           └───────────────┘
         │                           │                           │
         └───────────────────────────┼───────────────────────────┘
@@ -469,28 +471,28 @@ _Questions raised by Yogendra Singh and Utkarsh during the design phase, with ju
 
 **Asked by:** Yogendra Singh, Utkarsh
 
-**Answer:** **1-second as base, with derived views for higher timeframes** ✅
+**Answer:** **1-minute as base** ✅ (Broker API limitation)
 
 **Justification:**
 
-| Approach             | Pros                                    | Cons                            |
-| -------------------- | --------------------------------------- | ------------------------------- |
-| 1-minute base        | Smaller storage (~300 MB/10yr)          | Lose tick-level precision       |
-| **1-second base** ✅ | Full granularity, derive all timeframes | Larger storage (~20-30 GB/10yr) |
+| Approach             | Pros                              | Cons                          |
+| -------------------- | --------------------------------- | ----------------------------- |
+| **1-minute base** ✅ | Broker supported, smaller storage | Lose tick-level precision     |
+| 1-second base        | Full granularity                  | ❌ Not available from broker! |
 
-**Decision:** Store 1-second ticks, create continuous aggregates for 1m/5m/15m/1h/1d/weekly.
+**Decision:** Store 1-minute candles as base, create continuous aggregates for 5m/15m/30m/1h/1d/weekly.
 
 **Evidence:**
 
-- **Storage is cheap**: 20-30 GB for 10 years costs ~$10/month on AWS
-- **Flexibility**: Can always derive 1m from 1s, but cannot go back the other way
-- **Future-proof**: If we need tick-level analysis (order flow, volume profile), data is available
-- **Continuous aggregates**: TimescaleDB auto-computes higher timeframes with no extra code
+- **Broker Limitation**: MStock API minimum interval is `minute` (no 1-second historical data)
+- **Storage efficient**: ~350-500 MB for 10 years (50 stocks)
+- **Cost effective**: ~$2/month AWS storage
+- **Sufficient for trading**: RSI, MACD, EMA all work on 1-minute or higher
 
 **Derived Views (Auto-computed):**
 
 ```
-1-second → candles_1m → candles_5m → candles_15m → candles_1h → candles_1d → candles_weekly
+candles_1m (BASE) → candles_5m → candles_15m → candles_30m → candles_1h → candles_1d → candles_weekly
 ```
 
 ---
@@ -547,19 +549,19 @@ We can JOIN user preferences with market data (e.g., "notify user X when RELIANC
 
 **Asked by:** Yogendra Singh
 
-**Answer:** **~20-30 GB for 10 years, ~$15-25/month on AWS** ✅
+**Answer:** **~350-500 MB for 10 years, ~$30-50/month on AWS** ✅
 
-**Storage Calculation (1-Second Base):**
+**Storage Calculation (1-Minute Base):**
 
 ```
-1-second ticks:
-  50 stocks × 22,500 ticks/day × 240 days/year × 10 years
-  = 2,700,000,000 rows (2.7 Billion)
+1-minute candles:
+  50 stocks × 375 candles/day × 240 days/year × 10 years
+  = 45,000,000 rows (45 Million)
 
-Row size: ~80 bytes (time, symbol, ltp, volume, bid, ask)
-Raw size: 2.7B × 80 = ~216 GB
+Row size: ~80 bytes (time, symbol, open, high, low, close, volume)
+Raw size: 45M × 80 = ~3.5 GB
 
-With TimescaleDB compression (90%): ~20-30 GB
+With TimescaleDB compression (90%): ~350-500 MB
 ```
 
 **AWS Cloud Hosting Costs (Monthly):**
@@ -567,30 +569,30 @@ With TimescaleDB compression (90%): ~20-30 GB
 | Component           | Service             | Spec                      | Cost/Month     |
 | ------------------- | ------------------- | ------------------------- | -------------- |
 | **Database**        | RDS PostgreSQL      | db.t3.micro (1 vCPU, 1GB) | ~$15           |
-| **Storage**         | GP3 SSD             | 100 GB                    | ~$10           |
-| **Backup**          | Automated snapshots | 30 days retention         | ~$5            |
+| **Storage**         | GP3 SSD             | 20 GB                     | ~$2            |
+| **Backup**          | Automated snapshots | 30 days retention         | ~$2            |
 | **Redis Cache**     | ElastiCache         | cache.t3.micro            | ~$12           |
-| **Total (Minimal)** |                     |                           | **~$42/month** |
+| **Total (Minimal)** |                     |                           | **~$31/month** |
 
 **Cost by Scale:**
 
 | Scale               | DB Instance  | Storage | Redis           | Total/Month |
 | ------------------- | ------------ | ------- | --------------- | ----------- |
-| **Dev/Test**        | db.t3.micro  | 50 GB   | cache.t3.micro  | **~$30**    |
-| **50 stocks/5yr**   | db.t3.small  | 100 GB  | cache.t3.small  | **~$50**    |
-| **50 stocks/10yr**  | db.t3.medium | 200 GB  | cache.t3.small  | **~$80**    |
-| **200 stocks/10yr** | db.t3.large  | 500 GB  | cache.t3.medium | **~$150**   |
-| **Enterprise**      | db.r6g.large | 1 TB    | cache.r6g.large | **~$400**   |
+| **Dev/Test**        | db.t3.micro  | 20 GB   | cache.t3.micro  | **~$30**    |
+| **50 stocks/5yr**   | db.t3.micro  | 20 GB   | cache.t3.micro  | **~$30**    |
+| **50 stocks/10yr**  | db.t3.small  | 50 GB   | cache.t3.small  | **~$45**    |
+| **200 stocks/10yr** | db.t3.medium | 100 GB  | cache.t3.small  | **~$70**    |
+| **Enterprise**      | db.t3.large  | 500 GB  | cache.t3.medium | **~$150**   |
 
 **Alternative: Local Docker (Current Setup):**
 
-| Scenario                  | Storage    | Monthly Cost           |
-| ------------------------- | ---------- | ---------------------- |
-| Mac Mini M2 (home server) | 1 TB SSD   | ~$0 (electricity only) |
-| EC2 Spot (t3.medium)      | 100 GB EBS | ~$15-20                |
-| EC2 On-Demand (t3.medium) | 100 GB EBS | ~$35-40                |
+| Scenario                  | Storage   | Monthly Cost           |
+| ------------------------- | --------- | ---------------------- |
+| Mac Mini M2 (home server) | 1 TB SSD  | ~$0 (electricity only) |
+| EC2 Spot (t3.medium)      | 50 GB EBS | ~$15-20                |
+| EC2 On-Demand (t3.medium) | 50 GB EBS | ~$35-40                |
 
-**Evidence:** Current `docker-compose.prod.yml` runs entire stack (DB + Redis + Kafka + App) on t3.medium with 4GB RAM.
+**Evidence:** 1-minute data is ~60x smaller than 1-second data, significantly reducing storage and costs.
 
 ---
 

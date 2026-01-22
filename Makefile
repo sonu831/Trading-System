@@ -54,6 +54,10 @@ help:
 	@echo "  make logs           Tail all logs"
 	@echo "  make clean          Remove build artifacts"
 	@echo "  make clean-data     Delete all data (CAUTION!)"
+	@echo ""
+	@echo "💾 DATABASE"
+	@echo "  make backup         Backup TimescaleDB to ./backups/"
+	@echo "  make restore        Restore from latest backup"
 
 # ===========================================================
 # DOCKER STACKS (Primary Commands)
@@ -220,6 +224,33 @@ clean-data:
 	@read -p "Continue? [y/N] " c && [ "$$c" = "y" ] || exit 1
 	rm -rf data/*
 	@echo "✅ Data deleted."
+
+
+# ===========================================================
+# DATABASE BACKUP & RESTORE
+# ===========================================================
+
+backup:
+	@mkdir -p backups
+	@echo "💾 Backing up TimescaleDB..."
+	@docker exec timescaledb pg_dump -U trading nifty50 > ./backups/nifty50_$$(date +%Y%m%d_%H%M%S).sql
+	@echo "✅ Backup saved to ./backups/"
+	@ls -lh backups/*.sql | tail -5
+
+restore:
+	@echo "📂 Available backups:"
+	@ls -1t backups/*.sql 2>/dev/null | head -10 || echo "No backups found!"
+	@echo ""
+	@read -p "Enter backup filename (or press Enter for latest): " file; \
+	if [ -z "$$file" ]; then \
+		file=$$(ls -1t backups/*.sql 2>/dev/null | head -1); \
+	fi; \
+	if [ -z "$$file" ]; then \
+		echo "❌ No backup file found!"; exit 1; \
+	fi; \
+	echo "🔄 Restoring from $$file..."; \
+	docker exec -i timescaledb psql -U trading nifty50 < $$file; \
+	echo "✅ Restore complete!"
 
 
 # ===========================================================

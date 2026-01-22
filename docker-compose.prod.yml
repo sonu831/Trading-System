@@ -144,6 +144,8 @@ services:
       PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@admin.com}
       PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin123}
       PGADMIN_CONFIG_SERVER_MODE: 'False'
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
     depends_on:
       - timescaledb
     restart: always
@@ -559,3 +561,4 @@ volumes:
   timescaledb_data:
   prometheus_data:
   grafana_data:
+  pgadmin_data:

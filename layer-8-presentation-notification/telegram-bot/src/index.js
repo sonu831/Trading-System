@@ -1374,6 +1374,19 @@ async function main() {
           { EX: 86400 }
         ); // Expire in 24h
 
+        // Publish bot restart notification for email service
+        publisher.publish(
+          'system:bot_restart',
+          JSON.stringify({
+            botName: 'Guru Ji Trading Bot',
+            instanceId: INSTANCE_ID,
+            hostname: HOSTNAME,
+            startTime: START_TIME,
+            nodeVersion: process.version,
+            platform: process.platform,
+          })
+        );
+
         // Notify admin/subscribers of deployment
         broadcast(`🙏 *Namaste Ji!* Guru Ji is back online. 🚀\n_Instance: ${INSTANCE_ID}_`);
       })

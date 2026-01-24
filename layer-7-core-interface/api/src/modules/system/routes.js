@@ -18,6 +18,12 @@ async function systemRoutes(fastify, options) {
     schema: backfillTriggerSchema,
     handler: systemController.triggerBackfill,
   });
+
+  const healthController = require('./health.controller');
+  fastify.get('/api/v1/health/detailed', healthController.getDetailedHealth);
+
+  const newsController = require('./news.controller');
+  fastify.get('/api/v1/news', newsController.getNews);
 }
 
 module.exports = systemRoutes;

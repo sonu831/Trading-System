@@ -23,15 +23,14 @@ services:
       - FLATTRADE_USER_ID=${FLATTRADE_USER_ID}
       - FLATTRADE_API_KEY=${FLATTRADE_API_KEY}
       - FLATTRADE_ACTID=${FLATTRADE_ACTID}
+      - SKIP_HISTORICAL_SYNC=false
     volumes:
       - ../../vendor:/app/vendor:ro
     networks:
       - trading-network
     restart: unless-stopped
-    # NOTE: Loki Docker logging driver doesn't work on M1/ARM64 Mac
-    # Logs are collected via promtail instead
 
-    # Layer 1: FlatTrade Python Ingestion (Sidecar)
+  # Layer 1: FlatTrade Python Ingestion (Sidecar)
   flattrade-ingestion:
     build:
       context: ../../layer-1-flattrade-python

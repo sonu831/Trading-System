@@ -1,0 +1,19 @@
+{
+  "name": "@trading-system/kafka-notifications",
+  "version": "1.0.0",
+  "description": "Shared Kafka Notification Producer/Consumer for Trading System",
+  "main": "index.js",
+  "files": [
+    "notification-producer.js",
+    "notification-consumer.js",
+    "index.js"
+  ],
+  "dependencies": {
+    "kafkajs": "^2.2.4"
+  },
+  "keywords": [
+    "kafka",
+    "notifications",
+    "trading-system"
+  ]
+}

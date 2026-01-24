@@ -3,6 +3,7 @@ const nodemailer = require('nodemailer');
 const pino = require('pino');
 const express = require('express');
 const promClient = require('prom-client');
+const { EmailKafkaConsumer } = require('./kafka-consumer');
 
 // Express App for /metrics
 const app = express();
@@ -55,6 +56,14 @@ const notificationsReceived = new promClient.Counter({
   labelNames: ['channel'],
 });
 register.registerMetric(notificationsReceived);
+
+// Kafka Notifications Processed
+const kafkaNotificationsProcessed = new promClient.Counter({
+  name: 'kafka_notifications_processed_total',
+  help: 'Total Kafka notifications processed by status',
+  labelNames: ['type', 'status'], // status: success, failed, retried, dlq
+});
+register.registerMetric(kafkaNotificationsProcessed);
 
 // Logger
 const logger = pino({
@@ -345,6 +354,18 @@ async function main() {
     app.listen(PORT, () => {
       logger.info({ port: PORT }, `📡 HTTP Server listening on port ${PORT} (Metrics: /metrics)`);
     });
+
+    // Start Kafka Consumer (dual-mode: Redis Pub/Sub + Kafka)
+    const kafkaConsumer = new EmailKafkaConsumer({
+      logger,
+      sendEmail,
+      metrics: {
+        notificationsReceived,
+        kafkaProcessed: kafkaNotificationsProcessed,
+      },
+    });
+    await kafkaConsumer.start();
+    logger.info('🚀 Email Service started (Redis + Kafka dual-mode)');
   } catch (err) {
     logger.error({ err }, 'Fatal Error');
     process.exit(1);

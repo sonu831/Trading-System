@@ -12,4 +12,4 @@ COPY . .
 # Run as non-root user
 USER node
 
-CMD ["node", "src/index.js"]
+CMD ["npm", "start"]

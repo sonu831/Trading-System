@@ -72,6 +72,8 @@ up: infra observe notify app ui
 	@echo "   API:       http://localhost:4000"
 	@echo "   Grafana:   http://localhost:3001"
 
+	
+
 down:
 	@echo "🛑 Stopping all containers..."
 	-$(DC) -f $(COMPOSE_DIR)/docker-compose.gateway.yml down
@@ -113,6 +115,11 @@ app:
 	$(DC) -f $(COMPOSE_DIR)/docker-compose.app.yml up -d
 	@echo "✅ Pipeline running."
 
+app-build:
+	@echo "🚀 Rebuilding Pipeline..."
+	$(DC) -f $(COMPOSE_DIR)/docker-compose.app.yml up -d --build
+	@echo "✅ Pipeline rebuilt."
+
 ui:
 	@echo "🖥️  Building Dashboard..."
 	$(DC) -f $(COMPOSE_DIR)/docker-compose.ui.yml up -d --build
@@ -127,6 +134,11 @@ notify:
 	@echo "🔔 Starting Notifications..."
 	$(DC) -f $(COMPOSE_DIR)/docker-compose.notify.yml up -d
 	@echo "✅ Telegram Bot & Email Service running"
+
+notify-build:
+	@echo "🔔 Rebuilding Notifications..."
+	$(DC) -f $(COMPOSE_DIR)/docker-compose.notify.yml up -d --build
+	@echo "✅ Rebuilt Telegram Bot & Email Service"
 
 gateway:
 	@echo "🌐 Starting Gateway..."

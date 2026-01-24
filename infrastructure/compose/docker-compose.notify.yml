@@ -5,7 +5,7 @@ services:
   # NOTIFICATION SERVICES
   # ===========================================
 
-  # Layer 7: Telegram Bot
+  # Layer 8: Telegram Bot
   telegram-bot:
     build:
       context: ../../layer-8-presentation-notification/telegram-bot
@@ -15,11 +15,16 @@ services:
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
       - REDIS_URL=redis://redis:6379
       - LOG_LEVEL=${LOG_LEVEL:-info}
+      # Kafka Configuration
+      - KAFKA_BROKERS=kafka:29092
+      - KAFKA_NOTIFICATION_TOPIC=notifications
+      - KAFKA_NOTIFICATION_DLQ_TOPIC=notifications-dlq
+      - KAFKA_ENABLED=${KAFKA_NOTIFICATIONS_ENABLED:-true}
     networks:
       - trading-network
     restart: unless-stopped
 
-  # Layer 7: Email Service
+  # Layer 8: Email Service
   email-service:
     build:
       context: ../../layer-8-presentation-notification/email-service
@@ -36,6 +41,11 @@ services:
       - SMTP_PASS=${SMTP_PASS:-}
       - ADMIN_EMAILS=${ADMIN_EMAILS:-}
       - SYSTEM_EMAIL=${SYSTEM_EMAIL:-}
+      # Kafka Configuration
+      - KAFKA_BROKERS=kafka:29092
+      - KAFKA_NOTIFICATION_TOPIC=notifications
+      - KAFKA_NOTIFICATION_DLQ_TOPIC=notifications-dlq
+      - KAFKA_ENABLED=${KAFKA_NOTIFICATIONS_ENABLED:-true}
     networks:
       - trading-network
     restart: unless-stopped

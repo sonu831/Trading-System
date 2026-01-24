@@ -342,8 +342,12 @@ async function initialize() {
 
     // --- Auto-Run if Market is Closed ---
     if (!marketHours.isMarketOpen()) {
-      logger.info('🌙 Market is Closed. Auto-triggering Historical Data Backfill...');
-      runBackfill();
+      if (process.env.SKIP_HISTORICAL_SYNC === 'true') {
+        logger.info('🌙 Market is Closed. Auto-backfill SKIPPED (SKIP_HISTORICAL_SYNC=true).');
+      } else {
+        logger.info('🌙 Market is Closed. Auto-triggering Historical Data Backfill...');
+        runBackfill();
+      }
     }
   } catch (error) {
     logger.error('❌ Initialization failed:', error);

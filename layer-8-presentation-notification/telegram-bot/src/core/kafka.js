@@ -7,7 +7,7 @@ class KafkaClient {
     this.kafka = new Kafka({
       clientId: config.kafka.clientId,
       brokers: config.kafka.brokers,
-      logLevel: logLevel.ERROR,
+      logLevel: logLevel ? logLevel.ERROR : 1, // Fallback to 1 (ERROR) if undefined
       retry: {
         initialRetryTime: 300,
         retries: 10, // Aggressive retry for startup

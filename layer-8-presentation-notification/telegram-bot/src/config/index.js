@@ -18,6 +18,7 @@ module.exports = {
   telegram: {
     token: process.env.TELEGRAM_BOT_TOKEN,
     webhookUrl: process.env.TELEGRAM_WEBHOOK_URL,
+    adminChatId: process.env.ADMIN_CHAT_ID,
   },
 
   // Infrastructure
@@ -34,6 +35,7 @@ module.exports = {
   // API Endpoints
   api: {
     backend: process.env.BACKEND_API_URL || 'http://backend-api:4000/api/v1',
+    analysis: process.env.ANALYSIS_API_URL || 'http://analysis:8081',
   },
 
   // Feature Flags / Constants

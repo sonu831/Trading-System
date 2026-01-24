@@ -8,6 +8,8 @@ import DashboardSkeleton from './components/DashboardSkeleton';
 import { Button } from '@/components/ui';
 import { BackfillModal } from '@/components/features/Backfill';
 
+import TopPicksWidget from './components/TopPicksWidget';
+
 const DashboardView = ({ marketView, signals, loading }) => {
   const [activeTab, setActiveTab] = useState('GRID'); // GRID | SIGNALS
   const [showBackfill, setShowBackfill] = useState(false);
@@ -34,7 +36,10 @@ const DashboardView = ({ marketView, signals, loading }) => {
           </p>
         </div>
       ) : (
-        <MarketOverview marketView={marketView} />
+        <>
+          <MarketOverview marketView={marketView} />
+          <TopPicksWidget marketView={marketView} />
+        </>
       )}
 
       {/* Top Movers Carousel */}

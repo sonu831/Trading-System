@@ -242,7 +242,8 @@ export default function SystemPipeline() {
     const fetchStatus = async () => {
       try {
         const res = await axios.get(`${API_URL}/system-status`);
-        setSystemData(res.data);
+        // Handle wrapped response
+        setSystemData(res.data?.data || res.data);
       } catch (err) {
         console.error(err);
       }

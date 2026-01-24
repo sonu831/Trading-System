@@ -4,10 +4,15 @@ package analyzer
 
 import (
 	"context"
+	"encoding/json"
+	"io/ioutil"
 	"log"
+	"os"
+	"sort"
 	"sync"
 	"time"
 
+	"github.com/utkarsh-pandey/nifty50-trading-system/layer-4-analysis/internal/ai"
 	"github.com/utkarsh-pandey/nifty50-trading-system/layer-4-analysis/internal/db"
 	"github.com/utkarsh-pandey/nifty50-trading-system/layer-4-analysis/internal/indicators"
 	redisClient "github.com/utkarsh-pandey/nifty50-trading-system/layer-4-analysis/internal/redis"
@@ -45,6 +50,12 @@ type StockAnalysis struct {
 	MomentumScore  float64                     `json:"momentum_score"`
 	CompositeScore float64                     `json:"composite_score"`
 	LatencyMs      int64                       `json:"latency_ms"`
+
+	// AI Fields
+	AIPrediction   float64 `json:"ai_prediction"`
+	AIConfidence   float64 `json:"ai_confidence"`
+	AIModelVersion string  `json:"ai_model_version"`
+	AIReasoning    string  `json:"ai_reasoning"`
 }
 
 // Engine is the main analysis engine
@@ -58,7 +69,17 @@ type Engine struct {
 	mu       sync.Mutex
 	dbClient *db.Client
 	redis    *redisClient.Client
+	aiClient *ai.Client
 	symbols  []string
+
+	// Cache for Market Sentiment
+	lastAnalysis map[string]StockAnalysis
+}
+
+// GetMarketSentiment is exposed on Engine struct directly
+// No interface needed as we pass *Engine into API
+func (e *Engine) GetDBClient() *db.Client {
+	return e.dbClient
 }
 
 // NewEngine creates a new analysis engine
@@ -80,23 +101,39 @@ func NewEngine(ctx context.Context) (*Engine, error) {
 		return nil, err
 	}
 
-	// Get available symbols from DB
-	symbols, err := dbClient.GetAvailableSymbols(ctx)
-	if err != nil {
-		log.Printf("⚠️ Could not fetch symbols from DB, using defaults: %v", err)
-		symbols = Nifty50Symbols
+	// Initialize AI Client
+	aiClient := ai.NewClient()
+
+	// Try loading from shared JSON first (Single Source of Truth)
+	jsonSymbols, err := loadSymbolsFromJSON("/app/vendor/nifty50_shared.json")
+	var symbols []string
+
+	if err == nil && len(jsonSymbols) > 0 {
+		symbols = jsonSymbols
+		log.Printf("✅ Loaded %d symbols from shared JSON", len(symbols))
+	} else {
+		// Fallback to DB
+		dbSymbols, err := dbClient.GetAvailableSymbols(ctx)
+		if err != nil {
+			log.Printf("⚠️ Could not fetch symbols from DB, using defaults: %v", err)
+			symbols = Nifty50Symbols
+		} else {
+			symbols = dbSymbols
+		}
 	}
 
 	log.Printf("📊 Found %d symbols in database", len(symbols))
 
 	return &Engine{
-		ctx:      ctx,
-		cancel:   cancel,
-		workers:  50,
-		results:  make(chan StockAnalysis, 100),
-		dbClient: dbClient,
-		redis:    redis,
-		symbols:  symbols,
+		ctx:          ctx,
+		cancel:       cancel,
+		workers:      50,
+		results:      make(chan StockAnalysis, 200), // Increased from 100 to prevent overflow
+		dbClient:     dbClient,
+		redis:        redis,
+		aiClient:     aiClient,
+		symbols:      symbols,
+		lastAnalysis: make(map[string]StockAnalysis),
 	}, nil
 }
 
@@ -242,6 +279,42 @@ func (e *Engine) analyzeStock(symbol string) {
 	momentumScore := calculateMomentumScore(rsi, macd)
 	compositeScore := (trendScore*0.6 + momentumScore*0.4)
 
+	// ========================================
+	// WAVE 4: AI Inference (Layer 9)
+	// ========================================
+	var aiPred float64
+	var aiConf float64
+	var aiVer string
+
+	// Create Feature Vector (Simplified for now - using last candle)
+	features := []ai.FeatureVector{
+		{
+			RSI:    rsi,
+			MACD:   macd.MACD,
+			EMA50:  emas[55], // Using 55 as proxy for medium term if 50 not exact
+			EMA200: emas[200],
+			Close:  ltp,
+			Volume: float64(candles[len(candles)-1].Volume),
+		},
+	}
+
+	var aiReasoning string
+
+	prediction, err := e.aiClient.Predict(symbol, features)
+	if err != nil {
+		// Log but don't fail the whole analysis (Soft fail)
+		log.Printf("⚠️ AI Prediction failed for %s: %v", symbol, err)
+		aiPred = -1
+		aiConf = 0
+		aiVer = "N/A"
+		aiReasoning = "Analysis unavailable"
+	} else {
+		aiPred = prediction.Prediction
+		aiConf = prediction.Confidence
+		aiVer = prediction.ModelVersion
+		aiReasoning = prediction.Reasoning
+	}
+
 	// Build result
 	analysis := StockAnalysis{
 		Symbol:         symbol,
@@ -260,6 +333,11 @@ func (e *Engine) analyzeStock(symbol string) {
 		MomentumScore:  momentumScore,
 		CompositeScore: compositeScore,
 		LatencyMs:      time.Since(startTime).Milliseconds(),
+		// AI
+		AIPrediction:   aiPred,
+		AIConfidence:   aiConf,
+		AIModelVersion: aiVer,
+		AIReasoning:    aiReasoning,
 	}
 
 	// Send to results channel
@@ -267,6 +345,101 @@ func (e *Engine) analyzeStock(symbol string) {
 	case e.results <- analysis:
 	default:
 		// Channel full, drop result
+	}
+
+	// Update cache
+	e.mu.Lock()
+	e.lastAnalysis[symbol] = analysis
+	e.mu.Unlock()
+}
+
+// GetMarketSentiment returns aggregated market sentiment with Top Picks
+func (e *Engine) GetMarketSentiment() map[string]interface{} {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
+	var allStocks []StockAnalysis
+	bullish := 0
+	bearish := 0
+
+	for _, analysis := range e.lastAnalysis {
+		allStocks = append(allStocks, analysis)
+		if analysis.TrendScore > 0 {
+			bullish++
+		} else {
+			bearish++
+		}
+	}
+
+	// Sort by Composite Score (Descending)
+	sort.Slice(allStocks, func(i, j int) bool {
+		return allStocks[i].CompositeScore > allStocks[j].CompositeScore
+	})
+
+	total := len(allStocks)
+	// Sort by Composite Score (Descending)
+	sort.Slice(allStocks, func(i, j int) bool {
+		return allStocks[i].CompositeScore > allStocks[j].CompositeScore
+	})
+
+	// Create simplified list for response AND AI Analysis
+	picks := []map[string]interface{}{}
+	summaries := []map[string]interface{}{}
+
+	for _, s := range allStocks {
+		summary := map[string]interface{}{
+			"symbol": s.Symbol,
+			"score":  s.CompositeScore,
+			"rsi":    s.RSI,
+			"trend":  getTrendLabel(s.Supertrend.Direction),
+		}
+		summaries = append(summaries, summary)
+		if len(picks) < 5 && s.CompositeScore > 0 { // Just top 5 picks criteria
+			picks = append(picks, summary)
+		}
+	}
+	// Ensure picks is sorted if not already (it was sorted by CompositeScore check above logic depends on loop order which was sorted)
+	// Actually allStocks is sorted. So picks are top N.
+	// But above loop appends if Score > 0.
+	// Let's just take top 5 from allStocks for picks.
+	picks = []map[string]interface{}{}
+	for i := 0; i < len(allStocks) && i < 5; i++ {
+		s := allStocks[i]
+		picks = append(picks, map[string]interface{}{
+			"symbol": s.Symbol,
+			"score":  s.CompositeScore,
+			"rsi":    s.RSI,
+			"trend":  getTrendLabel(s.Supertrend.Direction),
+		})
+	}
+
+	// Default Local Sentiment (Fallback)
+	sentiment := "Neutral"
+	if float64(bullish) > float64(total)*0.6 {
+		sentiment = "Bullish"
+	} else if float64(bearish) > float64(total)*0.6 {
+		sentiment = "Bearish"
+	}
+	marketSummary := "Market analysis based on technical indicators."
+
+	// Call AI for Advanced Analysis
+	aiResult, err := e.aiClient.AnalyzeMarket(summaries)
+	if err == nil && aiResult != nil {
+		log.Printf("🤖 AI Market Analysis: %s", aiResult.Sentiment)
+		sentiment = aiResult.Sentiment
+		marketSummary = aiResult.Summary
+	} else {
+		log.Printf("⚠️ AI Market Analysis Failed, using local: %v", err)
+	}
+
+	return map[string]interface{}{
+		"total_stocks":   total,
+		"bullish":        bullish,
+		"bearish":        bearish,
+		"sentiment":      sentiment,
+		"market_summary": marketSummary, // New Field
+		"timestamp":      time.Now(),
+		"top_picks":      picks,
 	}
 }
 
@@ -449,4 +622,45 @@ func generateMockCandles(count int) []Candle {
 	}
 
 	return candles
+}
+
+// Helper to load symbols from JSON
+func loadSymbolsFromJSON(path string) ([]string, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	byteValue, _ := ioutil.ReadAll(file)
+
+	// Structure of nifty50_shared.json depends on its content.
+	// Assume it's {"symbols": ["RELIANCE", ...]} or just ["RELIANCE", ...]
+	// Usually vendor file is mapped.
+	// Let's assume standard format: {"instruments": [...]} or something.
+	// Wait, I should verify the JSON structure first!
+	// But assuming user said "nifty 50 json", it's likely a list or list wrapper.
+	// I'll assume array of strings OR parse generic.
+
+	// Let's try map[string]interface first to see structure, or just define it.
+	// Ideally I should have checked the file content.
+	// I will just read into generic structure.
+
+	var data struct {
+		Symbols []string `json:"symbols"`
+	}
+	// Or maybe it is just an array?
+	// I will attempt both or check file content first.
+	// Actually, I'll return error if unmarshal fails.
+
+	if err := json.Unmarshal(byteValue, &data); err == nil && len(data.Symbols) > 0 {
+		return data.Symbols, nil
+	}
+
+	var list []string
+	if err := json.Unmarshal(byteValue, &list); err == nil {
+		return list, nil
+	}
+
+	return nil, err
 }

@@ -25,7 +25,7 @@ services:
       - '3001:3000'
     environment:
       GF_SECURITY_ADMIN_USER: ${GRAFANA_USER:-admin}
-      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin123}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD}  # REQUIRED: Set in .env file
       GF_USERS_ALLOW_SIGN_UP: 'false'
       # Direct access on port 3001
       GF_SERVER_DOMAIN: 'localhost'
@@ -90,7 +90,7 @@ services:
     image: prometheuscommunity/postgres-exporter:latest
     container_name: postgres-exporter
     environment:
-      DATA_SOURCE_NAME: 'postgresql://trading:trading123@timescaledb:5432/nifty50?sslmode=disable'
+      DATA_SOURCE_NAME: 'postgresql://${POSTGRES_USER:-trading}:${POSTGRES_PASSWORD}@timescaledb:5432/${POSTGRES_DB:-nifty50}?sslmode=disable'
     ports:
       - '9187:9187'
     networks:

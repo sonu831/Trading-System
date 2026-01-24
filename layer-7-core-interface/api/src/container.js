@@ -52,6 +52,10 @@ container.register({
   marketRepository: asClass(require('./modules/market/MarketRepository')).singleton(),
   marketService: asClass(require('./modules/market/MarketService')).singleton(),
   marketController: asClass(require('./modules/market/MarketController')).singleton(),
+
+  // Analysis (Proxy to Layer 4)
+  analysisService: asClass(require('./modules/analysis/AnalysisService')).singleton(),
+  analysisController: asClass(require('./modules/analysis/AnalysisController')).singleton(),
 });
 
 module.exports = container;

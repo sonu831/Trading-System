@@ -134,6 +134,7 @@ fastify.register(require('./modules/signals/routes'));
 fastify.register(require('./modules/system/routes'));
 fastify.register(require('./modules/market/routes'));
 fastify.register(require('./modules/data/routes'));
+fastify.register(require('./modules/analysis/routes'));
 
 // Suggestions Endpoint (Refactored to Prisma) -> Leaving inline as it belongs to User Domain (next phase)
 fastify.post('/api/v1/suggestions', async (req, reply) => {

@@ -4,19 +4,25 @@ import { useDispatch } from 'react-redux';
 import { setBackfillModalOpen } from '@/store/slices/systemSlice';
 import { ThemeToggle } from '../../ui';
 
+import Link from 'next/link';
+
 const Navbar = ({ viewMode, setViewMode, systemStatus = 'ONLINE' }) => {
   const dispatch = useDispatch();
 
   return (
+    // ... (in Navbar component)
+
     <header className="mb-6 bg-surface p-4 rounded-xl shadow-lg border border-border flex flex-col md:flex-row justify-between items-center transition-colors duration-200">
-      <div>
-        <h1 className="text-3xl md:text-4xl font-extrabold bg-clip-text text-transparent bg-gradient-to-r from-primary to-accent tracking-tight">
-          Stock Analysis By Gurus
-        </h1>
-        <p className="text-text-secondary text-xs md:text-sm mt-1 font-light tracking-wide">
-          India's First Complex to Simple AI Driven Stock Analysis Application
-        </p>
-      </div>
+      <Link href="/" className="cursor-pointer group">
+        <div>
+          <h1 className="text-3xl md:text-4xl font-extrabold bg-clip-text text-transparent bg-gradient-to-r from-primary to-accent tracking-tight group-hover:opacity-80 transition-opacity">
+            Stock Analysis By Gurus
+          </h1>
+          <p className="text-text-secondary text-xs md:text-sm mt-1 font-light tracking-wide group-hover:text-white transition-colors">
+            India's First Complex to Simple AI Driven Stock Analysis Application
+          </p>
+        </div>
+      </Link>
 
       <div className="flex items-center space-x-4 mt-4 md:mt-0">
         <ThemeToggle />

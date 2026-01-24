@@ -3,6 +3,8 @@ import { createSlice, createSelector } from '@reduxjs/toolkit';
 const initialState = {
   indices: {},
   all_stocks: [],
+  smartPicks: [], // New AI Picks
+  marketSummary: '', // New AI Summary
   marketStatus: 'CLOSED',
   marketSentiment: 'Neutral', // Bullish | Bearish | Neutral
   advanceDecline: { advances: 0, declines: 0 },
@@ -16,10 +18,20 @@ const marketSlice = createSlice({
   initialState,
   reducers: {
     setMarketData: (state, action) => {
-      const { indices, all_stocks, marketStatus, timestamp, marketSentiment, advanceDecline } =
-        action.payload;
+      const {
+        indices,
+        all_stocks,
+        marketStatus,
+        timestamp,
+        marketSentiment,
+        advanceDecline,
+        smartPicks,
+        marketSummary,
+      } = action.payload;
       state.indices = indices || state.indices;
       state.all_stocks = all_stocks || state.all_stocks;
+      state.smartPicks = smartPicks || state.smartPicks; // Update
+      state.marketSummary = marketSummary || state.marketSummary; // Update
       state.marketStatus = marketStatus || state.marketStatus;
       state.marketSentiment = marketSentiment || state.marketSentiment;
       state.advanceDecline = advanceDecline || state.advanceDecline;
@@ -44,6 +56,8 @@ const selectMarketState = (state) => state.market;
 export const selectMarketView = createSelector([selectMarketState], (market) => ({
   indices: market.indices,
   all_stocks: market.all_stocks,
+  smartPicks: market.smartPicks,
+  marketSummary: market.marketSummary,
   marketStatus: market.marketStatus,
   marketSentiment: market.marketSentiment,
   advanceDecline: market.advanceDecline,

@@ -33,6 +33,7 @@ export const useDashboard = () => {
         axios.get(`${API_URL}/market-view`),
         axios.get(`${API_URL}/signals`),
         axios.get(`${API_URL}/system-status`),
+        axios.get(`${API_URL}/analyze/market`), // New Smart Picks (timeout handled by axios def or server)
       ]);
 
       const marketRes =
@@ -40,18 +41,23 @@ export const useDashboard = () => {
       const signalsRes = results[1].status === 'fulfilled' ? results[1].value : { data: [] };
       const systemRes =
         results[2].status === 'fulfilled' ? results[2].value : { data: { status: 'PARTIAL' } };
+      const aiRes =
+        results[3].status === 'fulfilled' ? results[3].value : { data: { top_picks: [] } };
 
       if (results[0].status === 'rejected') console.warn('Market API Failed', results[0].reason);
       if (results[1].status === 'rejected') console.warn('Signals API Failed', results[1].reason);
       if (results[2].status === 'rejected') console.warn('System API Failed', results[2].reason);
 
-      console.log('DEBUG: API_URL', API_URL);
-      console.log('DEBUG: marketRes', marketRes);
-      console.log('DEBUG: signalsRes', signalsRes.data);
-      console.log('DEBUG: systemRes', systemRes.data);
+      // Extract nested data payload (BaseController wraps in { success: true, data: ... })
+      const marketData = marketRes.data?.data || {};
+      const aiData = aiRes.data?.data || {};
 
-      const stocks = marketRes.data.all_stocks || [];
-      console.log('DEBUG: stocks length:', stocks.length);
+      const stocks = marketData.all_stocks || [];
+      const smartPicks = aiData.top_picks || []; // Extract picks
+      const marketSummary = aiData.market_summary || ''; // Extract summary
+
+      console.log('DEBUG: Market Data', marketData);
+      console.log('DEBUG: AI Data', aiData);
 
       // If no stocks, dispatch minimal update to keep system online but don't overwrite if we have old data?
       // Actually, if stocks are empty, it means system has no data.
@@ -68,23 +74,32 @@ export const useDashboard = () => {
       const advances = stocks.filter((s) => s.change_pct > 0).length;
       const declines = stocks.filter((s) => s.change_pct < 0).length;
 
-      // Calculate Sentiment (Simple logic for now)
-      const ratio = advances / (advances + declines || 1);
-      let sentiment = 'Neutral';
-      if (ratio > 0.6) sentiment = 'Bullish';
-      if (ratio < 0.4) sentiment = 'Bearish';
+      // Calculate Sentiment (Prioritize AI, Fallback to Local)
+      let sentiment = aiData.sentiment;
+      if (!sentiment) {
+        const ratio = advances / (advances + declines || 1);
+        sentiment = 'Neutral';
+        if (ratio > 0.6) sentiment = 'Bullish';
+        if (ratio < 0.4) sentiment = 'Bearish';
+      }
 
       dispatch(
         setMarketData({
-          ...marketRes.data,
-          marketSentiment: sentiment,
+          ...marketData, // Spread the inner data object
+          smartPicks: smartPicks, // Add to Redux
+          marketSummary: marketSummary, // Add to Redux
+          marketSentiment: sentiment, // Use prioritized sentiment
           advanceDecline: { advances, declines },
           timestamp: new Date().toISOString(),
         })
       );
 
-      dispatch(setSignals(signalsRes.data));
-      dispatch(setSystemStatus(systemRes.data)); // Dispatch full object
+      // Extract signals (BaseController wraps in { success: true, data: ... })
+      const signalsData = signalsRes.data?.data || [];
+      const systemDataPayload = systemRes.data?.data || systemRes.data || { status: 'PARTIAL' };
+
+      dispatch(setSignals(signalsData));
+      dispatch(setSystemStatus(systemDataPayload)); // Dispatch full object
       dispatch(setMarketLoading(false));
     } catch (err) {
       console.error('Failed to fetch dashboard data', err);

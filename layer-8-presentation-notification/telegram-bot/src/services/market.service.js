@@ -1,9 +1,77 @@
 const redis = require('../core/redis');
 const logger = require('../core/logger');
+const stringSimilarity = require('string-similarity');
+
+// Hardcoded Nifty 50 for Fuzzy Matching (Single Source of Truth: vendor/json is best, but this is fast fallback)
+const NIFTY_50 = [
+  'RELIANCE',
+  'TCS',
+  'HDFCBANK',
+  'INFY',
+  'ICICIBANK',
+  'HINDUNILVR',
+  'SBIN',
+  'BHARTIARTL',
+  'KOTAKBANK',
+  'ITC',
+  'LT',
+  'AXISBANK',
+  'BAJFINANCE',
+  'ASIANPAINT',
+  'MARUTI',
+  'HCLTECH',
+  'TITAN',
+  'WIPRO',
+  'SUNPHARMA',
+  'ULTRACEMCO',
+  'ONGC',
+  'NTPC',
+  'POWERGRID',
+  'TATAMOTORS',
+  'M&M',
+  'BAJAJFINSV',
+  'ADANIPORTS',
+  'COALINDIA',
+  'TATASTEEL',
+  'TECHM',
+  'JSWSTEEL',
+  'INDUSINDBK',
+  'HINDALCO',
+  'DRREDDY',
+  'DIVISLAB',
+  'CIPLA',
+  'GRASIM',
+  'BRITANNIA',
+  'NESTLEIND',
+  'EICHERMOT',
+  'APOLLOHOSP',
+  'BPCL',
+  'HEROMOTOCO',
+  'SBILIFE',
+  'HDFCLIFE',
+  'BAJAJ-AUTO',
+  'TATACONSUM',
+  'ADANIENT',
+  'LTIM',
+  'SHRIRAMFIN',
+];
 
 class MarketService {
   constructor() {
     this.redis = redis;
+  }
+
+  findClosestSymbol(input) {
+    input = input.toUpperCase();
+    if (NIFTY_50.includes(input)) return { symbol: input, original: true };
+
+    const matches = stringSimilarity.findBestMatch(input, NIFTY_50);
+    const best = matches.bestMatch;
+
+    if (best.rating > 0.4) {
+      return { symbol: best.target, original: false, confidence: best.rating };
+    }
+    return null;
   }
 
   async getMarketSnapshot() {

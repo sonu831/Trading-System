@@ -29,6 +29,14 @@ services:
     networks:
       - trading-network
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
 
   # Layer 1: FlatTrade Python Ingestion (Sidecar)
   flattrade-ingestion:
@@ -58,10 +66,18 @@ services:
     environment:
       - KAFKA_BROKERS=kafka:29092
       - REDIS_URL=redis://redis:6379
-      - TIMESCALE_URL=postgresql://trading:trading123@timescaledb:5432/nifty50
+      - TIMESCALE_URL=postgresql://${POSTGRES_USER:-trading}:${POSTGRES_PASSWORD}@timescaledb:5432/${POSTGRES_DB:-nifty50}
     networks:
       - trading-network
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.75'
+          memory: 768M
+        reservations:
+          cpus: '0.5'
+          memory: 384M
 
   # Layer 4: Analysis Engine (Go)
   analysis:
@@ -74,10 +90,20 @@ services:
     environment:
       - REDIS_URL=redis://redis:6379
       - KAFKA_BROKERS=kafka:29092
-      - TIMESCALE_URL=postgresql://trading:trading123@timescaledb:5432/nifty50
+      - TIMESCALE_URL=postgresql://${POSTGRES_USER:-trading}:${POSTGRES_PASSWORD}@timescaledb:5432/${POSTGRES_DB:-nifty50}
+    volumes:
+      - ../../vendor:/app/vendor:ro
     networks:
       - trading-network
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 1536M
+        reservations:
+          cpus: '1'
+          memory: 768M
 
   # Layer 5: Aggregation (Go)
   aggregation:
@@ -89,10 +115,18 @@ services:
       - '8080:8080'
     environment:
       - REDIS_URL=redis://redis:6379
-      - TIMESCALE_URL=postgresql://trading:trading123@timescaledb:5432/nifty50
+      - TIMESCALE_URL=postgresql://${POSTGRES_USER:-trading}:${POSTGRES_PASSWORD}@timescaledb:5432/${POSTGRES_DB:-nifty50}
     networks:
       - trading-network
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 256M
 
   # Layer 6: Signal Generation
   signal:
@@ -104,10 +138,18 @@ services:
       - '8082:8082'
     environment:
       - REDIS_URL=redis://redis:6379
-      - TIMESCALE_URL=postgresql://trading:trading123@timescaledb:5432/nifty50
+      - TIMESCALE_URL=postgresql://${POSTGRES_USER:-trading}:${POSTGRES_PASSWORD}@timescaledb:5432/${POSTGRES_DB:-nifty50}
     networks:
       - trading-network
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
 
   # Layer 7: Core Interface (API)
   backend-api:
@@ -120,7 +162,53 @@ services:
       - '4000:4000'
     environment:
       - REDIS_URL=redis://redis:6379
-      - TIMESCALE_URL=postgresql://trading:trading123@timescaledb:5432/nifty50
+      - TIMESCALE_URL=postgresql://${POSTGRES_USER:-trading}:${POSTGRES_PASSWORD}@timescaledb:5432/${POSTGRES_DB:-nifty50}
+    networks:
+      - trading-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1024M
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+  # Layer 9: AI Inference Service (Python/PyTorch)
+  ai-inference:
+    build:
+      context: ../../layer-9-ai-service
+      dockerfile: Dockerfile
+    container_name: ai-inference
+    ports:
+      - '8000:8000'
+    environment:
+      - AI_PROVIDER=${AI_PROVIDER:-ollama}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - OLLAMA_URL=http://ollama:11434
+      - OLLAMA_MODEL=llama3
+    networks:
+      - trading-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 2048M
+        reservations:
+          cpus: '0.5'
+          memory: 1024M
+
+  # Layer 9 Extension: Local LLM Provider
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
     networks:
       - trading-network
     restart: unless-stopped
@@ -146,3 +234,6 @@ networks:
   trading-network:
     external: true
     name: local-trading-network
+
+volumes:
+  ollama_data:

@@ -5,6 +5,37 @@ All notable changes to the **Nifty 50 Trading System** project will be documente
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.0] - 2026-01-25
+
+### 🚀 Added
+
+- **AI Market Intelligence (Layer 9)**:
+  - **Ollama Integration**: Fully integrated Llama 3 for deep reasoning on Nifty 50 market trends.
+  - **Advanced Sentiment**: Backend now produces "Bullish/Bearish/Neutral" labels using AI, replacing simple heuristic ratios.
+  - **Market Summary**: AI-generated 2-sentence market condition summaries displayed in Dashboard and Bot.
+- **Telegram Bot v4.0**:
+  - **Hourly Market Insights**: Automatic background job that broadcasts AI-curated top picks to the admin channel every hour.
+  - **Enhanced `/analyze`**: Now includes AI confidence scores and detailed reasoning/logic for every stock.
+- **Maintenance & DevOps**:
+  - **`make prune`**: New maintenance command with safety confirmation to aggressively reclaim disk space (verified to save 30GB+).
+  - **Always-Build Policy**: Updated `make up` and `make ui` to enforce `--build`, ensuring code changes are always baked into containers.
+
+### 🐛 Fixed
+
+- **Critical Stability Fixes**:
+  - **Go Analysis Engine**: Fixed a nil pointer dereference panic in `engine.go` when AI services were loading or unreachable.
+  - **Layer 7 Connectivity**: Fixed `axios` dependency crash that prevented the API from booting in certain environments.
+  - **AI Service Syntax**: Corrected a critical Python `SyntaxError` (extra parenthesis) in the Ollama engine module.
+- **Data Flow Improvements**:
+  - **Frontend Mapping**: Fixed `useDashboard.js` logic that was accidentally overwriting AI sentiment with local calculations.
+  - **Port Consistency**: Standardized internal/external port 8081 for the analysis service.
+
+### 🛠 Changed
+
+- **Dashboard UI**:
+  - Updated "Top Picks" widget to display dynamic scores and RSI values directly.
+  - Integrated the new AI Market Summary panel.
+
 ## [0.7.0] - 2026-01-24
 
 ### 🚀 Added

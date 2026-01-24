@@ -8,16 +8,14 @@ package main
 import (
 	"context"
 	"log"
-	"net/http"
 	"os"
 	"os/signal"
 	"runtime"
 	"syscall"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus/promhttp"
-
 	"github.com/utkarsh-pandey/nifty50-trading-system/layer-4-analysis/internal/analyzer"
+	"github.com/utkarsh-pandey/nifty50-trading-system/layer-4-analysis/internal/api"
 )
 
 func main() {
@@ -38,31 +36,12 @@ func main() {
 		log.Fatalf("❌ Failed to start engine: %v", err)
 	}
 
-	// Start Prometheus Metrics Server
+	// Start API Server (includes metrics)
+	server := api.NewServer(engine)
 	go func() {
-		http.Handle("/metrics", promhttp.Handler())
-		log.Println("📊 Metrics server listening on :8081")
-		if err := http.ListenAndServe(":8081", nil); err != nil {
-			log.Printf("⚠️ Metrics server failed: %v", err)
-		}
-	}()
-
-	// Start Metrics Publisher
-	go func() {
-		ticker := time.NewTicker(5 * time.Second)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-ticker.C:
-				metrics := map[string]interface{}{
-					"goroutines": runtime.NumGoroutine(),
-					"service":    "analysis",
-					"timestamp":  time.Now(),
-				}
-				engine.PublishRuntimeMetrics(metrics)
-			}
+		log.Println("📊 API Server listening on :8081")
+		if err := server.Start(":8081"); err != nil {
+			log.Printf("⚠️ API Server failed: %v", err)
 		}
 	}()
 

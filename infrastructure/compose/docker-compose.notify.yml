@@ -5,34 +5,47 @@ services:
   # NOTIFICATION SERVICES
   # ===========================================
 
-  # Layer 7: Telegram Bot
+  # Layer 8: Telegram Bot
   telegram-bot:
     build:
-      context: ../../layer-7-presentation-notification/telegram-bot
+      context: ../../layer-8-presentation-notification/telegram-bot
       dockerfile: Dockerfile
     container_name: telegram-bot
     environment:
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
       - REDIS_URL=redis://redis:6379
       - LOG_LEVEL=${LOG_LEVEL:-info}
+      # Kafka Configuration
+      - KAFKA_BROKERS=kafka:29092
+      - KAFKA_NOTIFICATION_TOPIC=notifications
+      - KAFKA_NOTIFICATION_DLQ_TOPIC=notifications-dlq
+      - KAFKA_ENABLED=${KAFKA_NOTIFICATIONS_ENABLED:-true}
     networks:
       - trading-network
     restart: unless-stopped
 
-  # Layer 7: Email Service
+  # Layer 8: Email Service
   email-service:
     build:
-      context: ../../layer-7-presentation-notification/email-service
+      context: ../../layer-8-presentation-notification/email-service
       dockerfile: Dockerfile
     container_name: email-service
+    ports:
+      - '7001:7001'
     environment:
+      - PORT=7001
       - REDIS_URL=redis://redis:6379
       - SMTP_HOST=${SMTP_HOST:-}
       - SMTP_PORT=${SMTP_PORT:-587}
       - SMTP_USER=${SMTP_USER:-}
       - SMTP_PASS=${SMTP_PASS:-}
-      - ADMIN_EMAIL=${ADMIN_EMAIL:-}
+      - ADMIN_EMAILS=${ADMIN_EMAILS:-}
       - SYSTEM_EMAIL=${SYSTEM_EMAIL:-}
+      # Kafka Configuration
+      - KAFKA_BROKERS=kafka:29092
+      - KAFKA_NOTIFICATION_TOPIC=notifications
+      - KAFKA_NOTIFICATION_DLQ_TOPIC=notifications-dlq
+      - KAFKA_ENABLED=${KAFKA_NOTIFICATIONS_ENABLED:-true}
     networks:
       - trading-network
     restart: unless-stopped

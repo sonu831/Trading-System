@@ -36,5 +36,8 @@
     "layer-5-aggregation/**/*.go": [
       "gofmt -w"
     ]
+  },
+  "dependencies": {
+    "socket.io-client": "^4.8.3"
   }
 }

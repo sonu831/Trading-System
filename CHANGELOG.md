@@ -5,6 +5,122 @@ All notable changes to the **Nifty 50 Trading System** project will be documente
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.0] - 2026-01-25
+
+### 🚀 Added
+
+- **AI Market Intelligence (Layer 9)**:
+  - **Ollama Integration**: Fully integrated Llama 3 for deep reasoning on Nifty 50 market trends.
+  - **Advanced Sentiment**: Backend now produces "Bullish/Bearish/Neutral" labels using AI, replacing simple heuristic ratios.
+  - **Market Summary**: AI-generated 2-sentence market condition summaries displayed in Dashboard and Bot.
+- **Telegram Bot v4.0**:
+  - **Hourly Market Insights**: Automatic background job that broadcasts AI-curated top picks to the admin channel every hour.
+  - **Enhanced `/analyze`**: Now includes AI confidence scores and detailed reasoning/logic for every stock.
+- **Maintenance & DevOps**:
+  - **`make prune`**: New maintenance command with safety confirmation to aggressively reclaim disk space (verified to save 30GB+).
+  - **Always-Build Policy**: Updated `make up` and `make ui` to enforce `--build`, ensuring code changes are always baked into containers.
+
+### 🐛 Fixed
+
+- **Critical Stability Fixes**:
+  - **Go Analysis Engine**: Fixed a nil pointer dereference panic in `engine.go` when AI services were loading or unreachable.
+  - **Layer 7 Connectivity**: Fixed `axios` dependency crash that prevented the API from booting in certain environments.
+  - **AI Service Syntax**: Corrected a critical Python `SyntaxError` (extra parenthesis) in the Ollama engine module.
+- **Data Flow Improvements**:
+  - **Frontend Mapping**: Fixed `useDashboard.js` logic that was accidentally overwriting AI sentiment with local calculations.
+  - **Port Consistency**: Standardized internal/external port 8081 for the analysis service.
+
+### 🛠 Changed
+
+- **Dashboard UI**:
+  - Updated "Top Picks" widget to display dynamic scores and RSI values directly.
+  - Integrated the new AI Market Summary panel.
+
+## [0.7.0] - 2026-01-24
+
+### 🚀 Added
+
+- **Telegram Bot Features**:
+  - **Live Status Command (`/livestatus`)**: Real-time market stream health (ticks/heap) with visual indicators. Added "⚡ Live Status" button.
+  - **News Command (`/news`)**: Fetches latest market headlines from Backend API. Added "📰 Market News" button.
+  - **Suggest Command (`/suggest`)**: Direct user feedback submission to database (`/suggest <text>`).
+  - **Robust Routing**: Switched to Regex-based command matching (e.g., `/Market News/i`) to handle emoji variations gracefully.
+  - **Incoming Logger**: Added debug middleware to trace incoming message routing.
+
+- **Backend API Expansions**:
+  - **Detailed Health Check (`GET /api/v1/health/detailed`)**: New endpoint reporting status of Redis, Database, AND Ingestion Service.
+  - **Ingestion Heartbeats**: Checks `system:layer1:metrics` in Redis to determine if the Ingestion service is Active or Stale.
+  - **News Endpoint (`GET /api/v1/news`)**: Mock endpoint serving financial news data.
+
+### 🐛 Fixed
+
+- **System Status "All Down" False Alarm**:
+  - Fixed `health.controller.js` failing to ping Redis/DB by resolving dependencies correctly from the DI Container (`container.resolve('redis')`).
+  - Updated Redis Health Check to use `redis.publisher.ping()` for the wrapped client.
+- **Bot Connectivity**:
+  - Updated `dev:local` script to force `BACKEND_API_URL=http://localhost:4000/api/v1`, fixing `ENOTFOUND` errors during local development.
+- **Market Feed Crash**:
+  - Patched `market.command.js` to handle partial market data (missing breadth) gracefully without crashing the bot.
+
+## [0.6.2] - 2026-01-22
+
+### 🚀 Added
+
+- **Database Backup & Restore Commands**:
+  - Added `make backup` command to create timestamped TimescaleDB backups in `./backups/`.
+  - Added `make restore` command with interactive backup selection or latest auto-restore.
+  - Backups are SQL dumps that persist across container restarts.
+
+- **Container Resources Grafana Dashboard**:
+  - Created comprehensive `container-resources.json` dashboard with CPU and Memory monitoring.
+  - **Application Layers (L1-L7)**: Individual gauge panels for Ingestion, Processing, Analysis, Aggregation, Signal, API, Dashboard, and Telegram Bot.
+  - **Infrastructure**: Kafka, Redis, TimescaleDB, Prometheus, Grafana, Loki, and pgAdmin memory gauges.
+  - Time-series charts showing resource usage trends over time.
+  - All panels display friendly container names instead of Docker IDs.
+
+- **Prometheus cAdvisor Relabeling**:
+  - Added `metric_relabel_configs` to extract `container_id` label from cAdvisor metrics.
+  - Enables container-level resource filtering in Grafana queries.
+
+### 🐛 Fixed
+
+- **Layer 1 Ingestion Crash**:
+  - Fixed `ReferenceError: marketHours is not defined` by moving `MarketHours` import before its first usage in VendorManager initialization.
+
+- **pgAdmin Permission Issues**:
+  - Changed from bind mount (`./data/pgadmin`) to named Docker volume (`pgadmin_data`).
+  - Resolves macOS permission errors (`EACCES: permission denied`) that caused the container to crash-loop.
+  - Data persists across `docker-compose down` but is managed internally by Docker.
+
+### 🛠 Changed
+
+- **Makefile Enhancement**:
+  - Added `💾 DATABASE` section to help menu with backup/restore documentation.
+
+## [0.6.1] - 2026-01-21
+
+### 📚 Documentation
+
+- **Comprehensive Architecture Documentation**:
+  - Created `docs/ARCHITECTURE_DEEP_DIVE.md` with detailed documentation for all 7 layers.
+  - Added interactive **Draw.io architecture diagram** with complete system overview, data flows, and internal components.
+  - Documented multi-vendor "Octopus Pattern" for Layer 1 (MStock, Flattrade, Zerodha, Batch APIs).
+  - Documented TimescaleDB schema with hypertables, continuous aggregates (5m, 15m views), and compression policies.
+  - Added data volume calculations (22.5M rows for 5 years, ~2-3GB with compression).
+  - Included future AI/ML integration points for Layer 4 (pattern detection) and Layer 6 (decision engine).
+  - Added AWS hybrid architecture documentation with VPC, RDS, and ElastiCache setup.
+
+### 🗄️ Database
+
+- **Extended Database Schema (v2)**:
+  - Created `layer-3-storage/timescaledb/migrations/002_extended_schema.sql` with 22 tables across 6 domains.
+  - Added continuous aggregates: `candles_1h`, `candles_1d` for automatic rollups.
+  - Added **Data Watermark System**: `data_availability` table to prevent duplicate ingestion.
+  - Added **Reference Data**: `instruments`, `sectors`, `trading_calendar` tables.
+  - Added **User Data**: `users`, `user_alerts`, `user_watchlists` tables.
+  - Added **Billing**: `plans`, `subscriptions`, `payments`, `invoices` tables for future monetization.
+  - Added **System**: `backfill_jobs`, `system_config`, `audit_log` tables.
+
 ## [0.6.0] - 2026-01-21
 
 ### 🚀 Added

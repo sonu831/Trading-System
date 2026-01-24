@@ -1,0 +1,1169 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "id": 100,
+      "title": "📊 Overall Resource Usage",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus-datasource" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "axisBorderShow": false,
+            "axisLabel": "CPU %",
+            "axisPlacement": "auto",
+            "drawStyle": "line",
+            "fillOpacity": 20,
+            "gradientMode": "opacity",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "showPoints": "never",
+            "spanNulls": true
+          },
+          "mappings": [],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] },
+          "unit": "percent"
+        }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 1 },
+      "id": 1,
+      "options": {
+        "legend": {
+          "calcs": ["mean", "max"],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus-datasource" },
+          "expr": "sum(rate(container_cpu_usage_seconds_total{id=~\"/docker/d53111962c6a.*\"}[1m])) * 100",
+          "legendFormat": "ingestion",
+          "refId": "A"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus-datasource" },
+          "expr": "sum(rate(container_cpu_usage_seconds_total{id=~\"/docker/43c94c34eb5b.*\"}[1m])) * 100",
+          "legendFormat": "processing",
+          "refId": "B"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus-datasource" },
+          "expr": "sum(rate(container_cpu_usage_seconds_total{id=~\"/docker/a8ca4badcd43.*\"}[1m])) * 100",
+          "legendFormat": "analysis",
+          "refId": "C"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus-datasource" },
+          "expr": "sum(rate(container_cpu_usage_seconds_total{id=~\"/docker/6deafd358cd5.*\"}[1m])) * 100",
+          "legendFormat": "aggregation",
+          "refId": "D"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus-datasource" },
+          "expr": "sum(rate(container_cpu_usage_seconds_total{id=~\"/docker/8c40d612f2ca.*\"}[1m])) * 100",
+          "legendFormat": "signal",
+          "refId": "E"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus-datasource" },
+          "expr": "sum(rate(container_cpu_usage_seconds_total{id=~\"/docker/d22cb79d0f1a.*\"}[1m])) * 100",
+          "legendFormat": "backend-api",
+          "refId": "F"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus-datasource" },
+          "expr": "sum(rate(container_cpu_usage_seconds_total{id=~\"/docker/2a5d1978b7dc.*\"}[1m])) * 100",
+          "legendFormat": "dashboard",
+          "refId": "G"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus-datasource" },
+          "expr": "sum(rate(container_cpu_usage_seconds_total{id=~\"/docker/a9ac7c1ba54e.*\"}[1m])) * 100",
+          "legendFormat": "telegram-bot",
+          "refId": "H"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus-datasource" },
+          "expr": "sum(rate(container_cpu_usage_seconds_total{id=~\"/docker/34f0735666ae.*\"}[1m])) * 100",
+          "legendFormat": "kafka",
+          "refId": "I"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus-datasource" },
+          "expr": "sum(rate(container_cpu_usage_seconds_total{id=~\"/docker/2d5cfd919227.*\"}[1m])) * 100",
+          "legendFormat": "timescaledb",
+          "refId": "J"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus-datasource" },
+          "expr": "sum(rate(container_cpu_usage_seconds_total{id=~\"/docker/f6ecd88de9e1.*\"}[1m])) * 100",
+          "legendFormat": "redis",
+          "refId": "K"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus-datasource" },
+          "expr": "sum(rate(container_cpu_usage_seconds_total{id=~\"/docker/7b3dccb95ac1.*\"}[1m])) * 100",
+          "legendFormat": "grafana",
+          "refId": "L"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus-datasource" },
+          "expr": "sum(rate(container_cpu_usage_seconds_total{id=~\"/docker/48d269f2a3ee.*\"}[1m])) * 100",
+          "legendFormat": "prometheus",
+          "refId": "M"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus-datasource" },
+          "expr": "sum(rate(container_cpu_usage_seconds_total{id=~\"/docker/3b28cd834f34.*\"}[1m])) * 100",
+          "legendFormat": "loki",
+          "refId": "N"
+        }
+      ],
+      "title": "🔥 CPU Usage by Container",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus-datasource" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "axisBorderShow": false,
+            "axisLabel": "Memory",
+            "axisPlacement": "auto",
+            "drawStyle": "line",
+            "fillOpacity": 20,
+            "gradientMode": "opacity",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "showPoints": "never",
+            "spanNulls": true
+          },
+          "mappings": [],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] },
+          "unit": "bytes"
+        }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 1 },
+      "id": 2,
+      "options": {
+        "legend": {
+          "calcs": ["mean", "max"],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus-datasource" },
+          "expr": "container_memory_usage_bytes{id=~\"/docker/d53111962c6a.*\"}",
+          "legendFormat": "ingestion",
+          "refId": "A"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus-datasource" },
+          "expr": "container_memory_usage_bytes{id=~\"/docker/43c94c34eb5b.*\"}",
+          "legendFormat": "processing",
+          "refId": "B"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus-datasource" },
+          "expr": "container_memory_usage_bytes{id=~\"/docker/a8ca4badcd43.*\"}",
+          "legendFormat": "analysis",
+          "refId": "C"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus-datasource" },
+          "expr": "container_memory_usage_bytes{id=~\"/docker/6deafd358cd5.*\"}",
+          "legendFormat": "aggregation",
+          "refId": "D"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus-datasource" },
+          "expr": "container_memory_usage_bytes{id=~\"/docker/8c40d612f2ca.*\"}",
+          "legendFormat": "signal",
+          "refId": "E"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus-datasource" },
+          "expr": "container_memory_usage_bytes{id=~\"/docker/d22cb79d0f1a.*\"}",
+          "legendFormat": "backend-api",
+          "refId": "F"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus-datasource" },
+          "expr": "container_memory_usage_bytes{id=~\"/docker/2a5d1978b7dc.*\"}",
+          "legendFormat": "dashboard",
+          "refId": "G"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus-datasource" },
+          "expr": "container_memory_usage_bytes{id=~\"/docker/a9ac7c1ba54e.*\"}",
+          "legendFormat": "telegram-bot",
+          "refId": "H"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus-datasource" },
+          "expr": "container_memory_usage_bytes{id=~\"/docker/34f0735666ae.*\"}",
+          "legendFormat": "kafka",
+          "refId": "I"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus-datasource" },
+          "expr": "container_memory_usage_bytes{id=~\"/docker/2d5cfd919227.*\"}",
+          "legendFormat": "timescaledb",
+          "refId": "J"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus-datasource" },
+          "expr": "container_memory_usage_bytes{id=~\"/docker/f6ecd88de9e1.*\"}",
+          "legendFormat": "redis",
+          "refId": "K"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus-datasource" },
+          "expr": "container_memory_usage_bytes{id=~\"/docker/7b3dccb95ac1.*\"}",
+          "legendFormat": "grafana",
+          "refId": "L"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus-datasource" },
+          "expr": "container_memory_usage_bytes{id=~\"/docker/48d269f2a3ee.*\"}",
+          "legendFormat": "prometheus",
+          "refId": "M"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus-datasource" },
+          "expr": "container_memory_usage_bytes{id=~\"/docker/3b28cd834f34.*\"}",
+          "legendFormat": "loki",
+          "refId": "N"
+        }
+      ],
+      "title": "💾 Memory Usage by Container",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 9 },
+      "id": 101,
+      "title": "🏭 Application Layers - CPU %",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus-datasource" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "mappings": [],
+          "max": 100,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 50 },
+              { "color": "red", "value": 80 }
+            ]
+          },
+          "unit": "percent"
+        }
+      },
+      "gridPos": { "h": 4, "w": 3, "x": 0, "y": 10 },
+      "id": 10,
+      "options": {
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true,
+        "sizing": "auto"
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus-datasource" },
+          "expr": "sum(rate(container_cpu_usage_seconds_total{id=~\"/docker/d53111962c6a.*\"}[1m])) * 100",
+          "refId": "A"
+        }
+      ],
+      "title": "L1 Ingestion",
+      "type": "gauge"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus-datasource" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "mappings": [],
+          "max": 100,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 50 },
+              { "color": "red", "value": 80 }
+            ]
+          },
+          "unit": "percent"
+        }
+      },
+      "gridPos": { "h": 4, "w": 3, "x": 3, "y": 10 },
+      "id": 11,
+      "options": {
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true,
+        "sizing": "auto"
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus-datasource" },
+          "expr": "sum(rate(container_cpu_usage_seconds_total{id=~\"/docker/43c94c34eb5b.*\"}[1m])) * 100",
+          "refId": "A"
+        }
+      ],
+      "title": "L2 Processing",
+      "type": "gauge"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus-datasource" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "mappings": [],
+          "max": 100,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 50 },
+              { "color": "red", "value": 80 }
+            ]
+          },
+          "unit": "percent"
+        }
+      },
+      "gridPos": { "h": 4, "w": 3, "x": 6, "y": 10 },
+      "id": 12,
+      "options": {
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true,
+        "sizing": "auto"
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus-datasource" },
+          "expr": "sum(rate(container_cpu_usage_seconds_total{id=~\"/docker/a8ca4badcd43.*\"}[1m])) * 100",
+          "refId": "A"
+        }
+      ],
+      "title": "L4 Analysis",
+      "type": "gauge"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus-datasource" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "mappings": [],
+          "max": 100,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 50 },
+              { "color": "red", "value": 80 }
+            ]
+          },
+          "unit": "percent"
+        }
+      },
+      "gridPos": { "h": 4, "w": 3, "x": 9, "y": 10 },
+      "id": 13,
+      "options": {
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true,
+        "sizing": "auto"
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus-datasource" },
+          "expr": "sum(rate(container_cpu_usage_seconds_total{id=~\"/docker/6deafd358cd5.*\"}[1m])) * 100",
+          "refId": "A"
+        }
+      ],
+      "title": "L5 Aggregation",
+      "type": "gauge"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus-datasource" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "mappings": [],
+          "max": 100,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 50 },
+              { "color": "red", "value": 80 }
+            ]
+          },
+          "unit": "percent"
+        }
+      },
+      "gridPos": { "h": 4, "w": 3, "x": 12, "y": 10 },
+      "id": 14,
+      "options": {
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true,
+        "sizing": "auto"
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus-datasource" },
+          "expr": "sum(rate(container_cpu_usage_seconds_total{id=~\"/docker/8c40d612f2ca.*\"}[1m])) * 100",
+          "refId": "A"
+        }
+      ],
+      "title": "L6 Signal",
+      "type": "gauge"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus-datasource" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "mappings": [],
+          "max": 100,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 50 },
+              { "color": "red", "value": 80 }
+            ]
+          },
+          "unit": "percent"
+        }
+      },
+      "gridPos": { "h": 4, "w": 3, "x": 15, "y": 10 },
+      "id": 15,
+      "options": {
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true,
+        "sizing": "auto"
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus-datasource" },
+          "expr": "sum(rate(container_cpu_usage_seconds_total{id=~\"/docker/d22cb79d0f1a.*\"}[1m])) * 100",
+          "refId": "A"
+        }
+      ],
+      "title": "L7 API",
+      "type": "gauge"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus-datasource" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "mappings": [],
+          "max": 100,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 50 },
+              { "color": "red", "value": 80 }
+            ]
+          },
+          "unit": "percent"
+        }
+      },
+      "gridPos": { "h": 4, "w": 3, "x": 18, "y": 10 },
+      "id": 16,
+      "options": {
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true,
+        "sizing": "auto"
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus-datasource" },
+          "expr": "sum(rate(container_cpu_usage_seconds_total{id=~\"/docker/2a5d1978b7dc.*\"}[1m])) * 100",
+          "refId": "A"
+        }
+      ],
+      "title": "L7 Dashboard",
+      "type": "gauge"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus-datasource" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "mappings": [],
+          "max": 100,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 50 },
+              { "color": "red", "value": 80 }
+            ]
+          },
+          "unit": "percent"
+        }
+      },
+      "gridPos": { "h": 4, "w": 3, "x": 21, "y": 10 },
+      "id": 17,
+      "options": {
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true,
+        "sizing": "auto"
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus-datasource" },
+          "expr": "sum(rate(container_cpu_usage_seconds_total{id=~\"/docker/a9ac7c1ba54e.*\"}[1m])) * 100",
+          "refId": "A"
+        }
+      ],
+      "title": "L7 Bot",
+      "type": "gauge"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 14 },
+      "id": 102,
+      "title": "💾 Application Layers - Memory",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus-datasource" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "mappings": [],
+          "max": 209715200,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 104857600 },
+              { "color": "red", "value": 157286400 }
+            ]
+          },
+          "unit": "bytes"
+        }
+      },
+      "gridPos": { "h": 4, "w": 3, "x": 0, "y": 15 },
+      "id": 20,
+      "options": {
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true,
+        "sizing": "auto"
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus-datasource" },
+          "expr": "container_memory_usage_bytes{id=~\"/docker/d53111962c6a.*\"}",
+          "refId": "A"
+        }
+      ],
+      "title": "L1 Ingestion",
+      "type": "gauge"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus-datasource" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "mappings": [],
+          "max": 209715200,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 104857600 },
+              { "color": "red", "value": 157286400 }
+            ]
+          },
+          "unit": "bytes"
+        }
+      },
+      "gridPos": { "h": 4, "w": 3, "x": 3, "y": 15 },
+      "id": 21,
+      "options": {
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true,
+        "sizing": "auto"
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus-datasource" },
+          "expr": "container_memory_usage_bytes{id=~\"/docker/43c94c34eb5b.*\"}",
+          "refId": "A"
+        }
+      ],
+      "title": "L2 Processing",
+      "type": "gauge"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus-datasource" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "mappings": [],
+          "max": 209715200,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 104857600 },
+              { "color": "red", "value": 157286400 }
+            ]
+          },
+          "unit": "bytes"
+        }
+      },
+      "gridPos": { "h": 4, "w": 3, "x": 6, "y": 15 },
+      "id": 22,
+      "options": {
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true,
+        "sizing": "auto"
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus-datasource" },
+          "expr": "container_memory_usage_bytes{id=~\"/docker/a8ca4badcd43.*\"}",
+          "refId": "A"
+        }
+      ],
+      "title": "L4 Analysis",
+      "type": "gauge"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus-datasource" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "mappings": [],
+          "max": 157286400,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 78643200 },
+              { "color": "red", "value": 125829120 }
+            ]
+          },
+          "unit": "bytes"
+        }
+      },
+      "gridPos": { "h": 4, "w": 3, "x": 9, "y": 15 },
+      "id": 23,
+      "options": {
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true,
+        "sizing": "auto"
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus-datasource" },
+          "expr": "container_memory_usage_bytes{id=~\"/docker/6deafd358cd5.*\"}",
+          "refId": "A"
+        }
+      ],
+      "title": "L5 Aggregation",
+      "type": "gauge"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus-datasource" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "mappings": [],
+          "max": 157286400,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 78643200 },
+              { "color": "red", "value": 125829120 }
+            ]
+          },
+          "unit": "bytes"
+        }
+      },
+      "gridPos": { "h": 4, "w": 3, "x": 12, "y": 15 },
+      "id": 24,
+      "options": {
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true,
+        "sizing": "auto"
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus-datasource" },
+          "expr": "container_memory_usage_bytes{id=~\"/docker/8c40d612f2ca.*\"}",
+          "refId": "A"
+        }
+      ],
+      "title": "L6 Signal",
+      "type": "gauge"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus-datasource" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "mappings": [],
+          "max": 209715200,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 104857600 },
+              { "color": "red", "value": 157286400 }
+            ]
+          },
+          "unit": "bytes"
+        }
+      },
+      "gridPos": { "h": 4, "w": 3, "x": 15, "y": 15 },
+      "id": 25,
+      "options": {
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true,
+        "sizing": "auto"
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus-datasource" },
+          "expr": "container_memory_usage_bytes{id=~\"/docker/d22cb79d0f1a.*\"}",
+          "refId": "A"
+        }
+      ],
+      "title": "L7 API",
+      "type": "gauge"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus-datasource" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "mappings": [],
+          "max": 314572800,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 157286400 },
+              { "color": "red", "value": 262144000 }
+            ]
+          },
+          "unit": "bytes"
+        }
+      },
+      "gridPos": { "h": 4, "w": 3, "x": 18, "y": 15 },
+      "id": 26,
+      "options": {
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true,
+        "sizing": "auto"
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus-datasource" },
+          "expr": "container_memory_usage_bytes{id=~\"/docker/2a5d1978b7dc.*\"}",
+          "refId": "A"
+        }
+      ],
+      "title": "L7 Dashboard",
+      "type": "gauge"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus-datasource" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "mappings": [],
+          "max": 104857600,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 52428800 },
+              { "color": "red", "value": 83886080 }
+            ]
+          },
+          "unit": "bytes"
+        }
+      },
+      "gridPos": { "h": 4, "w": 3, "x": 21, "y": 15 },
+      "id": 27,
+      "options": {
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true,
+        "sizing": "auto"
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus-datasource" },
+          "expr": "container_memory_usage_bytes{id=~\"/docker/a9ac7c1ba54e.*\"}",
+          "refId": "A"
+        }
+      ],
+      "title": "L7 Bot",
+      "type": "gauge"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 19 },
+      "id": 103,
+      "title": "🗄️ Infrastructure Memory",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus-datasource" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "mappings": [],
+          "max": 524288000,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 262144000 },
+              { "color": "red", "value": 419430400 }
+            ]
+          },
+          "unit": "bytes"
+        }
+      },
+      "gridPos": { "h": 4, "w": 4, "x": 0, "y": 20 },
+      "id": 30,
+      "options": {
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true,
+        "sizing": "auto"
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus-datasource" },
+          "expr": "container_memory_usage_bytes{id=~\"/docker/34f0735666ae.*\"}",
+          "refId": "A"
+        }
+      ],
+      "title": "Kafka",
+      "type": "gauge"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus-datasource" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "mappings": [],
+          "max": 134217728,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 67108864 },
+              { "color": "red", "value": 104857600 }
+            ]
+          },
+          "unit": "bytes"
+        }
+      },
+      "gridPos": { "h": 4, "w": 4, "x": 4, "y": 20 },
+      "id": 31,
+      "options": {
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true,
+        "sizing": "auto"
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus-datasource" },
+          "expr": "container_memory_usage_bytes{id=~\"/docker/f6ecd88de9e1.*\"}",
+          "refId": "A"
+        }
+      ],
+      "title": "Redis",
+      "type": "gauge"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus-datasource" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "mappings": [],
+          "max": 314572800,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 157286400 },
+              { "color": "red", "value": 262144000 }
+            ]
+          },
+          "unit": "bytes"
+        }
+      },
+      "gridPos": { "h": 4, "w": 4, "x": 8, "y": 20 },
+      "id": 32,
+      "options": {
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true,
+        "sizing": "auto"
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus-datasource" },
+          "expr": "container_memory_usage_bytes{id=~\"/docker/2d5cfd919227.*\"}",
+          "refId": "A"
+        }
+      ],
+      "title": "TimescaleDB",
+      "type": "gauge"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus-datasource" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "mappings": [],
+          "max": 209715200,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 104857600 },
+              { "color": "red", "value": 157286400 }
+            ]
+          },
+          "unit": "bytes"
+        }
+      },
+      "gridPos": { "h": 4, "w": 4, "x": 12, "y": 20 },
+      "id": 33,
+      "options": {
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true,
+        "sizing": "auto"
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus-datasource" },
+          "expr": "container_memory_usage_bytes{id=~\"/docker/48d269f2a3ee.*\"}",
+          "refId": "A"
+        }
+      ],
+      "title": "Prometheus",
+      "type": "gauge"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus-datasource" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "mappings": [],
+          "max": 209715200,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 104857600 },
+              { "color": "red", "value": 157286400 }
+            ]
+          },
+          "unit": "bytes"
+        }
+      },
+      "gridPos": { "h": 4, "w": 4, "x": 16, "y": 20 },
+      "id": 34,
+      "options": {
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true,
+        "sizing": "auto"
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus-datasource" },
+          "expr": "container_memory_usage_bytes{id=~\"/docker/7b3dccb95ac1.*\"}",
+          "refId": "A"
+        }
+      ],
+      "title": "Grafana",
+      "type": "gauge"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus-datasource" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "mappings": [],
+          "max": 209715200,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 104857600 },
+              { "color": "red", "value": 157286400 }
+            ]
+          },
+          "unit": "bytes"
+        }
+      },
+      "gridPos": { "h": 4, "w": 3, "x": 18, "y": 20 },
+      "id": 35,
+      "options": {
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true,
+        "sizing": "auto"
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus-datasource" },
+          "expr": "container_memory_usage_bytes{id=~\"/docker/3b28cd834f34.*\"}",
+          "refId": "A"
+        }
+      ],
+      "title": "Loki",
+      "type": "gauge"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus-datasource" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "mappings": [],
+          "max": 524288000,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "orange", "value": 209715200 },
+              { "color": "red", "value": 419430400 }
+            ]
+          },
+          "unit": "bytes"
+        }
+      },
+      "gridPos": { "h": 4, "w": 3, "x": 21, "y": 20 },
+      "id": 36,
+      "options": {
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true,
+        "sizing": "auto"
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus-datasource" },
+          "expr": "container_memory_usage_bytes{id=~\"/docker/2c2791fa96b0.*\"}",
+          "refId": "A"
+        }
+      ],
+      "title": "⚠️ pgAdmin",
+      "type": "gauge"
+    }
+  ],
+  "refresh": "10s",
+  "schemaVersion": 39,
+  "tags": ["infrastructure", "containers", "resources"],
+  "templating": { "list": [] },
+  "time": { "from": "now-1h", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "Container Resources",
+  "uid": "container-resources",
+  "version": 6,
+  "weekStart": ""
+}

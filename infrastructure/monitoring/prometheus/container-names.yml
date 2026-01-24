@@ -1,0 +1,27 @@
+# Container Name Mapping
+# Maps Docker container IDs to friendly container names
+# Format: container_id (first 12 chars): container_name
+# This is used to provide friendly labels in Grafana dashboards
+
+# Application Containers (update these IDs when containers are recreated)
+container_names:
+  - id_prefix: "d5311196"
+    name: "ingestion"
+  - id_prefix: "2a5d1978"
+    name: "dashboard"
+  - id_prefix: "d22cb79d"
+    name: "backend-api"
+  - id_prefix: "43c94c34"
+    name: "processing"
+  - id_prefix: "8c40d612"
+    name: "signal"
+  - id_prefix: "a8ca4bad"
+    name: "analysis"
+  - id_prefix: "6deafd35"
+    name: "aggregation"
+  - id_prefix: "a9ac7c1b"
+    name: "telegram-bot"
+  - id_prefix: "48d269f2"
+    name: "prometheus"
+  - id_prefix: "7b3dccb9"
+    name: "grafana"

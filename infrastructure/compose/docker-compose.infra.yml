@@ -82,7 +82,7 @@ services:
     container_name: redis
     ports:
       - '6379:6379'
-    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
+    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy volatile-lru
     volumes:
       - ../../data/redis:/data
     networks:
@@ -115,8 +115,28 @@ services:
       - '5432:5432'
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-trading}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-trading123}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}  # REQUIRED: Set in .env file
       POSTGRES_DB: ${POSTGRES_DB:-nifty50}
+    command:
+      - postgres
+      - -c
+      - shared_buffers=1GB
+      - -c
+      - effective_cache_size=3GB
+      - -c
+      - work_mem=64MB
+      - -c
+      - maintenance_work_mem=512MB
+      - -c
+      - max_wal_size=2GB
+      - -c
+      - checkpoint_completion_target=0.9
+      - -c
+      - random_page_cost=1.1
+      - -c
+      - effective_io_concurrency=200
+      - -c
+      - max_connections=100
     volumes:
       - ../../data/timescaledb:/var/lib/postgresql/data
       - ../../layer-3-storage/timescaledb/migrations:/docker-entrypoint-initdb.d
@@ -135,7 +155,7 @@ services:
       - '5050:80'
     environment:
       PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@admin.com}
-      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin123}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD}  # REQUIRED: Set in .env file
       PGADMIN_CONFIG_SERVER_MODE: 'False'
       PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: 'False'
     depends_on:
@@ -143,7 +163,7 @@ services:
     networks:
       - trading-network
     volumes:
-      - ../../data/pgadmin:/var/lib/pgadmin
+      - pgadmin_data:/var/lib/pgadmin
       - ../pgadmin/servers.json:/pgadmin4/servers.json:ro
       - ../pgadmin/pgpass:/pgpass:ro
     entrypoint: >
@@ -156,3 +176,6 @@ networks:
   trading-network:
     driver: bridge
     name: local-trading-network
+
+volumes:
+  pgadmin_data:

@@ -54,6 +54,10 @@ help:
 	@echo "  make logs           Tail all logs"
 	@echo "  make clean          Remove build artifacts"
 	@echo "  make clean-data     Delete all data (CAUTION!)"
+	@echo ""
+	@echo "💾 DATABASE"
+	@echo "  make backup         Backup TimescaleDB to ./backups/"
+	@echo "  make restore        Restore from latest backup"
 
 # ===========================================================
 # DOCKER STACKS (Primary Commands)
@@ -68,12 +72,14 @@ up: infra observe notify app ui
 	@echo "   API:       http://localhost:4000"
 	@echo "   Grafana:   http://localhost:3001"
 
+	
+
 down:
 	@echo "🛑 Stopping all containers..."
 	-$(DC) -f $(COMPOSE_DIR)/docker-compose.gateway.yml down
 	-$(DC) -f $(COMPOSE_DIR)/docker-compose.notify.yml down
 	-$(DC) -f $(COMPOSE_DIR)/docker-compose.ui.yml down
-	-$(DC) -f $(COMPOSE_DIR)/docker-compose.app.yml --profile flattrade down
+	-$(DC) -f $(COMPOSE_DIR)/docker-compose.app.yml down
 	-$(DC) -f $(COMPOSE_DIR)/docker-compose.observe.yml down
 	-$(DC) -f $(COMPOSE_DIR)/docker-compose.infra.yml down
 	@echo "✅ Stopped."
@@ -101,13 +107,18 @@ up-prod:
 
 infra:
 	@echo "🔧 Starting Infrastructure..."
-	$(DC) -f $(COMPOSE_DIR)/docker-compose.infra.yml up -d
+	$(DC) -f $(COMPOSE_DIR)/docker-compose.infra.yml up -d --build
 	@echo "✅ Kafka: 9092 | Redis: 6379 | DB: 5432"
 
 app:
 	@echo "🚀 Starting Pipeline (L1-L6 + API)..."
-	$(DC) -f $(COMPOSE_DIR)/docker-compose.app.yml up -d
+	$(DC) -f $(COMPOSE_DIR)/docker-compose.app.yml up -d --build
 	@echo "✅ Pipeline running."
+
+app-build:
+	@echo "🚀 Rebuilding Pipeline..."
+	$(DC) -f $(COMPOSE_DIR)/docker-compose.app.yml up -d --build
+	@echo "✅ Pipeline rebuilt."
 
 ui:
 	@echo "🖥️  Building Dashboard..."
@@ -116,17 +127,35 @@ ui:
 
 observe:
 	@echo "📊 Starting Observability..."
-	$(DC) -f $(COMPOSE_DIR)/docker-compose.observe.yml up -d
+	$(DC) -f $(COMPOSE_DIR)/docker-compose.observe.yml up -d --build
 	@echo "✅ Prometheus: 9090 | Grafana: 3001"
 
 notify:
 	@echo "🔔 Starting Notifications..."
-	$(DC) -f $(COMPOSE_DIR)/docker-compose.notify.yml up -d
+	$(DC) -f $(COMPOSE_DIR)/docker-compose.notify.yml up -d --build
 	@echo "✅ Telegram Bot & Email Service running"
+
+notify-build:
+	@echo "🔔 Rebuilding Notifications..."
+	$(DC) -f $(COMPOSE_DIR)/docker-compose.notify.yml up -d --build
+	echo "✅ Rebuilt Telegram Bot & Email Service"
+
+ai:
+	@echo "🧠 Starting AI Stack (Inference + Ollama)..."
+	$(DC) -f $(COMPOSE_DIR)/docker-compose.app.yml up -d ai-inference ollama
+	@echo "✅ AI Services running."
+
+ai-restart:
+	@echo "🔄 Restarting AI Stack..."
+	$(DC) -f $(COMPOSE_DIR)/docker-compose.app.yml restart ai-inference ollama
+	@echo "✅ AI Services restarted."
+
+ai-logs:
+	@docker-compose -f $(COMPOSE_DIR)/docker-compose.app.yml logs -f ai-inference ollama
 
 gateway:
 	@echo "🌐 Starting Gateway..."
-	$(DC) -f $(COMPOSE_DIR)/docker-compose.gateway.yml up -d
+	$(DC) -f $(COMPOSE_DIR)/docker-compose.gateway.yml up -d --build
 	@echo "✅ Gateway: http://localhost:8088"
 
 share: up gateway
@@ -221,6 +250,40 @@ clean-data:
 	rm -rf data/*
 	@echo "✅ Data deleted."
 
+prune:
+	@echo "⚠️  This will delete ALL stopped containers, unused images, and build cache!"
+	@read -p "Are you sure? [y/N] " c && [ "$$c" = "y" ] || exit 1
+	@echo "🧹 Pruning Docker System..."
+	@docker system prune -a --volumes -f
+	@echo "✅ Docker Cleaned."
+
+
+# ===========================================================
+# DATABASE BACKUP & RESTORE
+# ===========================================================
+
+backup:
+	@mkdir -p backups
+	@echo "💾 Backing up TimescaleDB..."
+	@docker exec timescaledb pg_dump -U trading nifty50 > ./backups/nifty50_$$(date +%Y%m%d_%H%M%S).sql
+	@echo "✅ Backup saved to ./backups/"
+	@ls -lh backups/*.sql | tail -5
+
+restore:
+	@echo "📂 Available backups:"
+	@ls -1t backups/*.sql 2>/dev/null | head -10 || echo "No backups found!"
+	@echo ""
+	@read -p "Enter backup filename (or press Enter for latest): " file; \
+	if [ -z "$$file" ]; then \
+		file=$$(ls -1t backups/*.sql 2>/dev/null | head -1); \
+	fi; \
+	if [ -z "$$file" ]; then \
+		echo "❌ No backup file found!"; exit 1; \
+	fi; \
+	echo "🔄 Restoring from $$file..."; \
+	docker exec -i timescaledb psql -U trading nifty50 < $$file; \
+	echo "✅ Restore complete!"
+
 
 # ===========================================================
 # LEGACY ALIASES (for backward compatibility)
@@ -231,3 +294,22 @@ docker-down: down
 dashboard: ui
 infra-all: infra observe
 infra-down: down
+
+# ===========================================================
+# TROUBLESHOOTING
+# ===========================================================
+
+fix-kafka:
+	@echo "🔧 Attempting to fix Kafka Cluster ID..."
+	@# 1. Get the Container ID of the kafka service (even if stopped)
+	$(eval KAFKA_CONTAINER := $(shell $(DC) -f $(COMPOSE_DIR)/docker-compose.infra.yml ps -a -q kafka))
+	@if [ -z "$(KAFKA_CONTAINER)" ]; then echo "❌ Kafka container not found. Run 'make infra' first."; exit 1; fi
+	@echo "🎯 Found Kafka Container ID: $(KAFKA_CONTAINER)"
+	@# 2. Stop Kafka to be safe
+	$(DC) -f $(COMPOSE_DIR)/docker-compose.infra.yml stop kafka
+	@# 3. Run the surgical fix using volumes-from
+	docker run --rm --volumes-from $(KAFKA_CONTAINER) alpine rm -f /var/lib/kafka/data/meta.properties
+	@echo "✅ meta.properties deleted successfully."
+	@# 4. Restart Kafka
+	$(DC) -f $(COMPOSE_DIR)/docker-compose.infra.yml start kafka
+	@echo "🚀 Kafka restarted. Check logs with 'make logs'"

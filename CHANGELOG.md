@@ -5,6 +5,32 @@ All notable changes to the **Nifty 50 Trading System** project will be documente
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.0] - 2026-01-24
+
+### 🚀 Added
+
+- **Telegram Bot Features**:
+  - **Live Status Command (`/livestatus`)**: Real-time market stream health (ticks/heap) with visual indicators. Added "⚡ Live Status" button.
+  - **News Command (`/news`)**: Fetches latest market headlines from Backend API. Added "📰 Market News" button.
+  - **Suggest Command (`/suggest`)**: Direct user feedback submission to database (`/suggest <text>`).
+  - **Robust Routing**: Switched to Regex-based command matching (e.g., `/Market News/i`) to handle emoji variations gracefully.
+  - **Incoming Logger**: Added debug middleware to trace incoming message routing.
+
+- **Backend API Expansions**:
+  - **Detailed Health Check (`GET /api/v1/health/detailed`)**: New endpoint reporting status of Redis, Database, AND Ingestion Service.
+  - **Ingestion Heartbeats**: Checks `system:layer1:metrics` in Redis to determine if the Ingestion service is Active or Stale.
+  - **News Endpoint (`GET /api/v1/news`)**: Mock endpoint serving financial news data.
+
+### 🐛 Fixed
+
+- **System Status "All Down" False Alarm**:
+  - Fixed `health.controller.js` failing to ping Redis/DB by resolving dependencies correctly from the DI Container (`container.resolve('redis')`).
+  - Updated Redis Health Check to use `redis.publisher.ping()` for the wrapped client.
+- **Bot Connectivity**:
+  - Updated `dev:local` script to force `BACKEND_API_URL=http://localhost:4000/api/v1`, fixing `ENOTFOUND` errors during local development.
+- **Market Feed Crash**:
+  - Patched `market.command.js` to handle partial market data (missing breadth) gracefully without crashing the bot.
+
 ## [0.6.2] - 2026-01-22
 
 ### 🚀 Added

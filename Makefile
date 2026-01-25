@@ -58,6 +58,10 @@ help:
 	@echo "💾 DATABASE"
 	@echo "  make backup         Backup TimescaleDB to ./backups/"
 	@echo "  make restore        Restore from latest backup"
+	@echo ""
+	@echo "🔧 TROUBLESHOOTING"
+	@echo "  make fix-dashboards Update Grafana dashboards with current container IDs"
+	@echo "  make fix-kafka      Fix Kafka cluster ID issues"
 
 # ===========================================================
 # DOCKER STACKS (Primary Commands)
@@ -298,6 +302,13 @@ infra-down: down
 # ===========================================================
 # TROUBLESHOOTING
 # ===========================================================
+
+fix-dashboards:
+	@echo "🎨 Fixing Grafana dashboards..."
+	@python3 scripts/fix-dashboards-final.py
+	@docker restart grafana
+	@echo "✅ Dashboards fixed and Grafana restarted"
+	@echo "💡 Refresh your browser to see changes"
 
 fix-kafka:
 	@echo "🔧 Attempting to fix Kafka Cluster ID..."

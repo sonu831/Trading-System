@@ -102,6 +102,11 @@ async function main() {
           topic: TOPIC,
           messages: batch,
         });
+
+        // Throttle: Small delay every 10 batches (1000 messages) to prevent overwhelming the consumer
+        if ((i / BATCH_SIZE) % 10 === 0) {
+          await new Promise((resolve) => setTimeout(resolve, 100));
+        }
       }
       console.log(`   ✅ Sent ${messages.length} events for ${symbol}`);
     }

@@ -11,7 +11,10 @@ services:
       context: ../../layer-8-presentation-notification/telegram-bot
       dockerfile: Dockerfile
     container_name: telegram-bot
+    ports:
+      - '9104:7000'  # Metrics endpoint (host:container)
     environment:
+      - PORT=7000
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
       - REDIS_URL=redis://redis:6379
       - LOG_LEVEL=${LOG_LEVEL:-info}

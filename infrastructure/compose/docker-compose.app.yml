@@ -9,7 +9,10 @@ services:
       context: ../../layer-1-ingestion
       dockerfile: Dockerfile
     container_name: ingestion
+    ports:
+      - '9101:9101'  # Metrics endpoint
     environment:
+      - INGESTION_PORT=9101
       - KAFKA_BROKERS=kafka:29092
       - REDIS_URL=redis://redis:6379
       - MARKET_DATA_PROVIDER=${MARKET_DATA_PROVIDER:-kite}
@@ -63,7 +66,10 @@ services:
       context: ../../layer-2-processing
       dockerfile: Dockerfile
     container_name: processing
+    ports:
+      - '3002:3002'  # Metrics endpoint
     environment:
+      - PORT=3002
       - KAFKA_BROKERS=kafka:29092
       - REDIS_URL=redis://redis:6379
       - TIMESCALE_URL=postgresql://${POSTGRES_USER:-trading}:${POSTGRES_PASSWORD}@timescaledb:5432/${POSTGRES_DB:-nifty50}

@@ -3,13 +3,16 @@ const path = require('path');
 require('ts-node').register({
   transpileOnly: true,
   ignore: [/node_modules\/(?!@mstock-mirae-asset)/],
-  // Ensure we look in the right node_modules if script is nested
-  // dir: path.resolve(__dirname, '..') // might be needed
+  compilerOptions: {
+    module: "commonjs",
+    allowJs: true
+  }
 });
 
 const fs = require('fs');
 // const path = require('path'); // already imported
 require('dotenv').config({ path: path.resolve(__dirname, '../../.env') });
+console.log("DEBUG: Script initialized. Loading libs...");
 
 const { DateTime } = require('luxon');
 const { MStockVendor } = require('../src/vendors/mstock');
@@ -29,7 +32,9 @@ const JOB_ID = args.includes('--job-id')
   : `manual-${Date.now()}`;
 
 const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
+const PUSHGATEWAY_URL = process.env.PUSHGATEWAY_URL || 'http://prometheus-pushgateway:9091';
 const redis = require('redis');
+const axios = require('axios');
 let redisClient = null;
 
 const INTERVAL = process.env.BACKFILL_INTERVAL || 'ONE_MINUTE';
@@ -58,6 +63,24 @@ async function sendNotification(type, data) {
     );
   } catch (e) {
     console.warn('Notification failed:', e.message);
+  }
+}
+
+// Prometheus Pushgateway helper
+async function pushMetric(name, value, labels = {}) {
+  try {
+    const labelStr = Object.entries(labels)
+      .map(([k, v]) => `${k}="${v}"`)
+      .join(',');
+    const metric = `${name}{${labelStr}} ${value}\n`;
+
+    await axios.post(`${PUSHGATEWAY_URL}/metrics/job/backfill_batch`, metric, {
+      headers: { 'Content-Type': 'text/plain' },
+      timeout: 2000,
+    });
+  } catch (e) {
+    // Silently fail - metrics are non-critical
+    console.debug('Failed to push metric:', e.message);
   }
 }
 
@@ -114,6 +137,7 @@ async function main() {
       console.log('✅ Connected to Redis for status reporting.');
     } catch (e) {
       console.warn('⚠️ Redis not available, skipping status reporting.');
+      redisClient = null;
     }
   }
 
@@ -146,7 +170,6 @@ async function main() {
       const statusObj = {
         status: status, // 0:Idle, 1:Run, 2:Done, 3:Fail
         progress: Math.round(progress),
-        progress: Math.round(progress),
         details: details,
         job_type: 'historical_backfill',
         timestamp: Date.now(),
@@ -156,6 +179,13 @@ async function main() {
       // Auto-log details if provided
       if (details) await logToRedis(details);
     }
+
+    // Push metrics to Prometheus
+    await pushMetric('batch_job_status', status, { job_type: 'historical_backfill', job_id: JOB_ID });
+    await pushMetric('batch_job_progress', Math.round(progress), {
+      job_type: 'historical_backfill',
+      job_id: JOB_ID,
+    });
   };
 
   const vendor = new MStockVendor();
@@ -183,11 +213,7 @@ async function main() {
 
     // Calculate progress for step 1 (0-50%)
     const currentIdx = processList.indexOf(item);
-    const stepProgress = (currentIdx / processList.length) * 50;
-    await updateStatus(
-      stepProgress,
-      `Fetching ${symbol} (${currentIdx + 1}/${processList.length})`
-    );
+    // const stepProgress = (currentIdx / processList.length) * 50;
 
     try {
       const fetchParams = {

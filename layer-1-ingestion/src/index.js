@@ -75,28 +75,74 @@ let kafkaProducer;
 let normalizer;
 
 /**
+ * Wait for a dependency to be ready with retries
+ */
+async function waitForDependency(name, checkFn, maxRetries = 30, delayMs = 2000) {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      await checkFn();
+      logger.info(`✅ ${name} is ready (attempt ${attempt}/${maxRetries})`);
+      return true;
+    } catch (error) {
+      if (attempt === maxRetries) {
+        logger.error(`❌ ${name} failed to connect after ${maxRetries} attempts: ${error.message}`);
+        throw error;
+      }
+      logger.warn(`⏳ Waiting for ${name}... (attempt ${attempt}/${maxRetries}) - ${error.message}`);
+      await new Promise(resolve => setTimeout(resolve, delayMs));
+    }
+  }
+}
+
+/**
  * Initialize all services
  */
 async function initialize() {
-  logger.info('🚀 Starting Layer 1: Data Ingestion Service');
+  logger.info('');
+  logger.info('╔════════════════════════════════════════════════════════════╗');
+  logger.info('║     🚀 LAYER 1: DATA INGESTION SERVICE - STARTING          ║');
+  logger.info('╚════════════════════════════════════════════════════════════╝');
+  logger.info('');
+
+  const redis = require('redis');
+  let redisClient;
 
   try {
-    // Initialize Kafka Producer
+    // ═══════════════════════════════════════════════════════════════
+    // PHASE 1: Wait for Infrastructure Dependencies
+    // ═══════════════════════════════════════════════════════════════
+    logger.info('📋 PHASE 1: Checking Infrastructure Dependencies...');
+    logger.info('─'.repeat(60));
+
+    // Wait for Redis to be ready
+    logger.info('🔄 Connecting to Redis...');
+    await waitForDependency('Redis', async () => {
+      redisClient = redis.createClient({
+        url: process.env.REDIS_URL || 'redis://localhost:6379',
+      });
+      redisClient.on('error', (err) => {
+        if (!err.message.includes('ECONNREFUSED')) {
+          logger.error('Redis Client Error', err);
+        }
+      });
+      await redisClient.connect();
+    });
+
+    // Wait for Kafka to be ready
+    logger.info('🔄 Connecting to Kafka...');
     kafkaProducer = new KafkaProducer({
       brokers: process.env.KAFKA_BROKERS?.split(',') || ['localhost:9092'],
       topic: process.env.KAFKA_TOPIC_RAW_TICKS || 'raw-ticks',
     });
-    await kafkaProducer.connect();
-    logger.info('✅ Kafka Producer connected');
 
-    // Initialize Redis for System Metrics
-    const redis = require('redis');
-    const redisClient = redis.createClient({
-      url: process.env.REDIS_URL || 'redis://localhost:6379',
+    await waitForDependency('Kafka', async () => {
+      await kafkaProducer.connect();
     });
-    redisClient.on('error', (err) => logger.error('Redis Client Error', err));
-    await redisClient.connect();
-    logger.info('✅ Redis Metric Publisher connected');
+
+    logger.info('');
+    logger.info('✅ PHASE 1 COMPLETE: All infrastructure dependencies ready!');
+    logger.info('─'.repeat(60));
+    logger.info('');
 
     const logToRedis = async (message) => {
       try {
@@ -273,7 +319,24 @@ async function initialize() {
 
         await updateBackfillStatus(1, 5, `Starting Backfill... ${symbolMsg} ${dateMsg}`);
 
-        // 1. Run Batch Fetch
+        // 1. Clean Data Directory
+        // logger.info('🧹 Cleaning up historical data directory...');
+        // try {
+        //   const fs = require('fs');
+        //   const dataDir = path.resolve(__dirname, '../data/historical');
+        //   if (fs.existsSync(dataDir)) {
+        //      const files = fs.readdirSync(dataDir);
+        //      for (const file of files) {
+        //        if (file.endsWith('.json')) {
+        //          fs.unlinkSync(path.join(dataDir, file));
+        //        }
+        //      }
+        //   }
+        // } catch (e) {
+        //   logger.warn(`Failed to clean directory: ${e.message}`);
+        // }
+
+        // 2. Run Batch Fetch
         logger.info(`⏳ Step 1: Fetching Historical Data... ${symbolMsg} ${dateMsg}`);
         await updateBackfillStatus(1, 10, `Fetching Data... ${symbolMsg}`);
 
@@ -340,14 +403,89 @@ async function initialize() {
       logger.error('❌ Failed to connect Command Listener:', e);
     }
 
-    // --- Auto-Run if Market is Closed ---
+    // ═══════════════════════════════════════════════════════════════
+    // PHASE 3: Historical Data Sync (if market closed)
+    // ═══════════════════════════════════════════════════════════════
+    logger.info('');
+    logger.info('📋 PHASE 3: Historical Data Synchronization');
+    logger.info('─'.repeat(60));
+
+    const skipSync = process.env.SKIP_HISTORICAL_SYNC === 'true';
+    const backfillYears = parseInt(process.env.BACKFILL_YEARS || '1', 10);
+
     if (!marketHours.isMarketOpen()) {
-      if (process.env.SKIP_HISTORICAL_SYNC === 'true') {
-        logger.info('🌙 Market is Closed. Auto-backfill SKIPPED (SKIP_HISTORICAL_SYNC=true).');
+      if (skipSync) {
+        logger.info('');
+        logger.info('╔════════════════════════════════════════════════════════════╗');
+        logger.info('║  🌙 MARKET CLOSED - HISTORICAL SYNC SKIPPED                ║');
+        logger.info('║  Reason: SKIP_HISTORICAL_SYNC=true in .env                 ║');
+        logger.info('║  To enable: Set SKIP_HISTORICAL_SYNC=false                 ║');
+        logger.info('╚════════════════════════════════════════════════════════════╝');
+        logger.info('');
+        logger.info('📡 Service ready. Waiting for market to open or manual backfill command...');
       } else {
-        logger.info('🌙 Market is Closed. Auto-triggering Historical Data Backfill...');
-        runBackfill();
+        logger.info('');
+        logger.info('╔════════════════════════════════════════════════════════════╗');
+        logger.info('║  🌙 MARKET CLOSED - STARTING HISTORICAL DATA BACKFILL      ║');
+        logger.info('╚════════════════════════════════════════════════════════════╝');
+        logger.info('');
+
+        const currentYear = new Date().getFullYear();
+        const yearsToBackfill = [];
+
+        // Build list of years to backfill (most recent first)
+        for (let i = 0; i < backfillYears; i++) {
+          yearsToBackfill.push(currentYear - i);
+        }
+
+        logger.info(`📅 Backfill Strategy: ${backfillYears} year(s) of data`);
+        logger.info(`📅 Years to process: ${yearsToBackfill.join(', ')}`);
+        logger.info(`📊 Batch size: 1 minute candles, 100 ticks per request`);
+        logger.info(`📊 Processing: Day by Day → Month by Month → Year by Year`);
+        logger.info('─'.repeat(60));
+
+        let completedYears = 0;
+        const totalYears = yearsToBackfill.length;
+
+        for (const year of yearsToBackfill) {
+          const yearStartTime = Date.now();
+          completedYears++;
+
+          logger.info('');
+          logger.info(`╔════════════════════════════════════════════════════════════╗`);
+          logger.info(`║  📅 YEAR ${year} - Starting Backfill (${completedYears}/${totalYears})              ║`);
+          logger.info(`╚════════════════════════════════════════════════════════════╝`);
+
+          await runBackfill({
+            fromDate: `${year}-01-01`,
+            toDate: `${year}-12-31`
+          });
+
+          const yearDuration = ((Date.now() - yearStartTime) / 1000 / 60).toFixed(1);
+
+          logger.info('');
+          logger.info(`╔════════════════════════════════════════════════════════════╗`);
+          logger.info(`║  ✅ YEAR ${year} COMPLETE                                    ║`);
+          logger.info(`║  Duration: ${yearDuration} minutes                                     ║`);
+          logger.info(`║  Progress: ${completedYears}/${totalYears} years completed                          ║`);
+          logger.info(`╚════════════════════════════════════════════════════════════╝`);
+
+          // Log to Redis for UI visibility
+          await logToRedis(`✅ Year ${year} backfill complete (${completedYears}/${totalYears})`);
+        }
+
+        logger.info('');
+        logger.info('╔════════════════════════════════════════════════════════════╗');
+        logger.info('║  🎉 ALL HISTORICAL BACKFILLS COMPLETE!                     ║');
+        logger.info(`║  Total Years Processed: ${totalYears}                                   ║`);
+        logger.info('╚════════════════════════════════════════════════════════════╝');
+        logger.info('');
+
+        await logToRedis(`🎉 Historical backfill complete! ${totalYears} years of data ingested.`);
       }
+    } else {
+      logger.info('☀️ Market is OPEN - Skipping historical backfill');
+      logger.info('📡 Live data streaming active');
     }
   } catch (error) {
     logger.error('❌ Initialization failed:', error);

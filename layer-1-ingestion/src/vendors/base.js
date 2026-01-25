@@ -128,7 +128,7 @@ class BaseVendor {
         } else if (response && response.status === true && response.data === null) {
           // Empty chunk ok
         } else {
-          logger.warn(`BaseVendor: Chunk failed for ${chunkParams.fromdate}`);
+          logger.warn(`BaseVendor: Chunk failed for ${chunkParams.fromdate}. response: ${JSON.stringify(response)}`);
         }
       } catch (e) {
         logger.error(`BaseVendor: Chunk Error: ${e.message}`);

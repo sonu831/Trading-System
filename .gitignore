@@ -64,3 +64,4 @@ project.tar.gz
 *.antigravity
 *.antigravity.lock
 .antigravity/
+.claude/

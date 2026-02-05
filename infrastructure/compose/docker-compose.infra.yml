@@ -36,6 +36,8 @@ services:
       - '9093:9093'
     environment:
       KAFKA_BROKER_ID: 1
+      KAFKA_JMX_PORT: 9999
+      KAFKA_JMX_HOSTNAME: kafka
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
@@ -43,13 +45,15 @@ services:
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
-      KAFKA_NUM_PARTITIONS: 50
+      KAFKA_NUM_PARTITIONS: 2
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
       # Faster recovery settings
       KAFKA_ZOOKEEPER_SESSION_TIMEOUT_MS: 6000
       KAFKA_ZOOKEEPER_CONNECTION_TIMEOUT_MS: 6000
+      # Suppress verbose logs
+      KAFKA_LOG4J_LOGGERS: "kafka.coordinator.group=WARN"
     volumes:
-      - ../../data/kafka:/var/lib/kafka/data
+      - /Volumes/Yogi-External/personal/trading-data/kafka:/var/lib/kafka/data
     networks:
       - trading-network
     restart: on-failure
@@ -69,6 +73,7 @@ services:
       KAFKA_CLUSTERS_0_NAME: local
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
       KAFKA_CLUSTERS_0_ZOOKEEPER: zookeeper:2181
+      KAFKA_CLUSTERS_0_JMXPORT: 9999
     depends_on:
       - kafka
     networks:
@@ -84,7 +89,7 @@ services:
       - '6379:6379'
     command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy volatile-lru
     volumes:
-      - ../../data/redis:/data
+      - /Volumes/Yogi-External/personal/trading-data/redis:/data
     networks:
       - trading-network
     healthcheck:
@@ -108,14 +113,20 @@ services:
   # ===========================================
   # WARM STORAGE - TimescaleDB
   # ===========================================
+  # ⚠️  IMPORTANT: Using pinned version for cross-machine compatibility
+  # When external drive is shared between machines (corporate vs personal),
+  # both MUST use the same TimescaleDB version to avoid data corruption.
+  # Current version: 2.24.0 (as of Feb 2026)
+  # To upgrade: 1) Backup via `make backup` 2) Update version below
+  #             3) Delete data folder 4) Restore via `make restore`
   timescaledb:
-    image: timescale/timescaledb:latest-pg15
+    image: timescale/timescaledb:2.24.0-pg15
     container_name: timescaledb
     ports:
       - '5432:5432'
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-trading}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}  # REQUIRED: Set in .env file
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD} # REQUIRED: Set in .env file
       POSTGRES_DB: ${POSTGRES_DB:-nifty50}
     command:
       - postgres
@@ -138,8 +149,8 @@ services:
       - -c
       - max_connections=100
     volumes:
-      - ../../data/timescaledb:/var/lib/postgresql/data
-      - ../../layer-3-storage/timescaledb/migrations:/docker-entrypoint-initdb.d
+      - /Volumes/Yogi-External/personal/trading-data/timescaledb:/var/lib/postgresql/data
+      # - ../../layer-3-storage/timescaledb/migrations:/docker-entrypoint-initdb.d
     networks:
       - trading-network
     healthcheck:
@@ -152,10 +163,10 @@ services:
     image: dpage/pgadmin4:latest
     container_name: pgadmin
     ports:
-      - '5050:80'
+      - '5051:80'
     environment:
       PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@admin.com}
-      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD}  # REQUIRED: Set in .env file
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD} # REQUIRED: Set in .env file
       PGADMIN_CONFIG_SERVER_MODE: 'False'
       PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: 'False'
     depends_on:
@@ -163,11 +174,11 @@ services:
     networks:
       - trading-network
     volumes:
-      - pgadmin_data:/var/lib/pgadmin
+      - /Volumes/Yogi-External/personal/trading-data/pgadmin:/var/lib/pgadmin
       - ../pgadmin/servers.json:/pgadmin4/servers.json:ro
-      - ../pgadmin/pgpass:/pgpass:ro
+      - ../pgadmin/pgpass:/pgpass_source:ro
     entrypoint: >
-      /bin/sh -c " chmod 600 /pgpass; /entrypoint.sh "
+      /bin/sh -c " cp /pgpass_source /var/lib/pgadmin/pgpass && chmod 600 /var/lib/pgadmin/pgpass && chown 5050:5050 /var/lib/pgadmin/pgpass && /entrypoint.sh"
 
 # ===========================================
 # NETWORKS
@@ -176,6 +187,3 @@ networks:
   trading-network:
     driver: bridge
     name: local-trading-network
-
-volumes:
-  pgadmin_data:

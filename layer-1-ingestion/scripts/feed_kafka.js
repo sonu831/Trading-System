@@ -8,7 +8,7 @@ require('dotenv').config({ path: path.resolve(__dirname, '../../.env') });
 const KAFKA_BROKERS = process.env.KAFKA_BROKERS
   ? process.env.KAFKA_BROKERS.split(',')
   : ['localhost:9092'];
-const TOPIC = 'market_data_feed';
+const TOPIC = process.env.KAFKA_TOPIC || 'raw-ticks';
 const DATA_DIR = path.resolve(__dirname, '../data/historical');
 
 const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
@@ -18,13 +18,54 @@ let redisClient = null;
 const kafka = new Kafka({
   clientId: 'layer-1-history-feeder',
   brokers: KAFKA_BROKERS,
+  connectionTimeout: 10000,
+  requestTimeout: 30000,
   retry: {
-    initialRetryTime: 100,
-    retries: 2,
+    initialRetryTime: 500,
+    retries: 10,
+    maxRetryTime: 30000,
   },
 });
 
 const producer = kafka.producer();
+
+/**
+ * Wait for Kafka to be healthy (leaders available for topics)
+ */
+async function waitForKafka(maxRetries = 20, delayMs = 3000) {
+  const admin = kafka.admin();
+
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      await admin.connect();
+
+      // Check if the topic exists and has leaders
+      const metadata = await admin.fetchTopicMetadata({ topics: [TOPIC] });
+      const topicData = metadata.topics[0];
+
+      if (topicData && topicData.partitions) {
+        // Check all partitions have leaders
+        const allHaveLeaders = topicData.partitions.every(p => p.leader !== -1);
+        if (allHaveLeaders) {
+          console.log(`✅ Kafka is ready - topic '${TOPIC}' has ${topicData.partitions.length} partitions with leaders`);
+          await admin.disconnect();
+          return true;
+        }
+      }
+
+      throw new Error('Topic partitions do not have leaders yet');
+    } catch (error) {
+      if (attempt === maxRetries) {
+        console.error(`❌ Kafka not ready after ${maxRetries} attempts: ${error.message}`);
+        try { await admin.disconnect(); } catch (e) {}
+        throw error;
+      }
+      console.log(`⏳ Waiting for Kafka... (${attempt}/${maxRetries}) - ${error.message}`);
+      try { await admin.disconnect(); } catch (e) {}
+      await new Promise(resolve => setTimeout(resolve, delayMs));
+    }
+  }
+}
 
 async function main() {
   console.log('🚀 Starting Historical Data Feeder...');
@@ -32,11 +73,27 @@ async function main() {
   console.log(`📂 Data Dir: ${DATA_DIR}`);
 
   try {
-    await producer.connect();
-    console.log('✅ Connected to Kafka');
+    // Wait for Kafka to be fully ready (topic with leaders)
+    console.log('⏳ Waiting for Kafka to be ready...');
+    await waitForKafka();
 
-    const files = fs.readdirSync(DATA_DIR).filter((f) => f.endsWith('.json'));
-    console.log(`Found ${files.length} data files.`);
+    await producer.connect();
+    console.log('✅ Connected to Kafka Producer');
+
+    // Parse CLI args for symbol filter
+    const args = process.argv.slice(2);
+    const symbolArgIdx = args.indexOf('--symbol');
+    const targetSymbol = symbolArgIdx !== -1 ? args[symbolArgIdx + 1] : null;
+
+    let files = fs.readdirSync(DATA_DIR).filter((f) => f.endsWith('.json'));
+    
+    // Filter by symbol if provided
+    if (targetSymbol) {
+      console.log(`🎯 Feeding ONLY symbol: ${targetSymbol}`);
+      files = files.filter(f => f.toUpperCase().startsWith(targetSymbol.toUpperCase()));
+    }
+
+    console.log(`Found ${files.length} data files to feed.`);
 
     // Initialize Redis
     try {
@@ -102,6 +159,20 @@ async function main() {
           topic: TOPIC,
           messages: batch,
         });
+
+        if ((i / BATCH_SIZE) % 10 === 0) {
+          await new Promise((resolve) => setTimeout(resolve, 100));
+        }
+
+        // Report metric to parent process (for Prometheus/Grafana)
+        if (process.send) {
+          process.send({
+            type: 'metric',
+            name: 'kafkaMessagesSent',
+            labels: { topic: TOPIC },
+            value: batch.length,
+          });
+        }
       }
       console.log(`   ✅ Sent ${messages.length} events for ${symbol}`);
     }

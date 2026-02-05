@@ -17,6 +17,10 @@ services:
     networks:
       - trading-network
     restart: unless-stopped
+    volumes:
+      - ../../shared:/app/shared:ro
+    command: >
+      /bin/sh -c " echo 'Waiting for Backend API...' && node /app/shared/scripts/wait-for-it.js backend-api:4000 && echo 'Backend API is up! Starting Dashboard...' && node server.js"
 
 # ===========================================
 # NETWORKS (External - shared with infra)

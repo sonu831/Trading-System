@@ -15,6 +15,8 @@ class PredictionResult(BaseModel):
     confidence: float
     model_version: str
     reasoning: str = "Analysis based on technical indicators."
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
 
 class BaseEngine(ABC):
     @abstractmethod

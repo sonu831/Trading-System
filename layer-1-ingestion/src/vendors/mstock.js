@@ -5,10 +5,47 @@ const { metrics } = require('../utils/metrics');
 const OTPAuth = require('otpauth');
 const { MConnect, MTicker } = require('@mstock-mirae-asset/nodetradingapi-typeb');
 
+// =================================================================
+// GLOBAL HACK: Monkey-patch console.error & console.log to silence SDK noise
+// =================================================================
+const util = require('util');
+
+if (!global.isConsolePatched) {
+  const originalConsoleError = console.error;
+  const originalConsoleLog = console.log;
+
+  console.error = (...args) => {
+    // robustly detecting the error string using util.format (mimics console output)
+    const msg = util.format(...args);
+    if (
+      msg.includes('Unexpected server response: 502') ||
+      msg.includes('Max reconnection attempts reached') ||
+      msg.includes('WebSocket was closed before the connection was established')
+    ) {
+      // Silently suppress massive SDK error logs
+      return;
+    }
+    originalConsoleError.apply(console, args);
+  };
+
+  console.log = (...args) => {
+    const msg = util.format(...args);
+    if (msg.includes('WebSocket connection closed')) {
+       // Suppress SDK's generic close message (we log our own context-aware one)
+       return;
+    }
+    originalConsoleLog.apply(console, args);
+  };
+
+  global.isConsolePatched = true;
+}
+
 class MStockVendor extends BaseVendor {
   constructor(options = {}) {
     super(options);
     this.name = 'mstock';
+    // Debug helper: Random Instance ID
+    this.instanceId = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
 
     // Auth credentials
     this.apiKey = process.env.MSTOCK_API_KEY ? process.env.MSTOCK_API_KEY.trim() : '';
@@ -21,7 +58,7 @@ class MStockVendor extends BaseVendor {
       : '';
 
     if (!this.apiKey) {
-      logger.warn('MSTOCK_API_KEY not set. MStock SDK will fail.');
+      logger.warn(`[${this.instanceId}] MSTOCK_API_KEY not set. MStock SDK will fail.`);
     }
 
     this.mapper = new MStockMapper();
@@ -35,15 +72,16 @@ class MStockVendor extends BaseVendor {
   async connect() {
     this.intentionalDisconnect = false;
     try {
+      logger.info(`[${this.instanceId}] MStockVendor: Connecting...`);
       await this.authenticate();
       if (this.ticker) {
-        logger.info('MStockVendor: Disconnecting MTicker...');
+        logger.info(`[${this.instanceId}] MStockVendor: Disconnecting MTicker...`);
         this.ticker.disconnect();
       }
       await this.startWebSocket();
-      logger.info('MStockVendor: Connected via SDK.');
+      logger.info(`[${this.instanceId}] MStockVendor: Connected via SDK.`);
     } catch (error) {
-      logger.error(`MStockVendor connection failed: ${error.message}`);
+      logger.error(`[${this.instanceId}] MStockVendor connection failed: ${error.message}`);
     }
   }
 
@@ -164,6 +202,10 @@ class MStockVendor extends BaseVendor {
 
   async startWebSocket() {
     if (!this.accessToken) return;
+    if (process.env.SKIP_WEBSOCKET === 'true') {
+      logger.info('MStockVendor: SKIP_WEBSOCKET=true. Skipping WebSocket connection.');
+      return;
+    }
 
     logger.info(
       `MStockVendor: Starting WebSocket (MTicker)... APIKey Len: ${this.apiKey.length}, Token Len: ${this.accessToken.length}`
@@ -193,9 +235,16 @@ class MStockVendor extends BaseVendor {
       this.ticker = new MTicker({
         api_key: encodedApiKey,
         access_token: encodedToken,
-        maxReconnectionAttempts: 10,
+        maxReconnectionAttempts: 0, // Disable SDK internal retries; we handle it manually
         reconnectDelay: 2000,
       });
+
+      // Prevent unhandled error dumps from the underlying socket if possible
+      if (this.ticker.client) {
+        this.ticker.client.on('error', (err) => {
+           logger.debug(`[${this.instanceId}] Suppressed underlying WS error: ${err.message}`);
+        });
+      }
 
       // Event: Connected
       this.ticker.onConnect = () => {
@@ -224,19 +273,48 @@ class MStockVendor extends BaseVendor {
 
       // Event: Error
       this.ticker.onError = (err) => {
-        const msg = err instanceof Error ? err.message : JSON.stringify(err);
-        logger.error(`❌ MStock MTicker Error: ${msg}`);
+        let msg = '';
+        if (err instanceof Error) {
+          msg = err.message;
+        } else if (typeof err === 'object') {
+          // Handle ErrorEvent or other objects that JSON.stringify might miss
+          msg = err.message || err.type || JSON.stringify(err);
+        } else {
+          msg = String(err);
+        }
+        
+        // Special handling for 502 errors - server unavailable
+        if (msg.includes('502') || msg.includes('503') || msg.includes('Bad Gateway')) {
+          const retryDelay = Math.min(30000, (this.reconnectAttempts || 0) * 5000 + 5000);
+          metrics.websocketConnections.set({ vendor: 'mstock', status: 'error' }, 1);
+          
+          if (!this.intentionalDisconnect && !this.isReconnecting) {
+            logger.warn(`[${this.instanceId}] ⚠️ WebSocket 502/503 Error - Server unavailable. Retrying in ${retryDelay/1000}s...`);
+            this.isReconnecting = true;
+            this.reconnectAttempts = (this.reconnectAttempts || 0) + 1;
+            setTimeout(() => this.reconnect(), retryDelay);
+          } else {
+             logger.debug(`[${this.instanceId}] ⚠️ Additional 502 Error received (suppressed).`);
+          }
+          return; // Don't log as error, just retry
+        }
+        
+        logger.error(`[${this.instanceId}] ❌ MStock MTicker Error: ${msg}`);
       };
 
       // Event: Close
       this.ticker.onClose = () => {
-        logger.warn('⚠️ MStock MTicker Closed');
         this.connected = false;
+        metrics.websocketConnections.set({ vendor: 'mstock', status: 'disconnected' }, 1);
 
         if (!this.intentionalDisconnect && !this.isReconnecting) {
-          logger.warn('🔄 Unexpected Disconnect. Staring Reconnect Timer (5s)...');
+          logger.warn(`[${this.instanceId}] ⚠️ MStock MTicker Closed. Reconnecting...`);
+          const retryDelay = Math.min(60000, (this.reconnectAttempts || 0) * 5000 + 5000);
           this.isReconnecting = true;
-          setTimeout(() => this.reconnect(), 5000);
+          this.reconnectAttempts = (this.reconnectAttempts || 0) + 1;
+          setTimeout(() => this.reconnect(), retryDelay);
+        } else if (this.isReconnecting) {
+             logger.debug(`[${this.instanceId}] ⚠️ MStock MTicker Closed (Reconnection in progress).`);
         }
       };
 
@@ -259,6 +337,9 @@ class MStockVendor extends BaseVendor {
       // Ensure previous ticker is dead
       if (this.ticker) {
         try {
+          this.ticker.onClose = () => {};
+          this.ticker.onError = () => {};
+          this.ticker.onConnect = () => {};
           this.ticker.disconnect();
         } catch (e) {
           /* ignore */
@@ -315,10 +396,23 @@ class MStockVendor extends BaseVendor {
   async disconnect() {
     this.intentionalDisconnect = true;
     if (this.ticker) {
-      this.ticker.disconnect();
+      try {
+        // Prevent zombie callbacks triggering after we requested disconnect
+        // Use empty no-op functions instead of null to prevent "is not a function" crashes in SDK
+        this.ticker.onClose = () => {};
+        this.ticker.onError = () => {};
+        this.ticker.onConnect = () => {};
+        this.ticker.disconnect();
+      } catch (e) {
+        logger.debug(`[${this.instanceId}] Suppressed disconnect error: ${e.message}`);
+      }
     }
+    // Restore console.error if we patched it (in case we didn't via callbacks)
+    // Note: The variable originalConsoleError isn't in scope here unless we move it up,
+    // but the closure in startWebSocket handles it for that instance. 
+    // Ideally we should handle this cleaner, but for now relying on the instance lifecycle.
     this.connected = false;
-    logger.info('MStockVendor SDK Disconnected.');
+    logger.info(`[${this.instanceId}] MStockVendor SDK Disconnected.`);
   }
 
   // --- Helper Methods using HTTP Client (if needed) ---

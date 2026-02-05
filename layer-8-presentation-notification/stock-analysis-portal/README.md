@@ -58,7 +58,14 @@ src/
 │   │   │   ├── components/      # Sub-components
 │   │   │   │   ├── NiftyGrid.jsx
 │   │   │   │   └── ...
+│   │   ├── BackfillManager/  # Backfill & Swarm Monitor
+│   │   ├── Analysis/         # Technical Analysis Charts
 │   │   └── ...
+│   │
+│   ├── layout/           # Layout Components
+│   │   ├── Navbar/
+│   │   └── ...
+
 ```
 
 ### 3. Coding Standards

@@ -12,6 +12,10 @@ const nextConfig = {
         destination: `http://${apiHost}/api/v1/:path*`, // Proxy to Backend API
       },
       {
+        source: '/api/market/:path*',
+        destination: `http://${apiHost}/api/market/:path*`, // Market/Analysis API
+      },
+      {
         source: '/api/backfill/:path*',
         destination: `http://${apiHost}/api/backfill/:path*`, // Backfill routes
       },

@@ -10,9 +10,14 @@
 require('ts-node').register({
   transpileOnly: true,
   ignore: [/node_modules\/(?!@mstock-mirae-asset)/],
+  compilerOptions: {
+    module: "commonjs",
+    allowJs: true
+  }
 });
 
-require('dotenv').config({ path: '../.env' });
+const path = require('path');
+require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
 const { MStockVendor } = require('./src/vendors/mstock');
 const { DateTime } = require('luxon');
 

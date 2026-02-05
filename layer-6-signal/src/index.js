@@ -1,9 +1,9 @@
 const express = require('express');
 const promClient = require('prom-client');
-const { createClient } = require('redis');
 const redis = require('./redis/client');
 const engine = require('./engine/decisionEngine');
 const logger = require('./utils/logger');
+const { waitForAll } = require('/app/shared/health-check');
 
 const app = express();
 const PORT = process.env.PORT || 8082; // Signal Layer Port
@@ -44,7 +44,19 @@ async function start() {
   try {
     logger.info('🚀 Starting Layer 6 (Signal Generation)...');
 
-    // 1. Connect to Redis
+    // 1. Wait for Infrastructure Dependencies
+    const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
+    // const timescaleUrl = process.env.TIMESCALE_URL || 'postgresql://...';
+
+    // Initialize health metrics if needed, or pass registry (Layer 6 uses separate registry in promClient, so we can pass it if we want standard metrics)
+    // For now just wait for Redis
+    await waitForAll({
+      redis: {
+        url: redisUrl,
+      },
+    }, { logger });
+
+    // 2. Connect to Redis
     await redis.connect();
 
     // 2. Subscribe to Market View (Layer 5)
@@ -74,21 +86,12 @@ async function start() {
       res.json({ status: 'UP', redis: redis.isConnected });
     });
 
-    // Initialize Redis for System Metrics
-    const redisClient = createClient({
-      url: process.env.REDIS_URL || 'redis://localhost:6379',
-    });
-    redisClient.on('error', (err) => logger.error('Redis Client Error', err));
-    await redisClient.connect();
-
-    // Auto-fix WRONGTYPE error by deleting locally
+    // Auto-fix WRONGTYPE error by resetting the key (uses existing redis connection)
     try {
-      await redisClient.del('system:layer6:metrics');
+      await redis.publisher.del('system:layer6:metrics');
     } catch (e) {
       /* ignore */
     }
-
-    logger.info('✅ Redis Metric Publisher connected');
 
     // Start Metrics Loop
     setInterval(async () => {
@@ -154,5 +157,19 @@ async function handleAnalysisUpdate(analysis) {
     logger.error({ err }, 'Error processing analysis');
   }
 }
+
+// Graceful shutdown
+async function shutdown() {
+  logger.info('Shutting down Layer 6...');
+  try {
+    await redis.disconnect();
+  } catch (err) {
+    logger.error({ err }, 'Shutdown error');
+  }
+  process.exit(0);
+}
+
+process.on('SIGTERM', shutdown);
+process.on('SIGINT', shutdown);
 
 start();

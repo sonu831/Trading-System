@@ -33,9 +33,9 @@ export default function BackfillPanel() {
 
   const fetchCoverage = async () => {
     try {
-      const res = await fetch(`${API_URL}/api/backfill/status`);
+      const res = await fetch(`${API_URL}/api/v1/data/availability`);
       const data = await res.json();
-      setCoverage(data.coverage || []);
+      setCoverage(data.data?.symbols || []);
       setLoadingCoverage(false);
     } catch (e) {
       console.error('Failed to fetch coverage:', e);
@@ -68,7 +68,7 @@ export default function BackfillPanel() {
     setJobStatus(null);
 
     try {
-      const res = await fetch(`${API_URL}/api/backfill/trigger`, {
+      const res = await fetch(`${API_URL}/api/v1/system/backfill/trigger`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -82,7 +82,7 @@ export default function BackfillPanel() {
 
       if (res.ok) {
         setJobStatus({
-          jobId: data.jobId,
+          jobId: data.data?.jobId,
           from: fromDate,
           to: toDate,
           symbol: symbol || 'ALL (Nifty 50)',

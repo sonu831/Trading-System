@@ -1,5 +1,7 @@
 {
-  "annotations": { "list": [] },
+  "annotations": {
+    "list": []
+  },
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
@@ -8,167 +10,357 @@
   "liveNow": false,
   "panels": [
     {
-      "gridPos": { "h": 3, "w": 24, "x": 0, "y": 0 },
+      "gridPos": {
+        "h": 3,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
       "id": 1,
       "options": {
-        "content": "# 🔔 Notifications Dashboard\n### Telegram Bot & Email Service Monitoring",
+        "content": "# \ud83d\udd14 Notifications Dashboard\n### Telegram Bot & Email Service Monitoring",
         "mode": "markdown"
       },
       "title": "",
       "type": "text"
     },
     {
-      "gridPos": { "h": 2, "w": 24, "x": 0, "y": 3 },
+      "gridPos": {
+        "h": 2,
+        "w": 24,
+        "x": 0,
+        "y": 3
+      },
       "id": 100,
-      "options": { "content": "## 🤖 Telegram Bot", "mode": "markdown" },
+      "options": {
+        "content": "## \ud83e\udd16 Telegram Bot",
+        "mode": "markdown"
+      },
       "title": "",
       "type": "text"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "prometheus-datasource" },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus-datasource"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "thresholds" },
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] },
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
           "unit": "short"
         }
       },
-      "gridPos": { "h": 4, "w": 4, "x": 0, "y": 5 },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 0,
+        "y": 5
+      },
       "id": 2,
       "options": {
         "colorMode": "value",
         "graphMode": "area",
         "justifyMode": "auto",
         "orientation": "auto",
-        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
         "textMode": "auto"
       },
-      "targets": [{ "expr": "sum(telegram_commands_received_total)", "legendFormat": "Commands" }],
-      "title": "📥 Commands",
+      "targets": [
+        {
+          "expr": "sum(telegram_updates_total)",
+          "legendFormat": "Commands"
+        }
+      ],
+      "title": "\ud83d\udce5 Commands",
       "type": "stat"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "prometheus-datasource" },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus-datasource"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "thresholds" },
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "blue", "value": null }] },
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          },
           "unit": "short"
         }
       },
-      "gridPos": { "h": 4, "w": 4, "x": 4, "y": 5 },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 4,
+        "y": 5
+      },
       "id": 3,
       "options": {
         "colorMode": "value",
         "graphMode": "area",
         "justifyMode": "auto",
         "orientation": "auto",
-        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
         "textMode": "auto"
       },
       "targets": [
-        { "expr": "sum(telegram_messages_sent_total{status=\"success\"})", "legendFormat": "Sent" }
+        {
+          "expr": "sum(telegram_messages_sent_total)",
+          "legendFormat": "Sent"
+        }
       ],
-      "title": "📤 Msgs Sent",
+      "title": "\ud83d\udce4 Msgs Sent",
       "type": "stat"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "prometheus-datasource" },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus-datasource"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "thresholds" },
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "purple", "value": null }] },
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "purple",
+                "value": null
+              }
+            ]
+          },
           "unit": "short"
         }
       },
-      "gridPos": { "h": 4, "w": 4, "x": 8, "y": 5 },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 8,
+        "y": 5
+      },
       "id": 4,
       "options": {
         "colorMode": "value",
         "graphMode": "area",
         "justifyMode": "auto",
         "orientation": "auto",
-        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
         "textMode": "auto"
       },
-      "targets": [{ "expr": "telegram_unique_users_today", "legendFormat": "Users" }],
-      "title": "👥 Active Users",
+      "targets": [
+        {
+          "expr": "telegram_active_users_daily",
+          "legendFormat": "Users"
+        }
+      ],
+      "title": "\ud83d\udc65 Active Users",
       "type": "stat"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "prometheus-datasource" },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus-datasource"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "thresholds" },
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "orange", "value": null }] },
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "orange",
+                "value": null
+              }
+            ]
+          },
           "unit": "short"
         }
       },
-      "gridPos": { "h": 4, "w": 4, "x": 12, "y": 5 },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 12,
+        "y": 5
+      },
       "id": 5,
       "options": {
         "colorMode": "value",
         "graphMode": "area",
         "justifyMode": "auto",
         "orientation": "auto",
-        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
         "textMode": "auto"
       },
-      "targets": [{ "expr": "sum(telegram_broadcasts_sent_total)", "legendFormat": "Broadcasts" }],
-      "title": "📢 Broadcasts",
+      "targets": [
+        {
+          "expr": "sum(telegram_broadcasts_sent_total)",
+          "legendFormat": "Broadcasts"
+        }
+      ],
+      "title": "\ud83d\udce2 Broadcasts",
       "type": "stat"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "prometheus-datasource" },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus-datasource"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "thresholds" },
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] },
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
           "unit": "short"
         }
       },
-      "gridPos": { "h": 4, "w": 4, "x": 16, "y": 5 },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 16,
+        "y": 5
+      },
       "id": 6,
       "options": {
         "colorMode": "value",
         "graphMode": "none",
         "justifyMode": "auto",
         "orientation": "auto",
-        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
         "textMode": "auto"
       },
-      "targets": [{ "expr": "telegram_subscribers_total", "legendFormat": "Subscribers" }],
-      "title": "🔔 Subscribers",
+      "targets": [
+        {
+          "expr": "telegram_subscribers_total",
+          "legendFormat": "Subscribers"
+        }
+      ],
+      "title": "\ud83d\udd14 Subscribers",
       "type": "stat"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "prometheus-datasource" },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus-datasource"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "thresholds" },
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }] },
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              }
+            ]
+          },
           "unit": "short"
         }
       },
-      "gridPos": { "h": 4, "w": 4, "x": 20, "y": 5 },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 20,
+        "y": 5
+      },
       "id": 7,
       "options": {
         "colorMode": "value",
         "graphMode": "area",
         "justifyMode": "auto",
         "orientation": "auto",
-        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
         "textMode": "auto"
       },
-      "targets": [{ "expr": "sum(telegram_bot_errors_total)", "legendFormat": "Errors" }],
-      "title": "❌ Errors",
+      "targets": [
+        {
+          "expr": "sum(telegram_bot_errors_total)",
+          "legendFormat": "Errors"
+        }
+      ],
+      "title": "\u274c Errors",
       "type": "stat"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "prometheus-datasource" },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus-datasource"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "palette-classic" },
+          "color": {
+            "mode": "palette-classic"
+          },
           "custom": {
             "axisCenteredZero": false,
             "axisColorMode": "text",
@@ -178,68 +370,134 @@
             "drawStyle": "line",
             "fillOpacity": 20,
             "gradientMode": "none",
-            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
             "lineInterpolation": "smooth",
             "lineWidth": 2,
             "pointSize": 5,
-            "scaleDistribution": { "type": "linear" },
+            "scaleDistribution": {
+              "type": "linear"
+            },
             "showPoints": "never",
             "spanNulls": true,
-            "stacking": { "group": "A", "mode": "none" },
-            "thresholdsStyle": { "mode": "off" }
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
           },
           "unit": "short"
         }
       },
-      "gridPos": { "h": 6, "w": 12, "x": 0, "y": 9 },
+      "gridPos": {
+        "h": 6,
+        "w": 12,
+        "x": 0,
+        "y": 9
+      },
       "id": 8,
       "options": {
-        "legend": { "calcs": ["sum"], "displayMode": "table", "placement": "right" },
-        "tooltip": { "mode": "multi", "sort": "desc" }
+        "legend": {
+          "calcs": [
+            "sum"
+          ],
+          "displayMode": "table",
+          "placement": "right"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
       },
       "targets": [
         {
-          "expr": "sum by (command) (rate(telegram_commands_received_total[5m]) * 60)",
+          "expr": "sum by (command) (rate(telegram_updates_total[5m]) * 60)",
           "legendFormat": "{{command}}"
         }
       ],
-      "title": "📊 Commands Rate (per minute)",
+      "title": "\ud83d\udcca Commands Rate (per minute)",
       "type": "timeseries"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "prometheus-datasource" },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus-datasource"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "palette-classic" },
+          "color": {
+            "mode": "palette-classic"
+          },
           "mappings": [],
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
           "unit": "short"
         },
         "overrides": []
       },
-      "gridPos": { "h": 6, "w": 6, "x": 12, "y": 9 },
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 12,
+        "y": 9
+      },
       "id": 9,
       "options": {
-        "displayLabels": ["name", "percent"],
-        "legend": { "displayMode": "table", "placement": "right", "values": ["value"] },
+        "displayLabels": [
+          "name",
+          "percent"
+        ],
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "values": [
+            "value"
+          ]
+        },
         "pieType": "donut",
-        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
-        "tooltip": { "mode": "single", "sort": "none" }
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
       },
       "targets": [
         {
-          "expr": "sum by (command) (telegram_commands_received_total)",
+          "expr": "sum by (command) (telegram_updates_total)",
           "legendFormat": "{{command}}"
         }
       ],
-      "title": "🎯 Command Distribution",
+      "title": "\ud83c\udfaf Command Distribution",
       "type": "piechart"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "prometheus-datasource" },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus-datasource"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "palette-classic" },
+          "color": {
+            "mode": "palette-classic"
+          },
           "custom": {
             "axisCenteredZero": false,
             "axisColorMode": "text",
@@ -249,24 +507,49 @@
             "drawStyle": "bars",
             "fillOpacity": 80,
             "gradientMode": "none",
-            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
             "lineInterpolation": "linear",
             "lineWidth": 1,
             "pointSize": 5,
-            "scaleDistribution": { "type": "linear" },
+            "scaleDistribution": {
+              "type": "linear"
+            },
             "showPoints": "never",
             "spanNulls": false,
-            "stacking": { "group": "A", "mode": "normal" },
-            "thresholdsStyle": { "mode": "off" }
+            "stacking": {
+              "group": "A",
+              "mode": "normal"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
           },
           "unit": "short"
         }
       },
-      "gridPos": { "h": 6, "w": 6, "x": 18, "y": 9 },
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 18,
+        "y": 9
+      },
       "id": 10,
       "options": {
-        "legend": { "calcs": ["sum"], "displayMode": "table", "placement": "bottom" },
-        "tooltip": { "mode": "multi", "sort": "desc" }
+        "legend": {
+          "calcs": [
+            "sum"
+          ],
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
       },
       "targets": [
         {
@@ -274,134 +557,281 @@
           "legendFormat": "{{type}} ({{status}})"
         }
       ],
-      "title": "📤 Messages Rate",
+      "title": "\ud83d\udce4 Messages Rate",
       "type": "timeseries"
     },
     {
-      "gridPos": { "h": 2, "w": 24, "x": 0, "y": 15 },
+      "gridPos": {
+        "h": 2,
+        "w": 24,
+        "x": 0,
+        "y": 15
+      },
       "id": 200,
-      "options": { "content": "## 📧 Email Service", "mode": "markdown" },
+      "options": {
+        "content": "## \ud83d\udce7 Email Service",
+        "mode": "markdown"
+      },
       "title": "",
       "type": "text"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "prometheus-datasource" },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus-datasource"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "thresholds" },
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] },
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
           "unit": "short"
         }
       },
-      "gridPos": { "h": 4, "w": 4, "x": 0, "y": 17 },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 0,
+        "y": 17
+      },
       "id": 20,
       "options": {
         "colorMode": "value",
         "graphMode": "area",
         "justifyMode": "auto",
         "orientation": "auto",
-        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
         "textMode": "auto"
       },
-      "targets": [{ "expr": "sum(email_sent_total)", "legendFormat": "Sent" }],
-      "title": "✅ Emails Sent",
+      "targets": [
+        {
+          "expr": "sum(email_sent_total)",
+          "legendFormat": "Sent"
+        }
+      ],
+      "title": "\u2705 Emails Sent",
       "type": "stat"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "prometheus-datasource" },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus-datasource"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "thresholds" },
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }] },
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              }
+            ]
+          },
           "unit": "short"
         }
       },
-      "gridPos": { "h": 4, "w": 4, "x": 4, "y": 17 },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 4,
+        "y": 17
+      },
       "id": 21,
       "options": {
         "colorMode": "value",
         "graphMode": "area",
         "justifyMode": "auto",
         "orientation": "auto",
-        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
         "textMode": "auto"
       },
-      "targets": [{ "expr": "sum(email_failed_total)", "legendFormat": "Failed" }],
-      "title": "❌ Emails Failed",
+      "targets": [
+        {
+          "expr": "sum(email_failed_total)",
+          "legendFormat": "Failed"
+        }
+      ],
+      "title": "\u274c Emails Failed",
       "type": "stat"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "prometheus-datasource" },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus-datasource"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "thresholds" },
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "blue", "value": null }] },
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          },
           "unit": "short"
         }
       },
-      "gridPos": { "h": 4, "w": 4, "x": 8, "y": 17 },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 8,
+        "y": 17
+      },
       "id": 22,
       "options": {
         "colorMode": "value",
         "graphMode": "none",
         "justifyMode": "auto",
         "orientation": "auto",
-        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
         "textMode": "auto"
       },
-      "targets": [{ "expr": "email_recipients_configured", "legendFormat": "Recipients" }],
-      "title": "👥 Recipients",
+      "targets": [
+        {
+          "expr": "email_recipients_configured",
+          "legendFormat": "Recipients"
+        }
+      ],
+      "title": "\ud83d\udc65 Recipients",
       "type": "stat"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "prometheus-datasource" },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus-datasource"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "thresholds" },
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "purple", "value": null }] },
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "purple",
+                "value": null
+              }
+            ]
+          },
           "unit": "short"
         }
       },
-      "gridPos": { "h": 4, "w": 4, "x": 12, "y": 17 },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 12,
+        "y": 17
+      },
       "id": 23,
       "options": {
         "colorMode": "value",
         "graphMode": "area",
         "justifyMode": "auto",
         "orientation": "auto",
-        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
         "textMode": "auto"
       },
       "targets": [
-        { "expr": "sum(email_notifications_received_total)", "legendFormat": "Notifications" }
+        {
+          "expr": "sum(email_notifications_received_total)",
+          "legendFormat": "Notifications"
+        }
       ],
-      "title": "📥 Notifications",
+      "title": "\ud83d\udce5 Notifications",
       "type": "stat"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "prometheus-datasource" },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus-datasource"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "thresholds" },
+          "color": {
+            "mode": "thresholds"
+          },
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "green", "value": null },
-              { "color": "yellow", "value": 1 },
-              { "color": "red", "value": 5 }
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 5
+              }
             ]
           },
           "unit": "s"
         }
       },
-      "gridPos": { "h": 4, "w": 4, "x": 16, "y": 17 },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 16,
+        "y": 17
+      },
       "id": 24,
       "options": {
         "colorMode": "value",
         "graphMode": "area",
         "justifyMode": "auto",
         "orientation": "auto",
-        "reduceOptions": { "calcs": ["mean"], "fields": "", "values": false },
+        "reduceOptions": {
+          "calcs": [
+            "mean"
+          ],
+          "fields": "",
+          "values": false
+        },
         "textMode": "auto"
       },
       "targets": [
@@ -410,33 +840,58 @@
           "legendFormat": "p95"
         }
       ],
-      "title": "⏱️ Latency (p95)",
+      "title": "\u23f1\ufe0f Latency (p95)",
       "type": "stat"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "prometheus-datasource" },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus-datasource"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "thresholds" },
+          "color": {
+            "mode": "thresholds"
+          },
           "thresholds": {
             "mode": "percentage",
             "steps": [
-              { "color": "red", "value": null },
-              { "color": "yellow", "value": 90 },
-              { "color": "green", "value": 99 }
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 90
+              },
+              {
+                "color": "green",
+                "value": 99
+              }
             ]
           },
           "unit": "percentunit"
         }
       },
-      "gridPos": { "h": 4, "w": 4, "x": 20, "y": 17 },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 20,
+        "y": 17
+      },
       "id": 25,
       "options": {
         "colorMode": "value",
         "graphMode": "area",
         "justifyMode": "auto",
         "orientation": "auto",
-        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
         "textMode": "auto"
       },
       "targets": [
@@ -445,14 +900,19 @@
           "legendFormat": "Rate"
         }
       ],
-      "title": "📈 Success Rate",
+      "title": "\ud83d\udcc8 Success Rate",
       "type": "stat"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "prometheus-datasource" },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus-datasource"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "palette-classic" },
+          "color": {
+            "mode": "palette-classic"
+          },
           "custom": {
             "axisCenteredZero": false,
             "axisColorMode": "text",
@@ -462,24 +922,49 @@
             "drawStyle": "bars",
             "fillOpacity": 80,
             "gradientMode": "none",
-            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
             "lineInterpolation": "linear",
             "lineWidth": 1,
             "pointSize": 5,
-            "scaleDistribution": { "type": "linear" },
+            "scaleDistribution": {
+              "type": "linear"
+            },
             "showPoints": "never",
             "spanNulls": false,
-            "stacking": { "group": "A", "mode": "normal" },
-            "thresholdsStyle": { "mode": "off" }
+            "stacking": {
+              "group": "A",
+              "mode": "normal"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
           },
           "unit": "short"
         }
       },
-      "gridPos": { "h": 6, "w": 12, "x": 0, "y": 21 },
+      "gridPos": {
+        "h": 6,
+        "w": 12,
+        "x": 0,
+        "y": 21
+      },
       "id": 26,
       "options": {
-        "legend": { "calcs": ["sum"], "displayMode": "table", "placement": "right" },
-        "tooltip": { "mode": "multi", "sort": "desc" }
+        "legend": {
+          "calcs": [
+            "sum"
+          ],
+          "displayMode": "table",
+          "placement": "right"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
       },
       "targets": [
         {
@@ -487,14 +972,19 @@
           "legendFormat": "{{recipient}}"
         }
       ],
-      "title": "📧 Emails by Recipient (Last Hour)",
+      "title": "\ud83d\udce7 Emails by Recipient (Last Hour)",
       "type": "timeseries"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "prometheus-datasource" },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus-datasource"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "palette-classic" },
+          "color": {
+            "mode": "palette-classic"
+          },
           "custom": {
             "axisCenteredZero": false,
             "axisColorMode": "text",
@@ -504,50 +994,114 @@
             "drawStyle": "bars",
             "fillOpacity": 80,
             "gradientMode": "none",
-            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
             "lineInterpolation": "linear",
             "lineWidth": 1,
             "pointSize": 5,
-            "scaleDistribution": { "type": "linear" },
+            "scaleDistribution": {
+              "type": "linear"
+            },
             "showPoints": "never",
             "spanNulls": false,
-            "stacking": { "group": "A", "mode": "normal" },
-            "thresholdsStyle": { "mode": "off" }
+            "stacking": {
+              "group": "A",
+              "mode": "normal"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
           },
           "unit": "short"
         }
       },
-      "gridPos": { "h": 6, "w": 6, "x": 12, "y": 21 },
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 12,
+        "y": 21
+      },
       "id": 27,
       "options": {
-        "legend": { "calcs": ["sum"], "displayMode": "table", "placement": "bottom" },
-        "tooltip": { "mode": "multi", "sort": "desc" }
+        "legend": {
+          "calcs": [
+            "sum"
+          ],
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
       },
       "targets": [
-        { "expr": "sum by (type) (increase(email_sent_total[1h]))", "legendFormat": "{{type}}" }
+        {
+          "expr": "sum by (type) (increase(email_sent_total[1h]))",
+          "legendFormat": "{{type}}"
+        }
       ],
-      "title": "📊 Emails by Type",
+      "title": "\ud83d\udcca Emails by Type",
       "type": "timeseries"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "prometheus-datasource" },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus-datasource"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "palette-classic" },
+          "color": {
+            "mode": "palette-classic"
+          },
           "mappings": [],
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
           "unit": "short"
         },
         "overrides": []
       },
-      "gridPos": { "h": 6, "w": 6, "x": 18, "y": 21 },
+      "gridPos": {
+        "h": 1,
+        "w": 6,
+        "x": 18,
+        "y": 21
+      },
       "id": 28,
       "options": {
-        "displayLabels": ["name", "percent"],
-        "legend": { "displayMode": "table", "placement": "right", "values": ["value"] },
+        "displayLabels": [
+          "name",
+          "percent"
+        ],
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "values": [
+            "value"
+          ]
+        },
         "pieType": "donut",
-        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
-        "tooltip": { "mode": "single", "sort": "none" }
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
       },
       "targets": [
         {
@@ -555,36 +1109,95 @@
           "legendFormat": "{{channel}}"
         }
       ],
-      "title": "📥 By Channel",
-      "type": "piechart"
+      "title": "\ud83d\udce5 By Channel (No Kafka metrics)",
+      "type": "piechart",
+      "transparent": true
     },
     {
-      "datasource": { "type": "prometheus", "uid": "prometheus-datasource" },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus-datasource"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "palette-classic" },
-          "custom": { "align": "auto", "cellOptions": { "type": "auto" }, "inspect": false },
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          },
           "mappings": [],
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] }
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
         },
         "overrides": [
           {
-            "matcher": { "id": "byName", "options": "Sent" },
-            "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }]
+            "matcher": {
+              "id": "byName",
+              "options": "Sent"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "green",
+                  "mode": "fixed"
+                }
+              }
+            ]
           },
           {
-            "matcher": { "id": "byName", "options": "Failed" },
-            "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }]
+            "matcher": {
+              "id": "byName",
+              "options": "Failed"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "red",
+                  "mode": "fixed"
+                }
+              }
+            ]
           }
         ]
       },
-      "gridPos": { "h": 6, "w": 24, "x": 0, "y": 27 },
+      "gridPos": {
+        "h": 6,
+        "w": 24,
+        "x": 0,
+        "y": 27
+      },
       "id": 29,
       "options": {
         "cellHeight": "sm",
-        "footer": { "countRows": false, "fields": "", "reducer": ["sum"], "show": true },
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": true
+        },
         "showHeader": true,
-        "sortBy": [{ "desc": true, "displayName": "Sent" }]
+        "sortBy": [
+          {
+            "desc": true,
+            "displayName": "Sent"
+          }
+        ]
       },
       "targets": [
         {
@@ -602,13 +1215,18 @@
           "refId": "failed"
         }
       ],
-      "title": "📋 Email Summary by Recipient",
+      "title": "\ud83d\udccb Email Summary by Recipient",
       "transformations": [
-        { "id": "merge", "options": {} },
+        {
+          "id": "merge",
+          "options": {}
+        },
         {
           "id": "organize",
           "options": {
-            "excludeByName": { "Time": true },
+            "excludeByName": {
+              "Time": true
+            },
             "indexByName": {},
             "renameByName": {
               "Value #sent": "Sent",
@@ -621,53 +1239,117 @@
       "type": "table"
     },
     {
-      "gridPos": { "h": 2, "w": 24, "x": 0, "y": 33 },
+      "gridPos": {
+        "h": 2,
+        "w": 24,
+        "x": 0,
+        "y": 33
+      },
       "id": 400,
-      "options": { "content": "## 📨 Kafka Message Processing", "mode": "markdown" },
+      "options": {
+        "content": "## \ud83d\udce8 Kafka Message Processing",
+        "mode": "markdown"
+      },
       "title": "",
       "type": "text"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "prometheus-datasource" },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus-datasource"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "thresholds" },
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "blue", "value": null }] },
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          },
           "unit": "short"
         }
       },
-      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 35 },
+      "gridPos": {
+        "h": 1,
+        "w": 6,
+        "x": 0,
+        "y": 35
+      },
       "id": 40,
       "options": {
         "colorMode": "value",
         "graphMode": "area",
         "justifyMode": "auto",
         "orientation": "auto",
-        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
         "textMode": "auto"
       },
       "targets": [
-        { "expr": "sum(kafka_notifications_processed_total)", "legendFormat": "Processed" }
+        {
+          "expr": "sum(kafka_notifications_processed_total)",
+          "legendFormat": "Processed"
+        }
       ],
-      "title": "Total Processed",
-      "type": "stat"
+      "title": "Total Processed (No Kafka metrics)",
+      "type": "stat",
+      "transparent": true
     },
     {
-      "datasource": { "type": "prometheus", "uid": "prometheus-datasource" },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus-datasource"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "palette-classic" },
+          "color": {
+            "mode": "palette-classic"
+          },
           "unit": "short"
         }
       },
-      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 35 },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 6,
+        "y": 35
+      },
       "id": 41,
       "options": {
-        "displayLabels": ["name", "percent"],
-        "legend": { "displayMode": "table", "placement": "right", "values": ["value"] },
+        "displayLabels": [
+          "name",
+          "percent"
+        ],
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "values": [
+            "value"
+          ]
+        },
         "pieType": "donut",
-        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
-        "tooltip": { "mode": "single", "sort": "none" }
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
       },
       "targets": [
         {
@@ -679,24 +1361,46 @@
       "type": "piechart"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "prometheus-datasource" },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus-datasource"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "palette-classic" },
+          "color": {
+            "mode": "palette-classic"
+          },
           "custom": {
             "drawStyle": "bars",
             "fillOpacity": 80,
             "showPoints": "never",
-            "stacking": { "group": "A", "mode": "normal" }
+            "stacking": {
+              "group": "A",
+              "mode": "normal"
+            }
           },
           "unit": "short"
         }
       },
-      "gridPos": { "h": 4, "w": 12, "x": 12, "y": 35 },
+      "gridPos": {
+        "h": 4,
+        "w": 12,
+        "x": 12,
+        "y": 35
+      },
       "id": 42,
       "options": {
-        "legend": { "calcs": ["sum"], "displayMode": "table", "placement": "right" },
-        "tooltip": { "mode": "multi", "sort": "desc" }
+        "legend": {
+          "calcs": [
+            "sum"
+          ],
+          "displayMode": "table",
+          "placement": "right"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
       },
       "targets": [
         {
@@ -708,15 +1412,31 @@
       "type": "timeseries"
     },
     {
-      "gridPos": { "h": 2, "w": 24, "x": 0, "y": 39 },
+      "gridPos": {
+        "h": 2,
+        "w": 24,
+        "x": 0,
+        "y": 39
+      },
       "id": 300,
-      "options": { "content": "## 📜 Recent Logs", "mode": "markdown" },
+      "options": {
+        "content": "## \ud83d\udcdc Recent Logs",
+        "mode": "markdown"
+      },
       "title": "",
       "type": "text"
     },
     {
-      "datasource": { "type": "loki", "uid": "loki-datasource" },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 35 },
+      "datasource": {
+        "type": "loki",
+        "uid": "loki-datasource"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 35
+      },
       "id": 30,
       "options": {
         "dedupStrategy": "none",
@@ -728,13 +1448,27 @@
         "sortOrder": "Descending",
         "wrapLogMessage": true
       },
-      "targets": [{ "expr": "{container_name=\"telegram-bot\"}", "refId": "A" }],
-      "title": "🤖 Telegram Bot Logs",
-      "type": "logs"
+      "targets": [
+        {
+          "expr": "{container=\"telegram-bot\"} |= \"\"",
+          "refId": "A"
+        }
+      ],
+      "title": "\ud83e\udd16 Telegram Bot Logs",
+      "type": "logs",
+      "transparent": true
     },
     {
-      "datasource": { "type": "loki", "uid": "loki-datasource" },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 35 },
+      "datasource": {
+        "type": "loki",
+        "uid": "loki-datasource"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 35
+      },
       "id": 31,
       "options": {
         "dedupStrategy": "none",
@@ -746,17 +1480,33 @@
         "sortOrder": "Descending",
         "wrapLogMessage": true
       },
-      "targets": [{ "expr": "{container_name=\"email-service\"} |= \"Email\"", "refId": "A" }],
-      "title": "📧 Email Service Logs",
-      "type": "logs"
+      "targets": [
+        {
+          "expr": "{container=\"email-service\"} |= \"Email\"",
+          "refId": "A"
+        }
+      ],
+      "title": "\ud83d\udce7 Email Service Logs",
+      "type": "logs",
+      "transparent": true
     }
   ],
   "refresh": "10s",
   "schemaVersion": 38,
   "style": "dark",
-  "tags": ["notifications", "telegram", "email", "monitoring"],
-  "templating": { "list": [] },
-  "time": { "from": "now-1h", "to": "now" },
+  "tags": [
+    "notifications",
+    "telegram",
+    "email",
+    "monitoring"
+  ],
+  "templating": {
+    "list": []
+  },
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
   "timepicker": {},
   "timezone": "Asia/Kolkata",
   "title": "Notifications",

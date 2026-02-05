@@ -1,0 +1,23 @@
+{
+  "name": "@trading-system/health-check",
+  "version": "1.1.0",
+  "description": "Shared health check utilities for Trading System services with Prometheus metrics",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"No tests yet\""
+  },
+  "keywords": ["health-check", "kafka", "redis", "timescaledb", "prometheus", "grafana"],
+  "author": "Trading System Team",
+  "license": "MIT",
+  "peerDependencies": {
+    "kafkajs": "^2.0.0",
+    "redis": "^4.0.0",
+    "pg": "^8.0.0",
+    "prom-client": "^14.0.0"
+  },
+  "peerDependenciesMeta": {
+    "prom-client": {
+      "optional": true
+    }
+  }
+}

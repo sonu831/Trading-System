@@ -261,12 +261,11 @@ export default function SystemPipeline() {
           <p className="text-gray-400 text-sm md:text-base">Real-time Architecture Visualization</p>
         </div>
         <div className="flex flex-wrap justify-center gap-3 md:gap-4 w-full lg:w-auto">
-          <button
-            onClick={() => setIsBackfillOpen(true)}
-            disabled={systemData?.layers?.layer1?.backfill?.status === 'running'}
+          <a
+            href="/backfill"
             className={`flex items-center justify-center gap-2 px-3 md:px-4 py-2 rounded-lg font-bold transition text-sm md:text-base flex-1 sm:flex-initial ${
               systemData?.layers?.layer1?.backfill?.status === 'running'
-                ? 'bg-gray-700 text-gray-400 cursor-not-allowed'
+                ? 'bg-gray-700 text-gray-400 pointer-events-none'
                 : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-900/20'
             }`}
           >
@@ -276,7 +275,7 @@ export default function SystemPipeline() {
                 ? 'Backfilling...'
                 : 'Backfill Manager'}
             </span>
-          </button>
+          </a>
 
           <div className="flex gap-2 w-full sm:w-auto overflow-x-auto no-scrollbar pb-1 sm:pb-0">
             <a

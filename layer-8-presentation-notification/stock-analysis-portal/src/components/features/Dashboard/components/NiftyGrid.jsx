@@ -12,7 +12,15 @@ const NiftyGrid = React.memo(({ marketView }) => {
         label: 'Symbol',
         sortable: true,
         filterable: true,
-        className: 'font-bold text-primary',
+        className: 'font-bold',
+        render: (val) => (
+          <a
+            href={`/analysis/${val}`}
+            className="text-primary hover:text-accent hover:underline transition-colors"
+          >
+            {val}
+          </a>
+        ),
       },
       {
         key: 'ltp',

@@ -7,9 +7,7 @@ const BaseRepository = require('./common/repositories/BaseRepository');
 
 // Import Application Classes (Will be auto-loaded pattern later, but manual for now)
 // Data Availability Feature
-const DataRepository = require('./modules/data/DataRepository');
-const DataService = require('./modules/data/DataService');
-const DataController = require('./modules/data/DataController');
+
 
 // Initialize Singletons
 const prisma = new PrismaClient({
@@ -34,9 +32,7 @@ container.register({
 
   // 3. Application Components (Repositories -> Services -> Controllers)
   // Data Availability
-  dataRepository: asClass(DataRepository).singleton(),
-  dataService: asClass(DataService).singleton(),
-  dataController: asClass(DataController).singleton(),
+
 
   // Signals
   signalRepository: asClass(require('./modules/signals/SignalRepository')).singleton(),
@@ -53,7 +49,8 @@ container.register({
   marketService: asClass(require('./modules/market/MarketService')).singleton(),
   marketController: asClass(require('./modules/market/MarketController')).singleton(),
 
-  // Analysis (Proxy to Layer 4)
+  // Analysis (Technical Analysis + Candles)
+  analysisRepository: asClass(require('./modules/analysis/AnalysisRepository')).singleton(),
   analysisService: asClass(require('./modules/analysis/AnalysisService')).singleton(),
   analysisController: asClass(require('./modules/analysis/AnalysisController')).singleton(),
 });

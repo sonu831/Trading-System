@@ -35,6 +35,10 @@ class OllamaEngine(BaseEngine):
                 timeout=45
             )
             data = resp.json()
+            if 'response' not in data:
+                print(f"Ollama unexpected response: {data}")
+                raise KeyError("Missing 'response' field in Ollama output")
+
             # Parse 'response' field which contains the JSON string
             result_json = json.loads(data['response'])
             
@@ -42,7 +46,9 @@ class OllamaEngine(BaseEngine):
                 prediction=result_json.get("prediction", 0.5),
                 confidence=result_json.get("confidence", 0.0),
                 model_version=f"ollama-{self.model}",
-                reasoning=result_json.get("reasoning", "AI analysis completed.")
+                reasoning=result_json.get("reasoning", "AI analysis completed."),
+                prompt_tokens=data.get("prompt_eval_count", 0),
+                completion_tokens=data.get("eval_count", 0)
             )
         except Exception as e:
             print(f"Ollama Error: {e}")
@@ -83,7 +89,16 @@ class OllamaEngine(BaseEngine):
                 timeout=45
             )
             data = resp.json()
+            if 'response' not in data:
+                print(f"Ollama unexpected response: {data}")
+                raise KeyError("Missing 'response' field in Ollama output")
+
             result_json = json.loads(data['response'])
+             # Add usage stats to result
+            result_json['usage'] = {
+                'prompt_tokens': data.get("prompt_eval_count", 0),
+                'completion_tokens': data.get("eval_count", 0)
+            }
             return result_json
         except Exception as e:
             print(f"Ollama Market Analysis Error: {e}")

@@ -111,6 +111,20 @@ if (SMTP_HOST && SMTP_USER && SMTP_PASS) {
   logger.warn('⚠️ SMTP Credentials missing. Email Service running in MOCK MODE (logging only).');
 }
 
+/**
+ * Escape HTML special characters to prevent XSS in email templates.
+ * All user-controlled data MUST be passed through this before HTML interpolation.
+ */
+function escapeHtml(str) {
+  if (str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 async function sendEmail(subject, text, html, emailType = 'notification') {
   const end = emailDuration.startTimer({ type: emailType });
 
@@ -142,8 +156,21 @@ async function sendEmail(subject, text, html, emailType = 'notification') {
   end();
 }
 
+const { waitForAll, initHealthMetrics } = require('/app/shared/health-check');
+
 async function main() {
   try {
+    // Wait for Infrastructure
+    initHealthMetrics(register);
+
+    const kafkaBrokers = (process.env.KAFKA_BROKERS || 'kafka:29092').split(',');
+    const notificationTopic = process.env.KAFKA_NOTIFICATION_TOPIC || 'notifications';
+    
+    await waitForAll({
+      redis: { url: REDIS_URL },
+      kafka: { brokers: kafkaBrokers, topic: notificationTopic }
+    }, { logger });
+
     subscriber.on('error', (err) => logger.error({ err }, 'Redis Error'));
     await subscriber.connect();
     logger.info('✅ Connected to Redis Pub/Sub');
@@ -157,9 +184,9 @@ async function main() {
         const body = `User: ${data.user}\nMessage: ${data.text}\nSource: ${data.source}`;
         const html = `
           <h3>💡 New User Suggestion</h3>
-          <p><strong>User:</strong> ${data.user}</p>
-          <p><strong>Message:</strong> ${data.text}</p>
-          <p><em>Source: ${data.source}</em></p>
+          <p><strong>User:</strong> ${escapeHtml(data.user)}</p>
+          <p><strong>Message:</strong> ${escapeHtml(data.text)}</p>
+          <p><em>Source: ${escapeHtml(data.source)}</em></p>
         `;
         sendEmail(subject, body, html, 'suggestion');
       } catch {
@@ -200,15 +227,15 @@ async function main() {
               <table style="width: 100%; border-collapse: collapse;">
                 <tr style="border-bottom: 1px solid #eee;">
                   <td style="padding: 12px 0; color: #666;"><strong>Bot Name:</strong></td>
-                  <td style="padding: 12px 0;">${data.botName || 'Guru Ji Trading Bot'}</td>
+                  <td style="padding: 12px 0;">${escapeHtml(data.botName || 'Guru Ji Trading Bot')}</td>
                 </tr>
                 <tr style="border-bottom: 1px solid #eee;">
                   <td style="padding: 12px 0; color: #666;"><strong>Instance ID:</strong></td>
-                  <td style="padding: 12px 0; font-family: monospace;">${data.instanceId || 'N/A'}</td>
+                  <td style="padding: 12px 0; font-family: monospace;">${escapeHtml(data.instanceId || 'N/A')}</td>
                 </tr>
                 <tr style="border-bottom: 1px solid #eee;">
                   <td style="padding: 12px 0; color: #666;"><strong>Hostname:</strong></td>
-                  <td style="padding: 12px 0;">${data.hostname || 'Unknown'}</td>
+                  <td style="padding: 12px 0;">${escapeHtml(data.hostname || 'Unknown')}</td>
                 </tr>
                 <tr style="border-bottom: 1px solid #eee;">
                   <td style="padding: 12px 0; color: #666;"><strong>Restart Time:</strong></td>
@@ -250,11 +277,11 @@ async function main() {
               <table style="width: 100%; border-collapse: collapse;">
                 <tr style="border-bottom: 1px solid #eee;">
                   <td style="padding: 12px 0; color: #666;"><strong>Service:</strong></td>
-                  <td style="padding: 12px 0;">${data.service || 'Unknown Service'}</td>
+                  <td style="padding: 12px 0;">${escapeHtml(data.service || 'Unknown Service')}</td>
                 </tr>
                 <tr style="border-bottom: 1px solid #eee;">
                   <td style="padding: 12px 0; color: #666;"><strong>Error:</strong></td>
-                  <td style="padding: 12px 0; color: #dc3545;">${data.error || 'Connection Lost'}</td>
+                  <td style="padding: 12px 0; color: #dc3545;">${escapeHtml(data.error || 'Connection Lost')}</td>
                 </tr>
                 <tr style="border-bottom: 1px solid #eee;">
                   <td style="padding: 12px 0; color: #666;"><strong>Time Detected:</strong></td>
@@ -265,7 +292,7 @@ async function main() {
                   <td style="padding: 12px 0;"><span style="background: #dc3545; color: white; padding: 4px 12px; border-radius: 4px;">🔴 DOWN</span></td>
                 </tr>
               </table>
-              ${data.details ? `<pre style="background: #f8f9fa; padding: 15px; border-radius: 6px; overflow-x: auto; margin-top: 20px;">${JSON.stringify(data.details, null, 2)}</pre>` : ''}
+              ${data.details ? `<pre style="background: #f8f9fa; padding: 15px; border-radius: 6px; overflow-x: auto; margin-top: 20px;">${escapeHtml(JSON.stringify(data.details, null, 2))}</pre>` : ''}
               <div style="margin-top: 25px; padding: 15px; background: #f8f9fa; border-radius: 6px; text-align: center;">
                 <p style="margin: 0; color: #666;">🙏 <em>Thank you for your prompt attention!</em></p>
                 <p style="margin: 10px 0 0 0; color: #888; font-size: 12px;">Please investigate and restore the service.</p>
@@ -295,7 +322,7 @@ async function main() {
               <table style="width: 100%; border-collapse: collapse;">
                 <tr style="border-bottom: 1px solid #eee;">
                   <td style="padding: 12px 0; color: #666;"><strong>Service:</strong></td>
-                  <td style="padding: 12px 0;">${data.service || 'Trading System'}</td>
+                  <td style="padding: 12px 0;">${escapeHtml(data.service || 'Trading System')}</td>
                 </tr>
                 <tr style="border-bottom: 1px solid #eee;">
                   <td style="padding: 12px 0; color: #666;"><strong>Recovery Time:</strong></td>
@@ -303,7 +330,7 @@ async function main() {
                 </tr>
                 <tr style="border-bottom: 1px solid #eee;">
                   <td style="padding: 12px 0; color: #666;"><strong>Total Downtime:</strong></td>
-                  <td style="padding: 12px 0;">${downtime}</td>
+                  <td style="padding: 12px 0;">${escapeHtml(downtime)}</td>
                 </tr>
                 <tr>
                   <td style="padding: 12px 0; color: #666;"><strong>Status:</strong></td>
@@ -371,5 +398,19 @@ async function main() {
     process.exit(1);
   }
 }
+
+// Graceful shutdown
+async function shutdown() {
+  logger.info('Shutting down Email Service...');
+  try {
+    if (subscriber) await subscriber.quit();
+  } catch (err) {
+    logger.error({ err }, 'Shutdown error');
+  }
+  process.exit(0);
+}
+
+process.on('SIGTERM', shutdown);
+process.on('SIGINT', shutdown);
 
 main();

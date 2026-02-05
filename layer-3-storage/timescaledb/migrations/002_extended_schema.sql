@@ -14,8 +14,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- Add unique constraint to existing candles_1m for duplicate prevention
 ALTER TABLE candles_1m ADD CONSTRAINT unique_candle_1m 
-    UNIQUE (time, symbol) 
-    DEFERRABLE INITIALLY DEFERRED;
+    UNIQUE (time, symbol);
 
 -- ============================================
 -- NEW: candles_1h (Hourly Continuous Aggregate)

@@ -1,7 +1,10 @@
 const { pool } = require('../db/client');
+const logger = require('../utils/logger');
 
 /**
  * Insert a single candle into the candles_1m hypertable.
+ * Uses ON CONFLICT DO NOTHING to safely handle duplicate (time, symbol) pairs.
+ *
  * @param {Object} candle - The candle object
  * @param {string} candle.symbol - Stock symbol (e.g., "RELIANCE")
  * @param {string} candle.timestamp - ISO timestamp or "yyyy-MM-dd HH:mm"
@@ -32,7 +35,7 @@ async function insertCandle(candle) {
   try {
     await pool.query(query, values);
   } catch (err) {
-    console.error(`❌ Insert failed for ${candle.symbol}: ${err.message}`);
+    logger.error({ err, symbol: candle.symbol }, 'Insert failed');
   }
 }
 
@@ -67,10 +70,10 @@ async function insertCandlesBatch(candles) {
     }
 
     await client.query('COMMIT');
-    console.log(`✅ Inserted batch of ${candles.length} candles.`);
+    logger.info({ count: candles.length }, 'Inserted candle batch');
   } catch (err) {
     await client.query('ROLLBACK');
-    console.error(`❌ Batch insert failed: ${err.message}`);
+    logger.error({ err }, 'Batch insert failed');
   } finally {
     client.release();
   }

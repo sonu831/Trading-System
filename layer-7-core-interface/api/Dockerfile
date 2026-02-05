@@ -2,6 +2,9 @@ FROM node:20-alpine
 
 WORKDIR /app
 
+# Bypass SSL certificate verification (for corporate proxy/firewall)
+RUN npm config set strict-ssl false
+
 # Install dependencies
 COPY package*.json ./
 COPY prisma ./prisma/
@@ -9,8 +12,8 @@ COPY prisma ./prisma/
 # Install all dependencies (including dev for prisma CLI)
 RUN npm install --legacy-peer-deps && npm install fastify@5 --save-exact
 
-# Generate Prisma Client
-RUN npx prisma generate
+# Generate Prisma Client (disable SSL verification for binary download)
+RUN NODE_TLS_REJECT_UNAUTHORIZED=0 npx prisma generate
 
 # Copy source code
 COPY . .

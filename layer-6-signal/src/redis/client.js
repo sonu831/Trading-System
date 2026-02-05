@@ -1,4 +1,5 @@
 const { createClient } = require('redis');
+const logger = require('../utils/logger');
 
 const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
 
@@ -12,14 +13,14 @@ class RedisClient {
   async connect() {
     if (this.isConnected) return;
 
-    this.subscriber.on('error', (err) => console.error('Redis Subscriber Error:', err));
-    this.publisher.on('error', (err) => console.error('Redis Publisher Error:', err));
+    this.subscriber.on('error', (err) => logger.error({ err }, 'Redis Subscriber Error'));
+    this.publisher.on('error', (err) => logger.error({ err }, 'Redis Publisher Error'));
 
     await this.subscriber.connect();
     await this.publisher.connect();
 
     this.isConnected = true;
-    console.log(`✅ Layer 6 Connected to Redis: ${REDIS_URL}`);
+    logger.info({ url: REDIS_URL }, 'Layer 6 connected to Redis');
   }
 
   /**
@@ -35,10 +36,10 @@ class RedisClient {
         const data = JSON.parse(message);
         callback(data);
       } catch (err) {
-        console.error(`❌ Failed to parse message on ${channel}:`, err.message);
+        logger.error({ err, channel }, 'Failed to parse message');
       }
     });
-    console.log(`📡 Subscribed to ${channel}`);
+    logger.info({ channel }, 'Subscribed to Redis channel');
   }
 
   /**

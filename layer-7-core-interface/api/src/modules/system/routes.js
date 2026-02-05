@@ -9,16 +9,56 @@ async function systemRoutes(fastify, options) {
   const container = require('../../container');
   const systemController = container.resolve('systemController');
 
+  // ─────────────────────────────────────────────────────────────
+  // SYSTEM STATUS
+  // ─────────────────────────────────────────────────────────────
   fastify.get('/api/v1/system-status', {
     schema: systemStatusSchema,
     handler: systemController.getSystemStatus,
   });
 
+  // ─────────────────────────────────────────────────────────────
+  // BACKFILL MANAGEMENT
+  // ─────────────────────────────────────────────────────────────
   fastify.post('/api/v1/system/backfill/trigger', {
     schema: backfillTriggerSchema,
     handler: systemController.triggerBackfill,
   });
 
+  fastify.get('/api/v1/system/backfill/swarm/status', {
+    handler: systemController.getSwarmStatus,
+  });
+
+  fastify.get('/api/v1/backfill', {
+    handler: systemController.getBackfillJobs,
+  });
+
+  fastify.get('/api/v1/backfill/:jobId', {
+    handler: systemController.getBackfillJob,
+  });
+
+  fastify.patch('/api/v1/backfill/:jobId', {
+    handler: systemController.updateBackfillJob,
+  });
+
+  // ─────────────────────────────────────────────────────────────
+  // DATA AVAILABILITY (Used by Ingestion Layer)
+  // ─────────────────────────────────────────────────────────────
+  fastify.get('/api/v1/data/availability', {
+    handler: systemController.getDataAvailability,
+  });
+
+  fastify.put('/api/v1/data/availability', {
+    handler: systemController.updateDataAvailability,
+  });
+
+  fastify.get('/api/v1/data/gaps', {
+    handler: systemController.getSymbolsWithGaps,
+  });
+
+  // ─────────────────────────────────────────────────────────────
+  // HEALTH & NEWS
+  // ─────────────────────────────────────────────────────────────
   const healthController = require('./health.controller');
   fastify.get('/api/v1/health/detailed', healthController.getDetailedHealth);
 

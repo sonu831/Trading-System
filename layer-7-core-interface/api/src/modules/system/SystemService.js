@@ -1,4 +1,5 @@
 const BaseService = require('../../common/services/BaseService');
+const axios = require('axios');
 
 class SystemService extends BaseService {
   constructor({ systemRepository }) {
@@ -46,9 +47,140 @@ class SystemService extends BaseService {
     };
   }
 
+  async getSwarmStatus() {
+    // defaults to null (IDLE) if not found
+    return this.systemRepository.getSwarmStatus() || { status: 'IDLE' };
+  }
+
   async triggerBackfill(payload) {
-    await this.systemRepository.triggerBackfill(payload);
-    return { message: 'Backfill triggered successfully' };
+    // Default to HISTORICAL if not specified (User Request)
+    const type = payload.type || 'HISTORICAL';
+
+    // Create job record before triggering
+    const job = await this.systemRepository.createBackfillJob({
+      symbols: payload.symbol ? [payload.symbol] : [],
+      startDate: payload.fromDate,
+      endDate: payload.toDate,
+      type: type,
+      triggeredBy: 'api',
+    });
+
+    if (type === 'HISTORICAL') {
+      try {
+        // Direct call to Ingestion Service (Layer 1)
+        // Resolves to: http://ingestion:9101/api/backfill/historical
+        const response = await axios.post('http://ingestion:9101/api/backfill/historical', {
+          symbol: payload.symbol,
+          fromDate: payload.fromDate,
+          toDate: payload.toDate,
+          jobId: job.job_id,
+        });
+
+        return {
+          message: 'Historical Backfill triggered successfully',
+          jobId: job.job_id,
+          details: response.data
+        };
+      } catch (error) {
+        // Update job status if trigger fails
+        await this.systemRepository.updateBackfillJob(job.job_id, { status: 'FAILED' });
+        throw new Error(`Failed to trigger ingestion service: ${error.message}`);
+      }
+    }
+
+    // Legacy / Other Types (via Redis)
+    await this.systemRepository.triggerBackfill({
+      ...payload,
+      jobId: job.job_id,
+    });
+
+    return {
+      message: 'Backfill triggered successfully (Legacy)',
+      jobId: job.job_id,
+    };
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // DATA AVAILABILITY METHODS
+  // ═══════════════════════════════════════════════════════════════
+
+  /**
+   * Get data availability summary
+   * @param {string?} symbol - Optional symbol filter
+   */
+  async getDataAvailability(symbol = null) {
+    const records = await this.systemRepository.getDataAvailability(symbol);
+
+    // Map records to match Frontend expectations (BackfillPanel.jsx)
+    const mappedRecords = records.map(r => ({
+      ...r,
+      total_candles: r.total_records ? Number(r.total_records) : 0, // Frontend expects total_candles
+      earliest: r.first_date, // Frontend expects earliest
+      latest: r.last_date,    // Frontend expects latest
+    }));
+
+    // Calculate summary
+    const summary = {
+      totalSymbols: records.length,
+      totalRecords: records.reduce((sum, r) => sum + Number(r.total_records || 0), 0),
+      earliestDate: records.length ? records.reduce((min, r) => r.first_date < min ? r.first_date : min, records[0].first_date) : null,
+      latestDate: records.length ? records.reduce((max, r) => r.last_date > max ? r.last_date : max, records[0].last_date) : null,
+    };
+
+    return { summary, symbols: mappedRecords };
+  }
+
+  /**
+   * Get a specific backfill job by ID
+   * @param {string} jobId - The job UUID
+   */
+  async getBackfillJob(jobId) {
+    const job = await this.systemRepository.getBackfillJob(jobId);
+    if (!job) {
+      const error = new Error('Backfill job not found');
+      error.statusCode = 404;
+      throw error;
+    }
+    return job;
+  }
+
+  /**
+   * Get list of backfill jobs
+   * @param {string?} status - Optional status filter
+   * @param {number} limit - Max records
+   */
+  async getBackfillJobs(status = null, limit = 20) {
+    return this.systemRepository.getBackfillJobs(status, limit);
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // UPDATE METHODS (For Ingestion Layer HTTP Calls)
+  // ═══════════════════════════════════════════════════════════════
+
+  /**
+   * Update data availability after ingestion
+   * @param {Object} params - { symbol, timeframe, firstDate, lastDate, recordCount }
+   */
+  async updateDataAvailability(params) {
+    return this.systemRepository.updateDataAvailability(params);
+  }
+
+  /**
+   * Update backfill job status
+   * @param {string} jobId - The job UUID
+   * @param {Object} params - { status, processed, errors }
+   */
+  async updateBackfillJob(jobId, params) {
+    return this.systemRepository.updateBackfillJob(jobId, params);
+  }
+
+  /**
+   * Get symbols with data gaps
+   * @param {number} tradingDays - Number of trading days to check
+   */
+  async getSymbolsWithGaps(tradingDays = 5) {
+    const records = await this.systemRepository.getSymbolsWithGaps(tradingDays);
+    return records.map(r => r.symbol);
   }
 }
 

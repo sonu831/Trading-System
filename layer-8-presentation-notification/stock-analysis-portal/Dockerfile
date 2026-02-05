@@ -3,6 +3,10 @@ FROM node:20-alpine AS base
 # Install dependencies only when needed
 FROM base AS deps
 WORKDIR /app
+
+# Bypass SSL certificate verification (for corporate proxy/firewall)
+RUN npm config set strict-ssl false
+
 COPY package.json package-lock.json ./
 RUN npm install --frozen-lockfile || npm install
 

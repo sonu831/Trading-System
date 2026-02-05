@@ -41,3 +41,32 @@ docker exec -it timescaledb psql -U user -d trading
 ## Authors
 
 - **Yogendra Singh**
+
+## Backup & Disaster Recovery
+
+### 1. External Persistence
+Data is stored on the external drive at `/Volumes/Yogi-External/personal/trading-data`. This ensures data survives project deletions (`make clean`).
+
+### 2. Backup Strategies
+The system implements a 3-tier backup strategy:
+
+1.  **SQL Dumps (`make backup`)**:
+    *   Creates a `.sql` file in `./backups/`.
+    *   Best for portability (moving to cloud/other machines).
+    *   *Auto-Deduplication*: Automatically deletes duplicate or empty backups.
+
+2.  **File-Level Snapshots (`make snapshot`)**:
+    *   Copies the entire external data directory to `./backups/snapshots/`.
+    *   Best for instant, full-state recovery on the same machine.
+
+3.  **Automated Sync (`make auto-sync`)**:
+    *   Background daemon that syncs external data to your Local Mac (`~/trading-backups`) every 30 minutes.
+    *   Logs sync status and timestamps to the internal `backup_logs` table.
+    *   **Disaster Recovery**: If external drive fails, copied data exists on your laptop.
+
+### 3. Lifecycle Automation
+*   **Shutdown Hook**: Running `make down` automatically triggers a backup and a local sync to ensure safely before stopping containers.
+
+### 4. Restoration
+*   **Restore SQL**: `make restore` (Follow prompts).
+*   **Restore Snapshot**: Manually copy files from `backups/snapshots/` back to the external volume path.

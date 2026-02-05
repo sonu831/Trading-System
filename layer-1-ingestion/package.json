@@ -22,14 +22,17 @@
     "kafkajs": "^2.2.4",
     "kiteconnect": "^4.0.0",
     "luxon": "^3.7.2",
+    "node-cron": "^4.2.1",
     "otpauth": "^9.4.1",
+    "p-limit": "^3.1.0",
+    "pg": "^8.18.0",
+    "pino": "^9.6.0",
+    "pino-pretty": "^10.3.1",
     "prom-client": "^15.1.0",
     "redis": "^4.7.1",
     "ts-node": "^10.9.2",
     "typescript": "^5.9.3",
-    "ws": "^8.14.2",
-    "pino": "^9.6.0",
-    "pino-pretty": "^10.3.1"
+    "ws": "^8.14.2"
   },
   "devDependencies": {
     "eslint": "^8.56.0",

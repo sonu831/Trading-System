@@ -25,17 +25,54 @@ const path = require('path');
 const { fork } = require('child_process');
 
 const express = require('express');
+const cron = require('node-cron');
+const axios = require('axios');
 const { VendorFactory } = require('./vendors/factory');
 const { KafkaProducer } = require('./kafka/producer');
 const { Normalizer } = require('./normalizer');
 const { logger } = require('./utils/logger');
 const { metrics, register } = require('./utils/metrics');
 const client = require('prom-client');
+const redis = require('redis');
 const symbols = require('../config/symbols.json');
+
+// Import shared health-check library
+const { waitForAll, waitForKafka, waitForRedis, initHealthMetrics } = require('/app/shared/health-check');
+
+// Initialize health metrics with Prometheus registry for Grafana
+initHealthMetrics(register);
 
 // Initialize Express for health checks
 const app = express();
+app.use(express.json()); // Enable JSON body parsing
 const PORT = process.env.INGESTION_PORT || 3001;
+
+// Backend API URL (Layer 7 - Single Source of Truth)
+const BACKEND_API_URL = process.env.BACKEND_API_URL || 'http://backend-api:4000';
+
+// Helper for Backend API calls
+const backendApi = {
+  async triggerBackfill(params) {
+    const res = await axios.post(`${BACKEND_API_URL}/api/v1/system/backfill/trigger`, params);
+    return res.data?.data;
+  },
+  async getSymbolsWithGaps(days = 5) {
+    const res = await axios.get(`${BACKEND_API_URL}/api/v1/data/gaps?days=${days}`);
+    return res.data?.data?.symbols || [];
+  },
+  async getBackfillJob(jobId) {
+    const res = await axios.get(`${BACKEND_API_URL}/api/v1/backfill/${jobId}`);
+    return res.data?.data;
+  },
+  async updateBackfillJob(jobId, params) {
+    const res = await axios.patch(`${BACKEND_API_URL}/api/v1/backfill/${jobId}`, params);
+    return res.data?.data;
+  },
+  async updateDataAvailability(params) {
+    const res = await axios.put(`${BACKEND_API_URL}/api/v1/data/availability`, params);
+    return res.data?.data;
+  },
+};
 
 const httpRequestDurationMicroseconds = new client.Histogram({
   name: 'http_request_duration_seconds',
@@ -73,26 +110,26 @@ app.get('/metrics', async (req, res) => {
 let marketDataVendor;
 let kafkaProducer;
 let normalizer;
+let redisClient;
 
 /**
- * Wait for a dependency to be ready with retries
+ * Log to Redis Helper (Global)
  */
-async function waitForDependency(name, checkFn, maxRetries = 30, delayMs = 2000) {
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    try {
-      await checkFn();
-      logger.info(`✅ ${name} is ready (attempt ${attempt}/${maxRetries})`);
-      return true;
-    } catch (error) {
-      if (attempt === maxRetries) {
-        logger.error(`❌ ${name} failed to connect after ${maxRetries} attempts: ${error.message}`);
-        throw error;
-      }
-      logger.warn(`⏳ Waiting for ${name}... (attempt ${attempt}/${maxRetries}) - ${error.message}`);
-      await new Promise(resolve => setTimeout(resolve, delayMs));
-    }
+const logToRedis = async (message) => {
+  try {
+    if (!redisClient) return; // Skip if not ready
+    const timestamp = new Date().toLocaleTimeString();
+    const logEntry = `[${timestamp}] ${message}`;
+    await redisClient.lPush('system:layer1:logs', logEntry);
+    await redisClient.lTrim('system:layer1:logs', 0, 49);
+  } catch (e) {
+    logger.error('Failed to log to Redis', e);
   }
-}
+};
+
+
+// Note: Health check functions are now provided by the shared @trading-system/health-check library
+// See: /app/shared/health-check/README.md for usage
 
 /**
  * Initialize all services
@@ -104,56 +141,41 @@ async function initialize() {
   logger.info('╚════════════════════════════════════════════════════════════╝');
   logger.info('');
 
-  const redis = require('redis');
-  let redisClient;
+
 
   try {
     // ═══════════════════════════════════════════════════════════════
-    // PHASE 1: Wait for Infrastructure Dependencies
+    // PHASE 1: Wait for Infrastructure Dependencies (Shared Library)
     // ═══════════════════════════════════════════════════════════════
-    logger.info('📋 PHASE 1: Checking Infrastructure Dependencies...');
-    logger.info('─'.repeat(60));
+    const kafkaBrokers = process.env.KAFKA_BROKERS?.split(',') || ['localhost:9092'];
+    const kafkaTopic = process.env.KAFKA_TOPIC_RAW_TICKS || 'raw-ticks';
+    const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
 
-    // Wait for Redis to be ready
-    logger.info('🔄 Connecting to Redis...');
-    await waitForDependency('Redis', async () => {
-      redisClient = redis.createClient({
-        url: process.env.REDIS_URL || 'redis://localhost:6379',
-      });
-      redisClient.on('error', (err) => {
-        if (!err.message.includes('ECONNREFUSED')) {
-          logger.error('Redis Client Error', err);
-        }
-      });
-      await redisClient.connect();
-    });
+    // Use shared health-check library to wait for all dependencies
+    const { redis: connectedRedis } = await waitForAll({
+      kafka: {
+        brokers: kafkaBrokers,
+        topic: kafkaTopic,
+      },
+      redis: {
+        url: redisUrl,
+      },
+    }, { logger });
 
-    // Wait for Kafka to be ready
-    logger.info('🔄 Connecting to Kafka...');
+    // Use the connected Redis client from health check
+    redisClient = connectedRedis;
+
+    // Now connect the Kafka producer
+    logger.info('🔄 Connecting Kafka Producer...');
     kafkaProducer = new KafkaProducer({
-      brokers: process.env.KAFKA_BROKERS?.split(',') || ['localhost:9092'],
-      topic: process.env.KAFKA_TOPIC_RAW_TICKS || 'raw-ticks',
+      brokers: kafkaBrokers,
+      topic: kafkaTopic,
     });
 
-    await waitForDependency('Kafka', async () => {
-      await kafkaProducer.connect();
-    });
+    await kafkaProducer.connect();
+    logger.info('✅ Kafka Producer connected');
 
-    logger.info('');
-    logger.info('✅ PHASE 1 COMPLETE: All infrastructure dependencies ready!');
-    logger.info('─'.repeat(60));
-    logger.info('');
 
-    const logToRedis = async (message) => {
-      try {
-        const timestamp = new Date().toLocaleTimeString();
-        const logEntry = `[${timestamp}] ${message}`;
-        await redisClient.lPush('system:layer1:logs', logEntry);
-        await redisClient.lTrim('system:layer1:logs', 0, 49);
-      } catch (e) {
-        logger.error('Failed to log to Redis', e);
-      }
-    };
 
     await logToRedis('🚀 Layer 1 Ingestion Service Started');
 
@@ -236,148 +258,9 @@ async function initialize() {
     await logToRedis(`📡 Connected to MStock. ${statusText}`);
     logger.info(`🎯 Subscribed to ${subscriptionList.length} Nifty 50 symbols (Stream Mode)`);
 
-    const runScriptWithIPC = (scriptPath, args = []) => {
-      return new Promise((resolve, reject) => {
-        const child = fork(scriptPath, args, { stdio: 'inherit' });
 
-        child.on('message', (msg) => {
-          if (msg.type === 'metric') {
-            try {
-              // Direct lookup by key in the metrics object
-              const metric = metrics[msg.name];
-              if (metric) {
-                logger.debug(
-                  `📈 IPC Metric Update: ${msg.name} | ${JSON.stringify(msg.labels)} | +${msg.value || 1}`
-                );
-                if (metric.inc) metric.inc(msg.labels, msg.value || 1);
-                else if (metric.set) metric.set(msg.labels, msg.value || 1);
-                else if (metric.observe) metric.observe(msg.labels, msg.value || 1);
-              } else {
-                logger.warn(
-                  `⚠️ Metric ${msg.name} not found in parent. Available: ${Object.keys(metrics).join(', ')}`
-                );
-              }
-            } catch (err) {
-              logger.error(`Failed to update metric ${msg.name} from child`, err);
-            }
-          }
-        });
 
-        child.on('close', (code) => {
-          if (code === 0) resolve();
-          else reject(new Error(`Exit code ${code}`));
-        });
-      });
-    };
 
-    let isBackfilling = false;
-
-    const updateBackfillStatus = async (status, progress = 0, details = '') => {
-      try {
-        const statusObj = {
-          status, // 0:Idle, 1:Run, 2:Done, 3:Fail
-          progress,
-          details,
-          job_type: 'historical_backfill',
-          timestamp: Date.now(),
-        };
-        await redisClient.set('system:layer1:backfill', JSON.stringify(statusObj));
-
-        // Update Prometheus
-        if (status === 1 || status === 'running') {
-          metrics.batchJobStatus.set({ job_type: 'historical_backfill' }, 1);
-        } else if (status === 2 || status === 'completed') {
-          metrics.batchJobStatus.set({ job_type: 'historical_backfill' }, 2);
-        } else if (status === 3 || status === 'failed') {
-          metrics.batchJobStatus.set({ job_type: 'historical_backfill' }, 3);
-        } else {
-          metrics.batchJobStatus.set({ job_type: 'historical_backfill' }, 0);
-        }
-
-        if (progress > 0) {
-          metrics.batchJobProgress.set(
-            { job_type: 'historical_backfill', metric: 'percent' },
-            progress
-          );
-        }
-      } catch (e) {
-        logger.error('Failed to update backfill status', e);
-      }
-    };
-
-    const runBackfill = async (startParams = {}) => {
-      if (isBackfilling) {
-        logger.warn('⚠️ Backfill already in progress. Skipping...');
-        return;
-      }
-      isBackfilling = true;
-      try {
-        const startTime = Date.now();
-        const { fromDate, toDate, symbol } = startParams;
-        const symbolMsg = symbol ? `Symbol: ${symbol}` : 'All Symbols';
-        const dateMsg = fromDate && toDate ? `(${fromDate} to ${toDate})` : '(Last 5 Days)';
-
-        await updateBackfillStatus(1, 5, `Starting Backfill... ${symbolMsg} ${dateMsg}`);
-
-        // 1. Clean Data Directory
-        // logger.info('🧹 Cleaning up historical data directory...');
-        // try {
-        //   const fs = require('fs');
-        //   const dataDir = path.resolve(__dirname, '../data/historical');
-        //   if (fs.existsSync(dataDir)) {
-        //      const files = fs.readdirSync(dataDir);
-        //      for (const file of files) {
-        //        if (file.endsWith('.json')) {
-        //          fs.unlinkSync(path.join(dataDir, file));
-        //        }
-        //      }
-        //   }
-        // } catch (e) {
-        //   logger.warn(`Failed to clean directory: ${e.message}`);
-        // }
-
-        // 2. Run Batch Fetch
-        logger.info(`⏳ Step 1: Fetching Historical Data... ${symbolMsg} ${dateMsg}`);
-        await updateBackfillStatus(1, 10, `Fetching Data... ${symbolMsg}`);
-
-        const batchScript = path.resolve(__dirname, '../scripts/batch_nifty50.js');
-
-        // Construct Arguments based on params
-        const scriptArgs = [];
-        if (symbol) {
-          scriptArgs.push('--symbol', symbol);
-        }
-        if (fromDate && toDate) {
-          scriptArgs.push('--from', fromDate, '--to', toDate);
-        } else {
-          scriptArgs.push('--days', '5');
-        }
-
-        await runScriptWithIPC(batchScript, scriptArgs);
-
-        await updateBackfillStatus(1, 50, 'Step 1 Complete: Data Downloaded');
-
-        // 2. Feed Kafka
-        logger.info('⏳ Step 2: Feeding Data to Kafka...');
-        await updateBackfillStatus(1, 55, 'Feeding Data to Kafka...');
-        const feedScript = path.resolve(__dirname, '../scripts/feed_kafka.js');
-        await runScriptWithIPC(feedScript);
-
-        const duration = (Date.now() - startTime) / 1000;
-        metrics.batchJobDuration.observe(
-          { job_type: 'historical_backfill', status: 'success' },
-          duration
-        );
-
-        await updateBackfillStatus(2, 100, 'Backfill Complete');
-        logger.info('✅ Backfill Complete.');
-      } catch (err) {
-        await updateBackfillStatus(3, 0, err.message);
-        logger.error(`❌ Backfill Failed: ${err.message}`);
-      } finally {
-        isBackfilling = false;
-      }
-    };
 
     // --- Command Listener (Always Active) ---
     try {
@@ -404,94 +287,255 @@ async function initialize() {
     }
 
     // ═══════════════════════════════════════════════════════════════
-    // PHASE 3: Historical Data Sync (if market closed)
+    // PHASE 2.5: Scheduled Cron Job (Daily at 6:00 AM IST)
     // ═══════════════════════════════════════════════════════════════
     logger.info('');
-    logger.info('📋 PHASE 3: Historical Data Synchronization');
-    logger.info('─'.repeat(60));
+    logger.info('📋 Setting up Scheduled Backfill Job...');
+    
+    // 6:00 AM IST = 0:30 UTC (IST is UTC+5:30)
+    cron.schedule('30 0 * * 1-5', async () => {
+      logger.info('⏰ CRON: 6 AM IST - Triggering scheduled daily backfill...');
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      const fromDate = yesterday.toISOString().split('T')[0];
+      const toDate = new Date().toISOString().split('T')[0];
 
-    const skipSync = process.env.SKIP_HISTORICAL_SYNC === 'true';
-    const backfillYears = parseInt(process.env.BACKFILL_YEARS || '1', 10);
+      // runBackfill will create the job in Backend API automatically
+      runBackfill({ fromDate, toDate });
+    }, {
+      timezone: 'UTC'
+    });
+    logger.info('✅ Cron job scheduled: Daily at 6:00 AM IST (Mon-Fri)');
 
-    if (!marketHours.isMarketOpen()) {
-      if (skipSync) {
-        logger.info('');
-        logger.info('╔════════════════════════════════════════════════════════════╗');
-        logger.info('║  🌙 MARKET CLOSED - HISTORICAL SYNC SKIPPED                ║');
-        logger.info('║  Reason: SKIP_HISTORICAL_SYNC=true in .env                 ║');
-        logger.info('║  To enable: Set SKIP_HISTORICAL_SYNC=false                 ║');
-        logger.info('╚════════════════════════════════════════════════════════════╝');
-        logger.info('');
-        logger.info('📡 Service ready. Waiting for market to open or manual backfill command...');
+    // ═══════════════════════════════════════════════════════════════
+    // PHASE 2.6: Startup Gap Detection (Auto-Backfill) - DISABLED
+    // ═══════════════════════════════════════════════════════════════
+    // User Request: "REMOVE/COMMENT OUT the automatic execution of the backfill"
+    // The service should start and wait idly.
+    /*
+    logger.info('');
+    logger.info('📋 Checking for data gaps (Auto-Backfill)...');
+    
+    try {
+      const symbolsWithGaps = await backendApi.getSymbolsWithGaps(5);
+      if (symbolsWithGaps.length > 0) {
+        logger.info(`🔍 Found ${symbolsWithGaps.length} symbols with data gaps`);
+        setTimeout(async () => {
+          logger.info('🚀 Auto-triggering backfill for data gaps...');
+          await runBackfill({ days: 5 });
+        }, 30000);
       } else {
-        logger.info('');
-        logger.info('╔════════════════════════════════════════════════════════════╗');
-        logger.info('║  🌙 MARKET CLOSED - STARTING HISTORICAL DATA BACKFILL      ║');
-        logger.info('╚════════════════════════════════════════════════════════════╝');
-        logger.info('');
-
-        const currentYear = new Date().getFullYear();
-        const yearsToBackfill = [];
-
-        // Build list of years to backfill (most recent first)
-        for (let i = 0; i < backfillYears; i++) {
-          yearsToBackfill.push(currentYear - i);
-        }
-
-        logger.info(`📅 Backfill Strategy: ${backfillYears} year(s) of data`);
-        logger.info(`📅 Years to process: ${yearsToBackfill.join(', ')}`);
-        logger.info(`📊 Batch size: 1 minute candles, 100 ticks per request`);
-        logger.info(`📊 Processing: Day by Day → Month by Month → Year by Year`);
-        logger.info('─'.repeat(60));
-
-        let completedYears = 0;
-        const totalYears = yearsToBackfill.length;
-
-        for (const year of yearsToBackfill) {
-          const yearStartTime = Date.now();
-          completedYears++;
-
-          logger.info('');
-          logger.info(`╔════════════════════════════════════════════════════════════╗`);
-          logger.info(`║  📅 YEAR ${year} - Starting Backfill (${completedYears}/${totalYears})              ║`);
-          logger.info(`╚════════════════════════════════════════════════════════════╝`);
-
-          await runBackfill({
-            fromDate: `${year}-01-01`,
-            toDate: `${year}-12-31`
-          });
-
-          const yearDuration = ((Date.now() - yearStartTime) / 1000 / 60).toFixed(1);
-
-          logger.info('');
-          logger.info(`╔════════════════════════════════════════════════════════════╗`);
-          logger.info(`║  ✅ YEAR ${year} COMPLETE                                    ║`);
-          logger.info(`║  Duration: ${yearDuration} minutes                                     ║`);
-          logger.info(`║  Progress: ${completedYears}/${totalYears} years completed                          ║`);
-          logger.info(`╚════════════════════════════════════════════════════════════╝`);
-
-          // Log to Redis for UI visibility
-          await logToRedis(`✅ Year ${year} backfill complete (${completedYears}/${totalYears})`);
-        }
-
-        logger.info('');
-        logger.info('╔════════════════════════════════════════════════════════════╗');
-        logger.info('║  🎉 ALL HISTORICAL BACKFILLS COMPLETE!                     ║');
-        logger.info(`║  Total Years Processed: ${totalYears}                                   ║`);
-        logger.info('╚════════════════════════════════════════════════════════════╝');
-        logger.info('');
-
-        await logToRedis(`🎉 Historical backfill complete! ${totalYears} years of data ingested.`);
+        logger.info('✅ No significant data gaps detected');
       }
+    } catch (err) {
+      logger.warn(`⚠️ Gap detection skipped: ${err.message}`);
+    }
+    */
+
+    // ═══════════════════════════════════════════════════════════════
+    // PHASE 3: Historical Data Sync - DISABLED
+    // ═══════════════════════════════════════════════════════════════
+    // User Request: Disable startup scan entirely.
+    if (!marketHours.isMarketOpen()) {
+       logger.info('');
+       logger.info('╔════════════════════════════════════════════════════════════╗');
+       logger.info('║  🌙 MARKET CLOSED - SERVICE IDLE (Waiting for Trigger)     ║');
+       logger.info('╚════════════════════════════════════════════════════════════╝');
     } else {
-      logger.info('☀️ Market is OPEN - Skipping historical backfill');
-      logger.info('📡 Live data streaming active');
+       logger.info('☀️ Market is OPEN - Live Stream Active');
     }
   } catch (error) {
     logger.error('❌ Initialization failed:', error);
     process.exit(1);
   }
 }
+
+/* 
+ * =================================================================
+ * GLOBAL BACKFILL FUNCTIONS (Refactored out of initialize)
+ * =================================================================
+ */
+
+// Global state
+let isBackfilling = false;
+
+/**
+ * Execute a script file as a child process with IPC for metrics
+ */
+const runScriptWithIPC = (scriptPath, args = []) => {
+  return new Promise((resolve, reject) => {
+    const child = fork(scriptPath, args, { stdio: 'inherit' });
+
+    child.on('message', (msg) => {
+      if (msg.type === 'metric') {
+        try {
+          const metric = metrics[msg.name];
+          if (metric) {
+            logger.debug(
+              `📈 IPC Metric Update: ${msg.name} | ${JSON.stringify(msg.labels)} | +${msg.value || 1}`
+            );
+            if (metric.inc) metric.inc(msg.labels, msg.value || 1);
+            else if (metric.set) metric.set(msg.labels, msg.value || 1);
+            else if (metric.observe) metric.observe(msg.labels, msg.value || 1);
+          }
+        } catch (err) {
+          logger.error(`Failed to update metric ${msg.name} from child`, err);
+        }
+      }
+    });
+
+    child.on('close', (code) => {
+      if (code === 0) resolve();
+      else reject(new Error(`Exit code ${code}`));
+    });
+  });
+};
+
+/**
+ * Update Backfill Status in Redis & Prometheus
+ */
+const updateBackfillStatus = async (status, progress = 0, details = '') => {
+  try {
+    if (!redisClient) return; // Guard
+    const statusObj = {
+      status, // 0:Idle, 1:Run, 2:Done, 3:Fail
+      progress,
+      details,
+      job_type: 'historical_backfill',
+      timestamp: Date.now(),
+    };
+    await redisClient.set('system:layer1:backfill', JSON.stringify(statusObj));
+
+    // Update Prometheus
+    const statusVal = (status === 'running') ? 1 : (status === 'completed' ? 2 : (status === 'failed' ? 3 : status));
+    // Simplify mapping logic
+    metrics.batchJobStatus.set({ job_type: 'historical_backfill' }, typeof statusVal === 'number' ? statusVal : 0);
+
+    if (progress > 0) {
+      metrics.batchJobProgress.set(
+        { job_type: 'historical_backfill', metric: 'percent' },
+        progress
+      );
+    }
+  } catch (e) {
+    logger.error('Failed to update backfill status', e);
+  }
+};
+
+/**
+ * Run Historical Backfill Logic
+ */
+const runBackfill = async (startParams = {}) => {
+  if (isBackfilling) {
+    logger.warn('⚠️ Backfill already in progress. Skipping...');
+    return;
+  }
+  isBackfilling = true;
+  let jobId = startParams.jobId || null;
+
+  try {
+    const startTime = Date.now();
+    const { fromDate, toDate, symbol } = startParams;
+    const symbolMsg = symbol ? `Symbol: ${symbol}` : 'All Symbols';
+    const dateMsg = fromDate && toDate ? `(${fromDate} to ${toDate})` : '(Last 5 Days)';
+
+    // Create Job in Backend if missing
+    if (!jobId) {
+       try {
+         // Note: backendApi is global const
+         const jobResult = await backendApi.triggerBackfill({
+           symbol: symbol || null,
+           fromDate: fromDate || null,
+           toDate: toDate || null,
+         });
+         jobId = jobResult?.jobId;
+       } catch (err) {
+         logger.warn(`⚠️ Could not create job in Backend API: ${err.message}`);
+       }
+    }
+
+    await updateBackfillStatus(1, 5, `Starting Backfill... ${symbolMsg}`);
+
+    if (jobId) await backendApi.updateBackfillJob(jobId, { status: 'RUNNING', processed: 0 }).catch(() => {});
+
+    // Step 1: Fetch
+    logger.info(`⏳ Step 1: Fetching Data... ${symbolMsg}`);
+    await updateBackfillStatus(1, 10, 'Fetching Data...');
+    
+    // Scripts path relative to __dirname (which is src/)
+    const batchScript = path.resolve(__dirname, '../scripts/batch_nifty50.js');
+    const scriptArgs = [];
+    if (symbol) scriptArgs.push('--symbol', symbol);
+    if (fromDate && toDate) scriptArgs.push('--from', fromDate, '--to', toDate);
+    else scriptArgs.push('--days', '5');
+    if (jobId) scriptArgs.push('--job-id', jobId);
+    
+    // Pass Swarm Flag
+    if (startParams.useSwarm !== undefined) {
+      scriptArgs.push('--use-swarm', String(startParams.useSwarm));
+    }
+
+    await runScriptWithIPC(batchScript, scriptArgs);
+    await updateBackfillStatus(1, 50, 'Step 1 Complete');
+
+    // Step 2: Feed
+    logger.info('⏳ Step 2: Feeding Kafka...');
+    await updateBackfillStatus(1, 55, 'Feeding Kafka...');
+    const feedScript = path.resolve(__dirname, '../scripts/feed_kafka.js');
+    const feedArgs = symbol ? ['--symbol', symbol] : [];
+    await runScriptWithIPC(feedScript, feedArgs);
+
+    const duration = (Date.now() - startTime) / 1000;
+    metrics.batchJobDuration.observe({ job_type: 'historical_backfill', status: 'success' }, duration);
+    
+    await updateBackfillStatus(2, 100, 'Backfill Complete');
+    if (jobId) await backendApi.updateBackfillJob(jobId, { status: 'COMPLETED' }).catch(() => {});
+    
+    logger.info('✅ Backfill Complete.');
+    await logToRedis(`✅ Backfill Complete: ${symbolMsg}`);
+    
+  } catch (err) {
+    await updateBackfillStatus(3, 0, err.message);
+    if (jobId) await backendApi.updateBackfillJob(jobId, { status: 'FAILED' }).catch(() => {});
+    logger.error(`❌ Backfill Failed: ${err.message}`);
+  } finally {
+    isBackfilling = false;
+  }
+};
+
+// GLOBAL ROUTE DEFINITION
+// SWARM STATUS ENDPOINT (Added for Dashboard Visibility)
+app.get('/api/backfill/swarm/status', async (req, res) => {
+  if (!redisClient) {
+    return res.status(503).json({ error: 'Redis not available' });
+  }
+  try {
+    const status = await redisClient.get('system:layer1:swarm_status');
+    if (!status) {
+      return res.json({ status: 'IDLE', message: 'No active Swarm' });
+    }
+    return res.json(JSON.parse(status));
+  } catch (err) {
+    logger.error('Failed to get swarm status', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/backfill/historical', async (req, res) => {
+  try {
+    const { symbol, fromDate, toDate } = req.body;
+    // Allow null symbol -> "All Symbols"
+    // if (!symbol) return res.status(400).json({ error: 'Symbol is required' });
+
+    logger.info(`🎯 Received Historical Backfill Request: ${symbol}`);
+    runBackfill({ symbol, fromDate, toDate }).catch(err => logger.error('Backfill Error', err));
+
+    res.json({ success: true, message: `Started backfill for ${symbol}` });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 
 /**
  * Handle incoming tick data
@@ -533,18 +577,60 @@ app.get('/health', (req, res) => {
   res.json(health);
 });
 
-// Metrics endpoint for Prometheus
-app.get('/metrics', async (req, res) => {
-  res.set('Content-Type', register.contentType);
-  res.end(await register.metrics());
+// ═══════════════════════════════════════════════════════════════
+// API ENDPOINTS (Proxied to Backend API)
+// ═══════════════════════════════════════════════════════════════
+// Note: Main data APIs are in layer-7-backend-api (port 4000):
+//   - GET  /api/v1/data/availability
+//   - POST /api/v1/system/backfill/trigger
+//   - GET  /api/v1/backfill/:jobId
+//   - PATCH /api/v1/backfill/:jobId
+// The endpoints below are kept for backward compatibility but proxy to backend API.
+
+
+
+// POST /api/backfill - Proxy to backend API
+app.post('/api/backfill', async (req, res) => {
+  try {
+    const result = await backendApi.triggerBackfill(req.body);
+    res.json({ success: true, ...result });
+  } catch (err) {
+    logger.error('API backfill error:', err.message);
+    res.status(err.response?.status || 500).json({ error: err.message });
+  }
+});
+
+// GET /api/backfill/:jobId - Proxy to backend API
+app.get('/api/backfill/:jobId', async (req, res) => {
+  try {
+    const job = await backendApi.getBackfillJob(req.params.jobId);
+    res.json(job);
+  } catch (err) {
+    res.status(err.response?.status || 500).json({ error: err.message });
+  }
+});
+
+// GET /api/data-availability - Proxy to backend API
+app.get('/api/data-availability', async (req, res) => {
+  try {
+    const resp = await axios.get(`${BACKEND_API_URL}/api/v1/data/availability`);
+    res.json(resp.data?.data || {});
+  } catch (err) {
+    res.status(err.response?.status || 500).json({ error: err.message });
+  }
 });
 
 // Graceful shutdown
 async function shutdown() {
   logger.info('🛑 Shutting down gracefully...');
 
-  if (marketDataVendor) await marketDataVendor.disconnect();
-  if (kafkaProducer) await kafkaProducer.disconnect();
+  try {
+    if (marketDataVendor) await marketDataVendor.disconnect();
+    if (kafkaProducer) await kafkaProducer.disconnect();
+    if (redisClient) await redisClient.quit();
+  } catch (err) {
+    logger.error(`Shutdown error: ${err.message}`);
+  }
 
   process.exit(0);
 }

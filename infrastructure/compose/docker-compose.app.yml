@@ -4,17 +4,20 @@ services:
   # ===========================================
 
   # Layer 1: Ingestion
+  # Note: Application-level health checks wait for Kafka/Redis (see shared/health-check)
   ingestion:
     build:
       context: ../../layer-1-ingestion
       dockerfile: Dockerfile
     container_name: ingestion
     ports:
-      - '9101:9101'  # Metrics endpoint
+      - '9101:9101' # Metrics endpoint
     environment:
       - INGESTION_PORT=9101
       - KAFKA_BROKERS=kafka:29092
+      - KAFKA_TOPIC_RAW_TICKS=raw-ticks
       - REDIS_URL=redis://redis:6379
+      - BACKEND_API_URL=http://backend-api:4000
       - MARKET_DATA_PROVIDER=${MARKET_DATA_PROVIDER:-kite}
       - ZERODHA_API_KEY=${ZERODHA_API_KEY}
       - ZERODHA_ACCESS_TOKEN=${ZERODHA_ACCESS_TOKEN}
@@ -29,6 +32,7 @@ services:
       - SKIP_HISTORICAL_SYNC=false
     volumes:
       - ../../vendor:/app/vendor:ro
+      - ../../shared:/app/shared:ro
     networks:
       - trading-network
     restart: unless-stopped
@@ -61,18 +65,21 @@ services:
       - flattrade
 
   # Layer 2: Processing
+  # Note: Application-level health checks wait for Kafka/Redis/TimescaleDB (see shared/health-check)
   processing:
     build:
       context: ../../layer-2-processing
       dockerfile: Dockerfile
     container_name: processing
     ports:
-      - '3002:3002'  # Metrics endpoint
+      - '3002:3002' # Metrics endpoint
     environment:
       - PORT=3002
       - KAFKA_BROKERS=kafka:29092
       - REDIS_URL=redis://redis:6379
       - TIMESCALE_URL=postgresql://${POSTGRES_USER:-trading}:${POSTGRES_PASSWORD}@timescaledb:5432/${POSTGRES_DB:-nifty50}
+    volumes:
+      - ../../shared:/app/shared:ro
     networks:
       - trading-network
     restart: unless-stopped
@@ -145,6 +152,8 @@ services:
     environment:
       - REDIS_URL=redis://redis:6379
       - TIMESCALE_URL=postgresql://${POSTGRES_USER:-trading}:${POSTGRES_PASSWORD}@timescaledb:5432/${POSTGRES_DB:-nifty50}
+    volumes:
+      - ../../shared:/app/shared:ro
     networks:
       - trading-network
     restart: unless-stopped
@@ -169,6 +178,9 @@ services:
     environment:
       - REDIS_URL=redis://redis:6379
       - TIMESCALE_URL=postgresql://${POSTGRES_USER:-trading}:${POSTGRES_PASSWORD}@timescaledb:5432/${POSTGRES_DB:-nifty50}
+    volumes:
+      - ../../layer-7-core-interface/api/src:/app/src
+      - ../../shared:/app/shared:ro
     networks:
       - trading-network
     restart: unless-stopped
@@ -214,7 +226,7 @@ services:
     ports:
       - "11434:11434"
     volumes:
-      - ollama_data:/root/.ollama
+      - ../../data/ollama:/root/.ollama
     networks:
       - trading-network
     restart: unless-stopped
@@ -240,6 +252,3 @@ networks:
   trading-network:
     external: true
     name: local-trading-network
-
-volumes:
-  ollama_data:

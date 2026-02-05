@@ -11,7 +11,7 @@
 #
 # ===========================================================
 
-.PHONY: help up down infra app ui observe logs clean backup restore
+.PHONY: help up down infra wait-kafka app ui observe logs clean backup restore
 
 COMPOSE_DIR := infrastructure/compose
 DC := docker-compose --env-file .env
@@ -39,8 +39,14 @@ help:
 	@echo "� DATABASE"
 	@echo "  make backup         Backup TimescaleDB to ./backups/"
 	@echo "  make restore        Restore from latest backup"
+	@echo "  make snapshot       Backup external data (file-level)"
+	@echo "  make sync-local     Sync external data to local drive"
+	@echo "  make auto-sync      Start background sync daemon"
+	@echo "  make check-restore  Verify database content"
+	@echo "  make check-version  Check TimescaleDB version compatibility"
+	@echo "  make db-reset       Reset database (fresh start)"
 	@echo ""
-	@echo "� LOCAL DEV"
+	@echo "💻 LOCAL DEV"
 	@echo "  make layer[1-7]     Run specific layer locally (npm/go)"
 	@echo "  make dev            Start infrastructure for local dev"
 	@echo ""
@@ -54,13 +60,28 @@ help:
 # 2. LIFECYCLE MANAGEMENT
 # ===========================================================
 
-up: infra observe notify app ui check-restore
+up: infra wait-kafka observe notify app ui check-restore
 	@echo "🚀 Full stack running!"
-	@echo "   Dashboard: http://localhost:3000"
-	@echo "   API:       http://localhost:4000"
-	@echo "   Grafana:   http://localhost:3001"
+	@echo ""
+	@echo "🌐 Frontend:"
+	@echo "   - Dashboard:       http://localhost:3000"
+	@echo "   - Gateway:         http://localhost:8088"
+	@echo ""
+	@echo "🔌 APIs & Services:"
+	@echo "   - Backend API:     http://localhost:4000"
+	@echo "   - AI Service:      http://localhost:8000"
+	@echo "   - Email Service:   http://localhost:7001"
+	@echo "   - Telegram Bot:    http://localhost:7000"
+	@echo ""
+	@echo "📊 Observability:"
+	@echo "   - Grafana:         http://localhost:3001"
+	@echo "   - Prometheus:      http://localhost:9090"
+	@echo "   - Loki:            http://localhost:3100"
+	@echo ""
+	@echo "🔧 Infrastructure:"
+	@echo "   (Run 'make infra' to see DB/Kafka details)"
 
-down: backup
+down: backup sync-local
 	@echo "🛑 Stopping all containers..."
 	-$(DC) -f $(COMPOSE_DIR)/docker-compose.gateway.yml down
 	-$(DC) -f $(COMPOSE_DIR)/docker-compose.notify.yml down
@@ -94,10 +115,59 @@ stop-all:
 # 3. COMPONENT MANAGEMENT
 # ===========================================================
 
-infra:
+# Version check for cross-machine compatibility
+version-check:
+	@echo "🔍 Checking data version compatibility..."
+	@if [ -f /Volumes/Yogi-External/personal/trading-data/.version ]; then \
+		EXPECTED_VERSION=$$(grep TIMESCALEDB_VERSION /Volumes/Yogi-External/personal/trading-data/.version | cut -d= -f2); \
+		CONTAINER_VERSION=$$(docker run --rm timescale/timescaledb:2.24.0-pg15 psql --version 2>/dev/null | head -1 || echo "2.24.0"); \
+		echo "   Data expects: TimescaleDB $$EXPECTED_VERSION"; \
+		echo "   Container has: TimescaleDB 2.24.0"; \
+		if [ "$$EXPECTED_VERSION" != "2.24.0" ]; then \
+			echo "⚠️  VERSION MISMATCH! Data was created with $$EXPECTED_VERSION"; \
+			echo "   Options:"; \
+			echo "   1. Run 'make db-reset' to reset database (data loss!)"; \
+			echo "   2. Update docker-compose.infra.yml to use version $$EXPECTED_VERSION"; \
+			exit 1; \
+		fi; \
+	else \
+		echo "   No version file found (first run or legacy data)"; \
+	fi
+	@echo "✅ Version check passed!"
+
+infra: version-check
 	@echo "🔧 Starting Infrastructure..."
 	$(DC) -f $(COMPOSE_DIR)/docker-compose.infra.yml up -d --build
-	@echo "✅ Kafka: 9092 | Redis: 6379 | DB: 5432"
+	@echo "⏳ Waiting for TimescaleDB to be ready..."
+	@sleep 3
+	@echo "📝 Recording TimescaleDB version..."
+	@-docker exec timescaledb psql -U trading -d nifty50 -t -c \
+		"SELECT installed_version FROM pg_available_extensions WHERE name = 'timescaledb';" 2>/dev/null | \
+		tr -d '[:space:]' > /Volumes/Yogi-External/personal/trading-data/.tsdb_version 2>/dev/null || true
+	@echo "LAST_MACHINE=$$(hostname)" >> /Volumes/Yogi-External/personal/trading-data/.version 2>/dev/null || true
+	@echo "✅ Infrastructure Running:"
+	@echo "   - Kafka:           9092"
+	@echo "   - Kafka UI:        http://localhost:8090"
+	@echo "   - Redis:           6379"
+	@echo "   - Redis Commander: http://localhost:8085"
+	@echo "   - TimescaleDB:     5432 (v$$(cat /Volumes/Yogi-External/personal/trading-data/timescaledb/.tsdb_version 2>/dev/null || echo 'unknown'))"
+	@echo "   - PgAdmin:         http://localhost:5051"
+
+wait-kafka:
+	@echo "⏳ Waiting for Kafka to be healthy..."
+	@MAX_RETRIES=20; \
+	COUNTER=0; \
+	until docker exec kafka kafka-broker-api-versions --bootstrap-server localhost:9092 >/dev/null 2>&1; do \
+		COUNTER=$$((COUNTER + 1)); \
+		if [ $$COUNTER -ge $$MAX_RETRIES ]; then \
+			echo "❌ Kafka failed to become healthy after $$MAX_RETRIES attempts."; \
+			echo "💡 Tip: Run 'make fix-kafka' to resolve ClusterID inconsistency errors."; \
+			exit 1; \
+		fi; \
+		echo "   Kafka not ready yet ($$COUNTER/$$MAX_RETRIES), waiting..."; \
+		sleep 3; \
+	done
+	@echo "✅ Kafka is healthy!"
 
 app:
 	@echo "🚀 Starting Pipeline (L1-L6 + API)..."
@@ -145,7 +215,7 @@ ai-restart:
 	@echo "✅ AI Services restarted."
 
 ai-logs:
-	@docker-compose -f $(COMPOSE_DIR)/docker-compose.app.yml logs -f ai-inference ollama
+	@$(DC) -f $(COMPOSE_DIR)/docker-compose.app.yml logs -f ai-inference ollama
 
 # ===========================================================
 # 4. DATABASE OPERATIONS
@@ -154,9 +224,67 @@ ai-logs:
 backup:
 	@mkdir -p backups
 	@echo "💾 Backing up TimescaleDB..."
-	@docker exec timescaledb pg_dump -U trading nifty50 > ./backups/nifty50_$$(date +%Y%m%d_%H%M%S).sql
-	@echo "✅ Backup saved to ./backups/"
+	@FILE=./backups/nifty50_$$(date +%Y%m%d_%H%M%S).sql; \
+	docker exec timescaledb pg_dump -U trading nifty50 > $$FILE; \
+	if [ ! -s $$FILE ]; then \
+		echo "❌ Backup is empty! Deleting..."; \
+		rm $$FILE; \
+		exit 1; \
+	fi; \
+	LAST=$$(ls -1t backups/*.sql | grep -v "$$FILE" | head -1); \
+	if [ -n "$$LAST" ] && cmp -s "$$FILE" "$$LAST"; then \
+		echo "⚠️  Backup identical to last one. Deleting duplicate..."; \
+		rm $$FILE; \
+	else \
+		echo "✅ Backup saved: $$FILE"; \
+	fi
 	@ls -lh backups/*.sql | tail -5
+
+snapshot:
+	@mkdir -p backups/snapshots
+	@echo "📸 Creating file-level snapshot of external data..."
+	@SNAPSHOT_DIR=backups/snapshots/data_$$(date +%Y%m%d_%H%M%S); \
+	mkdir -p $$SNAPSHOT_DIR; \
+	cp -r /Volumes/Yogi-External/personal/trading-data/* $$SNAPSHOT_DIR/; \
+	echo "✅ Snapshot saved to $$SNAPSHOT_DIR"
+
+# Reset database for version mismatch recovery
+db-reset:
+	@echo "⚠️  DATABASE RESET - This will DELETE all TimescaleDB data!"
+	@read -p "Are you sure? Type 'yes' to confirm: " confirm && [ "$$confirm" = "yes" ] || exit 1
+	@echo "🛑 Stopping TimescaleDB..."
+	-$(DC) -f $(COMPOSE_DIR)/docker-compose.infra.yml stop timescaledb
+	@echo "🗑️  Deleting data directory..."
+	rm -rf /Volumes/Yogi-External/personal/trading-data/timescaledb/*
+	@echo "🚀 Starting fresh TimescaleDB..."
+	$(DC) -f $(COMPOSE_DIR)/docker-compose.infra.yml up -d timescaledb
+	@sleep 10
+	@echo "📦 Running migrations..."
+	@cd layer-3-storage/timescaledb/migrations && \
+		for f in *.sql; do \
+			echo "  Running $$f..."; \
+			docker exec -i timescaledb psql -U trading -d nifty50 < "$$f"; \
+		done
+	@echo "📝 Creating version file..."
+	@echo "TIMESCALEDB_VERSION=2.24.0" > /Volumes/Yogi-External/personal/trading-data/.version
+	@echo "POSTGRESQL_VERSION=15" >> /Volumes/Yogi-External/personal/trading-data/.version
+	@echo "SCHEMA_VERSION=004" >> /Volumes/Yogi-External/personal/trading-data/.version
+	@echo "CREATED_AT=$$(date +%Y-%m-%d)" >> /Volumes/Yogi-External/personal/trading-data/.version
+	@echo "LAST_MACHINE=$$(hostname)" >> /Volumes/Yogi-External/personal/trading-data/.version
+	@echo "✅ Database reset complete!"
+	@echo "💡 Run 'make up' to start the full system."
+
+sync-local:
+	@echo "🔄 Running automated sync to local drive..."
+	@./scripts/auto_sync.sh
+
+auto-sync:
+	@echo "🔄 Starting Auto-Sync Daemon (running every 30m)..."
+	@while true; do \
+		make sync-local; \
+		echo "💤 Sleeping for 30 minutes..."; \
+		sleep 1800; \
+	done
 
 restore:
 	@echo "📂 Available backups:"
@@ -175,13 +303,21 @@ restore:
 
 check-restore:
 	@echo "🔍 Checking if database is empty..."
-	@if ! docker exec timescaledb psql -U trading nifty50 -c "SELECT 1 FROM unified_data LIMIT 1;" >/dev/null 2>&1; then \
+	@if ! docker exec timescaledb psql -U trading nifty50 -c "SELECT 1 FROM instruments LIMIT 1;" >/dev/null 2>&1; then \
 		echo "⚠️  Database appears empty!"; \
-		echo "� You can restore data using: make restore"; \
+		echo "💡 You can restore data using: make restore"; \
 		echo "   Or run: make batch (to fetch fresh data)"; \
 	else \
-		COUNT=$$(docker exec timescaledb psql -U trading nifty50 -t -c "SELECT count(*) FROM unified_data;" | tr -d '[:space:]'); \
-		echo "✅ Database contains $$COUNT rows in unified_data."; \
+		COUNT=$$(docker exec timescaledb psql -U trading nifty50 -t -c "SELECT count(*) FROM instruments;" | tr -d '[:space:]'); \
+		echo "✅ Database contains $$COUNT rows in instruments."; \
+	fi
+
+version-check-manual:
+	@echo "🔍 Checking TimescaleDB version compatibility..."
+	@if [ -f /Volumes/Yogi-External/personal/trading-data/.version ]; then \
+		cat /Volumes/Yogi-External/personal/trading-data/.version; \
+	else \
+		echo "⚠️  No version file found"; \
 	fi
 
 # ===========================================================
@@ -199,6 +335,26 @@ feed:
 	@echo "📡 Feeding data to Kafka..."
 	cd layer-1-ingestion && node scripts/feed_kafka.js
 
+# Trigger backfill via Backend API (service must be running)
+# Usage: make backfill [SYMBOL=RELIANCE] [FROM=2024-01-01] [TO=2024-12-31]
+backfill:
+	@echo "📡 Triggering Backfill via Backend API..."
+	@curl -s -X POST http://localhost:4000/api/v1/system/backfill/trigger \
+		-H "Content-Type: application/json" \
+		-d '{"symbol":"$(SYMBOL)","fromDate":"$(FROM)","toDate":"$(TO)"}' | jq .
+	@echo "✅ Backfill job queued. Check status with: make backfill-status"
+
+# View data availability status via Backend API
+data-status:
+	@echo "📊 Data Availability Status..."
+	@curl -s http://localhost:4000/api/v1/data/availability | jq '.data.summary'
+
+# View backfill job history
+backfill-status:
+	@echo "📋 Backfill Jobs..."
+	@curl -s http://localhost:4000/api/v1/backfill | jq '.data.jobs[:5]'
+
+
 test:
 	cd layer-1-ingestion && npm test
 	cd layer-2-processing && npm test
@@ -209,40 +365,56 @@ test-layer1:
 # ===========================================================
 # 6. LOCAL DEVELOPMENT
 # ===========================================================
+# All layer targets load root .env for DATABASE_URL, REDIS_URL, KAFKA_BROKERS, etc.
 
 dev: infra
 	@echo "✅ Dev environment ready. Run layers manually."
 
 layer1:
-	cd layer-1-ingestion && npm run dev
+	@echo "🚀 Starting Layer 1 (Ingestion)..."
+	@export $$(cat .env | grep -v '^#' | xargs) && cd layer-1-ingestion && npm run dev
 
 layer2:
-	cd layer-2-processing && npm run dev
+	@echo "🚀 Starting Layer 2 (Processing)..."
+	@export $$(cat .env | grep -v '^#' | xargs) && cd layer-2-processing && npm run dev
 
 layer4:
-	cd layer-4-analysis && go run cmd/main.go
+	@echo "🚀 Starting Layer 4 (Analysis)..."
+	@export $$(cat .env | grep -v '^#' | xargs) && cd layer-4-analysis && go run cmd/main.go
 
 layer5:
-	cd layer-5-aggregation && go run cmd/main.go
+	@echo "🚀 Starting Layer 5 (Aggregation)..."
+	@export $$(cat .env | grep -v '^#' | xargs) && cd layer-5-aggregation && go run cmd/main.go
 
 layer6:
-	cd layer-6-signal && npm run dev
+	@echo "🚀 Starting Layer 6 (Signal)..."
+	@export $$(cat .env | grep -v '^#' | xargs) && cd layer-6-signal && npm run dev
 
 layer7-api:
-	cd layer-7-presentation-notification/api && npm run dev
+	@echo "🚀 Starting Layer 7 API (Presentation)..."
+	@export $$(cat .env | grep -v '^#' | xargs) && cd layer-7-presentation-notification/api && npm run dev
 
 layer7-dashboard:
-	cd layer-7-presentation-notification/stock-analysis-portal && npm run dev
+	@echo "🚀 Starting Layer 7 Dashboard..."
+	@export $$(cat .env | grep -v '^#' | xargs) && cd layer-7-presentation-notification/stock-analysis-portal && npm run dev
+
+layer-1-ingestion:
+	@echo "🚀 Starting Layer 1 (Ingestion)..."
+	@export $$(cat .env | grep -v '^#' | xargs) && cd layer-1-ingestion && npm run dev
+
+layer-7-backend-api:
+	@echo "🚀 Starting Backend API (Layer 7 Core Interface)..."
+	@export $$(cat .env | grep -v '^#' | xargs) && cd layer-7-core-interface/api && npm run dev
 
 # ===========================================================
 # 7. OBSERVABILITY & LOGS
 # ===========================================================
 
 logs:
-	docker-compose logs -f
+	$(DC) logs -f
 
 logs-%:
-	docker-compose logs -f $*
+	$(DC) logs -f $*
 
 # ===========================================================
 # 8. MAINTENANCE & CLEANUP
@@ -254,10 +426,9 @@ clean:
 	@echo "✅ Done."
 
 clean-data:
-	@echo "⚠️  This deletes ALL data!"
-	@read -p "Continue? [y/N] " c && [ "$$c" = "y" ] || exit 1
-	rm -rf data/*
-	@echo "✅ Data deleted."
+	@echo "⚠️  Data is stored externally at /Volumes/Yogi-External/personal/trading-data"
+	@echo "   To delete data, you must manually remove files in that directory."
+	@echo "   Action aborted for safety."
 
 prune:
 	@echo "⚠️  This will delete ALL stopped containers, unused images, and build cache!"

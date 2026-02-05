@@ -1,0 +1,562 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "description": "Nifty 50 Trading System - Infrastructure Health Dashboard",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 100,
+      "panels": [],
+      "title": "Overall System Health",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "uid": "prometheus-datasource"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [
+            {
+              "options": {
+                "0": {
+                  "color": "red",
+                  "index": 1,
+                  "text": "UNHEALTHY"
+                },
+                "1": {
+                  "color": "green",
+                  "index": 0,
+                  "text": "HEALTHY"
+                }
+              },
+              "type": "value"
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          }
+        }
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 1
+      },
+      "id": 1,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value_and_name"
+      },
+      "targets": [
+        {
+          "expr": "infrastructure_all_services_healthy",
+          "legendFormat": "All Services"
+        }
+      ],
+      "title": "System Status",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "uid": "prometheus-datasource"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [
+            {
+              "options": {
+                "0": {
+                  "color": "red",
+                  "index": 1,
+                  "text": "DOWN"
+                },
+                "1": {
+                  "color": "green",
+                  "index": 0,
+                  "text": "UP"
+                }
+              },
+              "type": "value"
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          }
+        }
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 6,
+        "y": 1
+      },
+      "id": 2,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value_and_name"
+      },
+      "targets": [
+        {
+          "expr": "infrastructure_kafka_healthy",
+          "legendFormat": "Kafka"
+        }
+      ],
+      "title": "Kafka",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "uid": "prometheus-datasource"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [
+            {
+              "options": {
+                "0": {
+                  "color": "red",
+                  "index": 1,
+                  "text": "DOWN"
+                },
+                "1": {
+                  "color": "green",
+                  "index": 0,
+                  "text": "UP"
+                }
+              },
+              "type": "value"
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          }
+        }
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 12,
+        "y": 1
+      },
+      "id": 3,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value_and_name"
+      },
+      "targets": [
+        {
+          "expr": "infrastructure_redis_healthy",
+          "legendFormat": "Redis"
+        }
+      ],
+      "title": "Redis",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "uid": "prometheus-datasource"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [
+            {
+              "options": {
+                "0": {
+                  "color": "red",
+                  "index": 1,
+                  "text": "DOWN"
+                },
+                "1": {
+                  "color": "green",
+                  "index": 0,
+                  "text": "UP"
+                }
+              },
+              "type": "value"
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          }
+        }
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 18,
+        "y": 1
+      },
+      "id": 4,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value_and_name"
+      },
+      "targets": [
+        {
+          "expr": "infrastructure_timescale_healthy",
+          "legendFormat": "TimescaleDB"
+        }
+      ],
+      "title": "TimescaleDB",
+      "type": "stat"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 5
+      },
+      "id": 101,
+      "panels": [],
+      "title": "Kafka Details",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "uid": "prometheus-datasource"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "short"
+        }
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 8,
+        "x": 0,
+        "y": 6
+      },
+      "id": 10,
+      "targets": [
+        {
+          "expr": "infrastructure_kafka_partitions",
+          "legendFormat": "{{topic}} - Total"
+        },
+        {
+          "expr": "infrastructure_kafka_partitions_with_leaders",
+          "legendFormat": "{{topic}} - With Leaders"
+        }
+      ],
+      "title": "Kafka Topic Partitions",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "uid": "prometheus-datasource"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "s"
+        }
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 8,
+        "x": 8,
+        "y": 6
+      },
+      "id": 11,
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.99, rate(infrastructure_kafka_connect_seconds_bucket[5m]))",
+          "legendFormat": "p99"
+        },
+        {
+          "expr": "histogram_quantile(0.95, rate(infrastructure_kafka_connect_seconds_bucket[5m]))",
+          "legendFormat": "p95"
+        },
+        {
+          "expr": "histogram_quantile(0.50, rate(infrastructure_kafka_connect_seconds_bucket[5m]))",
+          "legendFormat": "p50"
+        }
+      ],
+      "title": "Kafka Connection Latency",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "uid": "prometheus-datasource"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "short"
+        }
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 8,
+        "x": 16,
+        "y": 6
+      },
+      "id": 12,
+      "targets": [
+        {
+          "expr": "rate(infrastructure_kafka_retries_total[5m])",
+          "legendFormat": "Retry Rate"
+        }
+      ],
+      "title": "Kafka Connection Retries",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 12
+      },
+      "id": 102,
+      "panels": [],
+      "title": "Database & Cache Latency",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "uid": "prometheus-datasource"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "s"
+        }
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 12,
+        "x": 0,
+        "y": 13
+      },
+      "id": 20,
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.99, rate(infrastructure_redis_connect_seconds_bucket[5m]))",
+          "legendFormat": "Redis p99"
+        },
+        {
+          "expr": "histogram_quantile(0.99, rate(infrastructure_timescale_connect_seconds_bucket[5m]))",
+          "legendFormat": "TimescaleDB p99"
+        }
+      ],
+      "title": "Connection Latency (p99)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "uid": "prometheus-datasource"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "short"
+        }
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 12,
+        "x": 12,
+        "y": 13
+      },
+      "id": 21,
+      "targets": [
+        {
+          "expr": "rate(infrastructure_redis_retries_total[5m])",
+          "legendFormat": "Redis Retries"
+        },
+        {
+          "expr": "rate(infrastructure_timescale_retries_total[5m])",
+          "legendFormat": "TimescaleDB Retries"
+        }
+      ],
+      "title": "Connection Retry Rate",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 19
+      },
+      "id": 103,
+      "panels": [],
+      "title": "Service Startup",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "uid": "prometheus-datasource"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "s"
+        }
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 24,
+        "x": 0,
+        "y": 20
+      },
+      "id": 30,
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.99, rate(infrastructure_startup_seconds_bucket[1h]))",
+          "legendFormat": "Startup Time p99"
+        },
+        {
+          "expr": "histogram_quantile(0.50, rate(infrastructure_startup_seconds_bucket[1h]))",
+          "legendFormat": "Startup Time p50"
+        }
+      ],
+      "title": "Service Startup Duration",
+      "type": "timeseries"
+    }
+  ],
+  "refresh": "10s",
+  "schemaVersion": 38,
+  "tags": ["infrastructure", "health", "nifty50"],
+  "templating": {
+    "list": []
+  },
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "Infrastructure Health",
+  "uid": "infrastructure-health",
+  "version": 1,
+  "weekStart": ""
+}

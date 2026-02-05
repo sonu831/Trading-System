@@ -28,26 +28,45 @@ const Navbar = ({ viewMode, setViewMode, systemStatus = 'ONLINE' }) => {
         <ThemeToggle />
 
         <div className="flex items-center gap-4">
-          <button
-            onClick={() => dispatch(setBackfillModalOpen(true))}
-            disabled={systemStatus === 'OFFLINE'}
+          <Link
+            href="/backfill"
             className={`
               relative group overflow-hidden px-5 py-2 rounded-lg font-bold text-sm transition-all duration-300 shadow-md transform hover:-translate-y-0.5
               ${
                 systemStatus === 'OFFLINE'
-                  ? 'bg-gray-800 text-gray-500 cursor-not-allowed shadow-none'
-                  : 'bg-gradient-to-r from-indigo-600 to-indigo-500 text-white hover:shadow-indigo-500/25 border border-indigo-400/20'
+                  ? 'bg-gray-800 text-gray-500 cursor-not-allowed shadow-none pointer-events-none'
+                  : 'bg-gradient-to-r from-emerald-600 to-emerald-500 text-white hover:shadow-emerald-500/25 border border-emerald-400/20'
               }
             `}
-            title="Manage Historical Data"
+            title="Manage Data"
           >
             <div className="relative z-10 flex items-center gap-2">
               <span className="text-lg">📥</span>
-              <span>Backfill Manager</span>
+              <span>Backfill Data</span>
+            </div>
+            {/* Hover Glow Effect */}
+            <div className="absolute inset-0 bg-gradient-to-r from-emerald-400/0 via-white/20 to-emerald-400/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700 ease-in-out"></div>
+          </Link>
+
+          <Link
+            href="/swarm"
+            className={`
+              relative group overflow-hidden px-5 py-2 rounded-lg font-bold text-sm transition-all duration-300 shadow-md transform hover:-translate-y-0.5
+              ${
+                systemStatus === 'OFFLINE'
+                  ? 'bg-gray-800 text-gray-500 cursor-not-allowed shadow-none pointer-events-none'
+                  : 'bg-gradient-to-r from-indigo-600 to-indigo-500 text-white hover:shadow-indigo-500/25 border border-indigo-400/20'
+              }
+            `}
+            title="Swarm Monitor"
+          >
+            <div className="relative z-10 flex items-center gap-2">
+              <span className="text-lg">🐝</span>
+              <span>Swarm Monitor</span>
             </div>
             {/* Hover Glow Effect */}
             <div className="absolute inset-0 bg-gradient-to-r from-indigo-400/0 via-white/20 to-indigo-400/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700 ease-in-out"></div>
-          </button>
+          </Link>
 
           <div className="flex bg-background border border-border rounded-lg p-1 gap-1">
             <button

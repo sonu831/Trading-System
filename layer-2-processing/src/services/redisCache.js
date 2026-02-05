@@ -1,26 +1,41 @@
 const { createClient } = require('redis');
+const logger = require('../utils/logger');
 
 const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
 
 let client = null;
 
 /**
- * Connect to Redis
+ * Connect to Redis with retries
  */
-async function connectRedis() {
-  try {
-    client = createClient({ url: REDIS_URL });
+async function connectRedis(maxRetries = 20, delayMs = 3000) {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      client = createClient({ url: REDIS_URL });
 
-    client.on('error', (err) => {
-      console.error('❌ Redis Client Error:', err.message);
-    });
+      client.on('error', (err) => {
+        // Only log non-connection errors (connection errors handled in retry loop)
+        if (!err.message.includes('ECONNREFUSED')) {
+          logger.error({ err }, 'Redis Client Error');
+        }
+      });
 
-    await client.connect();
-    console.log(`✅ Connected to Redis: ${REDIS_URL}`);
-    return client;
-  } catch (err) {
-    console.error('❌ Failed to connect to Redis:', err.message);
-    throw err;
+      await client.connect();
+      logger.info(`Connected to Redis: ${REDIS_URL}`);
+      return client;
+    } catch (err) {
+      if (attempt === maxRetries) {
+        logger.error({ err }, `Failed to connect to Redis after ${maxRetries} attempts`);
+        throw err;
+      }
+      logger.info(`Waiting for Redis... (${attempt}/${maxRetries}) - ${err.message}`);
+      // Clean up failed client before retrying
+      if (client) {
+        try { await client.quit(); } catch (e) { /* ignore */ }
+        client = null;
+      }
+      await new Promise(resolve => setTimeout(resolve, delayMs));
+    }
   }
 }
 
@@ -49,7 +64,7 @@ async function setLatestPrice(symbol, data) {
   try {
     await client.set(key, JSON.stringify(data), { EX: 60 });
   } catch (err) {
-    console.error(`❌ Redis SET failed for ${key}: ${err.message}`);
+    logger.error({ err, key }, 'Redis SET failed');
   }
 }
 
@@ -66,7 +81,7 @@ async function getLatestPrice(symbol) {
     const data = await client.get(key);
     return data ? JSON.parse(data) : null;
   } catch (err) {
-    console.error(`❌ Redis GET failed for ${key}: ${err.message}`);
+    logger.error({ err, key }, 'Redis GET failed');
     return null;
   }
 }
@@ -86,7 +101,7 @@ async function setLatestCandle(symbol, interval, candle) {
   try {
     await client.set(key, JSON.stringify(candle), { EX: 120 });
   } catch (err) {
-    console.error(`❌ Redis SET failed for ${key}: ${err.message}`);
+    logger.error({ err, key }, 'Redis SET failed');
   }
 }
 
@@ -96,7 +111,7 @@ async function setLatestCandle(symbol, interval, candle) {
 async function disconnectRedis() {
   if (client) {
     await client.quit();
-    console.log('🛑 Redis disconnected.');
+    logger.info('Redis disconnected');
   }
 }
 
@@ -112,7 +127,7 @@ module.exports = {
     try {
       await client.set('system:layer2:metrics', JSON.stringify(metrics));
     } catch (e) {
-      console.error('Metric Publish Error', e);
+      logger.error({ err: e }, 'Metric publish error');
     }
   },
 };

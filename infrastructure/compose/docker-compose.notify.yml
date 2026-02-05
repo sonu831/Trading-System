@@ -12,7 +12,7 @@ services:
       dockerfile: Dockerfile
     container_name: telegram-bot
     ports:
-      - '9104:7000'  # Metrics endpoint (host:container)
+      - '9104:7000' # Metrics endpoint (host:container)
     environment:
       - PORT=7000
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
@@ -49,6 +49,10 @@ services:
       - KAFKA_NOTIFICATION_TOPIC=notifications
       - KAFKA_NOTIFICATION_DLQ_TOPIC=notifications-dlq
       - KAFKA_ENABLED=${KAFKA_NOTIFICATIONS_ENABLED:-true}
+      - KAFKA_ENABLED=${KAFKA_NOTIFICATIONS_ENABLED:-true}
+      - KAFKAJS_NO_PARTITIONER_WARNING=1
+    volumes:
+      - ../../shared:/app/shared:ro
     networks:
       - trading-network
     restart: unless-stopped

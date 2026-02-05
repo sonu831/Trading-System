@@ -6,6 +6,7 @@ import HistoricalView from '@/components/features/Historical';
 import { useDashboard } from '@/hooks';
 import { selectPipelineStatus } from '@/store/slices/systemSlice';
 import { BackfillProgress } from '@/components/features/Backfill';
+import SwarmNotification from '@/components/features/Backfill/SwarmNotification';
 
 export default function Home() {
   const { marketView, signals, systemStatus, loading, viewMode, setViewMode } = useDashboard();
@@ -22,6 +23,9 @@ export default function Home() {
 
   return (
     <AppLayout viewMode={viewMode} setViewMode={setViewMode} systemStatus={systemStatus}>
+      {/* Global Swarm Notification */}
+      <SwarmNotification />
+
       {/* Backfill Progress Indicator */}
       {backfillData &&
         (backfillData.status === 'running' ||

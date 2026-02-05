@@ -33,6 +33,7 @@ const invalidTicksCounter = new client.Counter({
 const websocketConnections = new client.Gauge({
   name: 'websocket_connections_active',
   help: 'Active WebSocket connections',
+  labelNames: ['vendor', 'status'],
   registers: [register],
 });
 

@@ -1,5 +1,6 @@
 const { Pool } = require('pg');
 const dotenv = require('dotenv');
+const logger = require('../utils/logger');
 
 dotenv.config();
 
@@ -13,29 +14,38 @@ const pool = new Pool({
   connectionTimeoutMillis: 10000,
 });
 
-pool.on('error', (err, client) => {
-  console.error('❌ Unexpected error on idle DB client', err);
+pool.on('error', (err) => {
+  logger.error({ err }, 'Unexpected error on idle DB client');
   process.exit(-1);
 });
 
-async function connectDB() {
-  try {
-    const client = await pool.connect();
-    console.log('✅ Connected to TimescaleDB');
+/**
+ * Wait for TimescaleDB to be ready with retries
+ */
+async function connectDB(maxRetries = 20, delayMs = 3000) {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      const client = await pool.connect();
+      logger.info('Connected to TimescaleDB');
 
-    // Verify schema exists
-    const res = await client.query("SELECT to_regclass('public.candles_1m');");
-    if (res.rows[0].to_regclass) {
-      console.log("✅ 'candles_1m' hypertable verified.");
-    } else {
-      console.warn("⚠️ 'candles_1m' table NOT found. Please run migrations.");
+      // Verify schema exists
+      const res = await client.query("SELECT to_regclass('public.candles_1m');");
+      if (res.rows[0].to_regclass) {
+        logger.info("'candles_1m' hypertable verified");
+      } else {
+        logger.warn("'candles_1m' table NOT found. Please run migrations.");
+      }
+
+      client.release();
+      return; // Success - exit the retry loop
+    } catch (err) {
+      if (attempt === maxRetries) {
+        logger.error({ err }, `Failed to connect to TimescaleDB after ${maxRetries} attempts`);
+        throw err;
+      }
+      logger.info(`Waiting for TimescaleDB... (${attempt}/${maxRetries}) - ${err.message}`);
+      await new Promise(resolve => setTimeout(resolve, delayMs));
     }
-
-    client.release();
-  } catch (err) {
-    console.error('❌ Failed to connect to TimescaleDB:', err.message);
-    // Do not exit, allow retry logic in main loop if needed, or let Docker restart
-    throw err;
   }
 }
 

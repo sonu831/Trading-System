@@ -36,9 +36,8 @@ class KafkaProducer {
 
     this.producer = this.kafka.producer({
       allowAutoTopicCreation: true,
-      idempotent: true, // Enable exactly-once semantics
-      transactionalId: 'ingestion-producer',
-      maxInFlightRequests: 5,
+      // Removed idempotent and transactionalId - causes hangs in single-broker setup
+      // acks: 1 means leader acknowledgment only (faster, suitable for market data)
     });
   }
 

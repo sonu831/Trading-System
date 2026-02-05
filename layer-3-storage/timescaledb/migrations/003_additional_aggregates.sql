@@ -75,7 +75,7 @@ GROUP BY time_bucket('1 week', time), symbol, exchange
 WITH NO DATA;
 
 SELECT add_continuous_aggregate_policy('candles_weekly',
-    start_offset => INTERVAL '2 weeks',
+    start_offset => INTERVAL '1 month',
     end_offset => INTERVAL '1 week',
     schedule_interval => INTERVAL '1 day',
     if_not_exists => TRUE

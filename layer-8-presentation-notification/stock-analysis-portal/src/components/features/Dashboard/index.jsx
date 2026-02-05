@@ -67,12 +67,6 @@ const DashboardView = ({ marketView, signals, loading }) => {
         >
           Live Signals ({signals.length})
         </button>
-        <button
-          onClick={() => setShowBackfill(true)}
-          className="px-4 md:px-6 py-3 text-sm font-medium border-b-2 border-transparent text-text-tertiary hover:text-text-primary flex items-center gap-2"
-        >
-          📥 Backfill Data
-        </button>
         <a
           href="/system"
           className="px-4 md:px-6 py-3 text-sm font-medium border-b-2 border-transparent text-text-tertiary hover:text-text-primary"

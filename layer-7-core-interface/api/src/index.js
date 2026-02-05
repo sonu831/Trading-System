@@ -1,4 +1,10 @@
 require('dotenv').config();
+
+// Fix BigInt JSON serialization (required for Prisma BigInt fields)
+BigInt.prototype.toJSON = function() {
+  return Number(this);
+};
+
 const fastify = require('fastify')({
   logger: {
     level: 'info',
@@ -18,6 +24,7 @@ const fastify = require('fastify')({
   },
 });
 const container = require('./container');
+const { waitForAll } = require('/app/shared/health-check');
 
 // Decorate Fastify with DI Container
 fastify.decorate('container', container);
@@ -68,9 +75,6 @@ const redis = require('./redis/client');
 fastify.register(require('@fastify/cors'), {
   origin: true,
 });
-
-// Register backfill routes
-fastify.register(require('./routes/backfill'));
 
 // Register WebSocket Plugin (Real-Time)
 fastify.register(require('./plugins/websocket'));
@@ -133,7 +137,7 @@ fastify.get('/health', async (request, reply) => {
 fastify.register(require('./modules/signals/routes'));
 fastify.register(require('./modules/system/routes'));
 fastify.register(require('./modules/market/routes'));
-fastify.register(require('./modules/data/routes'));
+// fastify.register(require('./modules/data/routes'));
 fastify.register(require('./modules/analysis/routes'));
 
 // Suggestions Endpoint (Refactored to Prisma) -> Leaving inline as it belongs to User Domain (next phase)
@@ -192,6 +196,19 @@ fastify.post('/api/v1/subscribers', async (req, reply) => {
 
 const start = async () => {
   try {
+    // Wait for Infrastructure Dependencies
+    const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
+    const timescaleUrl = process.env.TIMESCALE_URL || 'postgresql://user:pass@timescaledb:5432/db';
+
+    // Initialize metrics with Global Registry (used by fastify-metrics/prom-client)
+    const { initHealthMetrics } = require('/app/shared/health-check');
+    initHealthMetrics(promClient.register);
+
+    await waitForAll({
+      redis: { url: redisUrl },
+      timescale: { connectionString: timescaleUrl },
+    }, { logger: fastify.log });
+
     await redis.connect();
     // DB Schema Init via Prisma Migration usually, but we check connection
     // Prisma client connects lazily or on first request.
@@ -203,5 +220,20 @@ const start = async () => {
     process.exit(1);
   }
 };
+
+// Graceful shutdown
+async function shutdown() {
+  fastify.log.info('Shutting down Layer 7...');
+  try {
+    await fastify.close();
+    await redis.disconnect();
+  } catch (err) {
+    fastify.log.error(err, 'Shutdown error');
+  }
+  process.exit(0);
+}
+
+process.on('SIGTERM', shutdown);
+process.on('SIGINT', shutdown);
 
 start();

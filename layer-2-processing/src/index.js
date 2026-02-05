@@ -13,6 +13,9 @@ const express = require('express');
 const client = require('prom-client');
 const logger = require('./utils/logger'); // Import Logger
 
+// Import shared health-check library
+const { waitForAll, initHealthMetrics } = require('/app/shared/health-check');
+
 const { connectDB, pool } = require('./db/client');
 const { startConsumer, stopConsumer } = require('./kafka/consumer');
 const { insertCandle } = require('./services/candleWriter');
@@ -137,10 +140,35 @@ async function main() {
   });
 
   try {
-    // 2. Connect to Database
-    await connectDB();
+    // 2. Wait for Infrastructure Dependencies (Shared Library)
+    // ═══════════════════════════════════════════════════════════════
+    const kafkaBrokers = (process.env.KAFKA_BROKERS || 'localhost:9092').split(',');
+    const kafkaTopic = process.env.KAFKA_TOPIC || 'raw-ticks';
+    const redisUrl = process.env.REDIS_URL || 'redis://redis:6379';
+    const timescaleUrl = process.env.TIMESCALE_URL || 'postgresql://user:pass@timescaledb:5432/db';
 
-    // 3. Connect to Redis
+    // Initialize metrics
+    initHealthMetrics(register);
+
+    const { redis: connectedRedis, timescale: connectedPgPool } = await waitForAll({
+      kafka: {
+        brokers: kafkaBrokers,
+        topic: kafkaTopic,
+      },
+      redis: {
+        url: redisUrl,
+      },
+      timescale: {
+        connectionString: timescaleUrl,
+        requiredTables: ['candles_1m'],
+      },
+    }, { logger });
+
+    // Use the connected clients (or reuse existing modules if they manage their own state)
+    // For this service, we already have modules managing singletons, so we just let them connect now that we know infra is ready.
+    // Ideally, we would inject these clients, but for minimal refactor, we let existing modules connect.
+
+    await connectDB(); // Might reuse the pool from waitForAll if refactored, but here we just wait.
     await connectRedis();
 
     // 4. Start Kafka Consumer

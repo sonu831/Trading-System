@@ -4,6 +4,7 @@ data/
 node_modules/
 dist/
 coverage/
+backups/
 
 # Environment files
 .env

@@ -10,7 +10,7 @@ services:
       - '9090:9090'
     volumes:
       - ../monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
-      - prometheus-data:/prometheus
+      - ../../data/prometheus:/prometheus
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
@@ -25,7 +25,7 @@ services:
       - '3001:3000'
     environment:
       GF_SECURITY_ADMIN_USER: ${GRAFANA_USER:-admin}
-      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD}  # REQUIRED: Set in .env file
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD} # REQUIRED: Set in .env file
       GF_USERS_ALLOW_SIGN_UP: 'false'
       # Direct access on port 3001
       GF_SERVER_DOMAIN: 'localhost'
@@ -36,7 +36,7 @@ services:
       GF_AUTH_ANONYMOUS_ENABLED: 'false'
 
     volumes:
-      - grafana-data:/var/lib/grafana
+      - ../../data/grafana:/var/lib/grafana
       - ../monitoring/grafana/provisioning:/etc/grafana/provisioning
       - ../monitoring/grafana/dashboards:/var/lib/grafana/dashboards
     depends_on:
@@ -128,13 +128,10 @@ services:
     command: -config.file=/etc/promtail/config.yaml
     networks:
       - trading-network
+    # ===========================================
+    # VOLUMES
+    # ===========================================
 
-# ===========================================
-# VOLUMES
-# ===========================================
-volumes:
-  prometheus-data:
-  grafana-data:
 
     # ===========================================
     # NETWORKS (External - shared with infra)

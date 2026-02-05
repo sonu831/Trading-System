@@ -898,6 +898,66 @@ MIT License - See [LICENSE](LICENSE) file for details.
 
 ---
 
+## Swarm Mode (Parallel Historical Backfill)
+
+For large historical data downloads (>35 days), the system activates **Swarm Mode** — a parallel fetching strategy that dramatically reduces backfill time.
+
+### How It Works
+
+1. `TimeSlicer` splits the date range into monthly (or weekly) partitions
+2. Each partition is fetched in parallel using `p-limit` concurrency control (max 12 workers)
+3. Each worker further chunks its partition into API-safe sizes via `HistoricalChunker` (max 1000 candles per request)
+4. Results are merged and sorted chronologically
+5. Failed partitions are retried up to 3 times with exponential backoff
+
+### Triggering a Backfill
+
+```bash
+# Via API
+curl -X POST http://localhost:4000/api/v1/system/backfill/trigger \
+  -H "Content-Type: application/json" \
+  -d '{"symbol": "RELIANCE", "fromDate": "2024-01-01", "toDate": "2024-12-31"}'
+
+# Via Makefile (all 50 stocks)
+make batch
+
+# Via Makefile (single stock)
+make batch-symbol SYMBOL=RELIANCE
+```
+
+### Monitoring Swarm Progress
+
+- **Redis Key**: `system:layer1:swarm_status` (real-time partition status)
+- **API**: `GET /api/v1/system/backfill/swarm/status`
+- **Dashboard**: Swarm Monitor page at `/swarm`
+
+---
+
+## Historical Bug Fixes & Lessons Learned
+
+### The "50% Data Loss" Bug (Resolved)
+
+**Problem**: During backfill operations, approximately 50% of candle data was silently lost.
+
+**Root Cause**: The `candles_1m` TimescaleDB hypertable had no unique constraint on `(time, symbol)`. When duplicate candles were inserted (from overlapping chunks or retries), PostgreSQL would throw a duplicate key error that killed the entire batch transaction, losing all candles in that batch.
+
+**Fix** (Migration `004_backup_logs.sql`):
+- Added `UNIQUE(time, symbol)` constraint to `candles_1m`
+- Changed all INSERT statements to use `ON CONFLICT DO NOTHING`
+- Implemented smart gap detection in `batch_nifty50.js` to skip already-fetched date ranges
+
+### The "Midnight Bug" (Resolved)
+
+**Problem**: Historical data API calls returned 0 candles for valid date ranges.
+
+**Root Cause**: The MStock API interprets bare dates (e.g., `2025-01-02`) as midnight (`00:00:00`), which is before market open (09:15). When `toDate` was midnight, the range `09:15 → 00:00` was empty.
+
+**Fix**: `HistoricalChunker` now always appends explicit times:
+- `fromDate` → `YYYY-MM-DD 09:15:00` (market open)
+- `toDate` → `YYYY-MM-DD 15:30:00` (market close)
+
+---
+
 ## Support
 
 - **Documentation**: See [ARCHITECTURE.md](ARCHITECTURE.md) for technical details

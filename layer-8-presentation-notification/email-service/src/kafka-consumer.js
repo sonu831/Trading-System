@@ -37,8 +37,8 @@ class EmailKafkaConsumer {
 
     this.consumer = this.kafka.consumer({
       groupId: 'email-notification-consumer',
-      sessionTimeout: 30000,
-      heartbeatInterval: 3000,
+      sessionTimeout: 60000,
+      heartbeatInterval: 10000,
     });
 
     this.producer = this.kafka.producer({

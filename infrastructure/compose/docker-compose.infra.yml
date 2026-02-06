@@ -131,23 +131,45 @@ services:
     command:
       - postgres
       - -c
-      - shared_buffers=1GB
+      - shared_buffers=6GB # ULTRA: 35-40% of 16GB RAM
       - -c
-      - effective_cache_size=3GB
+      - effective_cache_size=14GB # ULTRA: Assume full system cache usage
       - -c
-      - work_mem=64MB
+      - work_mem=256MB # ULTRA: High memory for complex sorts
       - -c
-      - maintenance_work_mem=512MB
+      - maintenance_work_mem=4GB # ULTRA: Super fast vacuums/indexes
       - -c
-      - max_wal_size=2GB
+      - max_wal_size=8GB # ULTRA: Reduce checkpoint frequency
       - -c
       - checkpoint_completion_target=0.9
       - -c
-      - random_page_cost=1.1
+      - random_page_cost=1.0 # ULTRA: NVMe native speed
       - -c
-      - effective_io_concurrency=200
+      - effective_io_concurrency=300 # ULTRA: High IOPS
       - -c
-      - max_connections=100
+      - max_worker_processes=32 # ULTRA: Support heavy background load
+      - -c
+      - max_parallel_workers_per_gather=8 # ULTRA: Use ALL 8 CORES for a single query
+      - -c
+      - max_parallel_workers=16 # ULTRA: High concurrency parallelism
+      - -c
+      - synchronous_commit=off # EXTREME: Sacrifice safety for raw SPEED (50L/sec target)
+      - -c
+      - wal_writer_delay=200ms # EXTREME: Reduce disk IO pressure
+      - -c
+      - wal_compression=on # EXTREME: Trade CPU for Disk Bandwidth
+      - -c
+      - commit_delay=100000 # EXTREME: Group commits aggressively
+      - -c
+      - checkpoint_timeout=30min # EXTREME: Reduce checkpoint IO spikes
+      - -c
+      - autovacuum_naptime=10min # EXTREME: Defer vacuuming during heavy loads
+      - -c
+      - work_mem=512MB # EXTREME READ: Massive sort/hash memory (8 workers * 512MB = 4GB peak per query)
+      - -c
+      - jit=on # EXTREME READ: JIT Compilation for complex aggregations
+      - -c
+      - default_statistics_target=500 # EXTREME READ: Better planner stats for large tables
     volumes:
       - ../../data/timescaledb:/var/lib/postgresql/data
       # - ../../layer-3-storage/timescaledb/migrations:/docker-entrypoint-initdb.d

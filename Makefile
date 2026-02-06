@@ -224,11 +224,10 @@ ai-logs:
 # ===========================================================
 
 backup:
-	@echo "💾 Backing up TimescaleDB..."
+	@echo "💾 Backing up TimescaleDB (Full)..."
 	@if ! docker ps | grep -q timescaledb; then \
 		echo "⚠️  TimescaleDB not running. Skipping backup."; \
 	else \
-		rm -rf backups/*; \
 		TS=$$(date "+%d-%b-%Y_%I-%M-%S_%p"); \
 		DIR="backups/Stock_Market_Live_Data_$$TS"; \
 		mkdir -p $$DIR; \
@@ -244,8 +243,6 @@ backup:
 
 
 backup-data:
-	@echo "🧹 Cleaning up old backups..."
-	@rm -rf backups/*
 	@TS=$$(date "+%d-%b-%Y_%I-%M-%S_%p"); \
 	DIR="backups/Stock_Market_Live_Data_DataOnly_$$TS"; \
 	mkdir -p $$DIR; \
@@ -260,8 +257,6 @@ backup-data:
 	fi
 
 backup-schema:
-	@echo "🧹 Cleaning up old backups..."
-	@rm -rf backups/*
 	@TS=$$(date "+%d-%b-%Y_%I-%M-%S_%p"); \
 	DIR="backups/Stock_Market_Live_Data_SchemaOnly_$$TS"; \
 	mkdir -p $$DIR; \
@@ -274,6 +269,11 @@ backup-schema:
 		rm -rf $$DIR; \
 		exit 1; \
 	fi
+
+clean-backups:
+	@echo "🧹 Cleaning up old backups..."
+	@rm -rf backups/*
+	@echo "✅ Backups cleaned."
 
 # Reset database for version mismatch recovery
 db-reset:

@@ -30,6 +30,8 @@ services:
       - FLATTRADE_API_KEY=${FLATTRADE_API_KEY}
       - FLATTRADE_ACTID=${FLATTRADE_ACTID}
       - SKIP_HISTORICAL_SYNC=false
+      - SWARM_CONCURRENCY=${SWARM_CONCURRENCY:-12}
+      - FORCE_HISTORICAL_MODE=${FORCE_HISTORICAL_MODE:-false}
     volumes:
       - ../../vendor:/app/vendor:ro
       - ../../shared:/app/shared:ro

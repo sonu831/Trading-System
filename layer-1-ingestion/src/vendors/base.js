@@ -14,7 +14,9 @@ class BaseVendor {
     this.onTick = options.onTick;
     this.marketHours = new MarketHours();
     this.redisClient = options.redisClient || null; // For Swarm Visibility
-    this.concurrencyLimit = pLimit(12); // Default Swarm Size (12 months)
+    const swarmSize = parseInt(process.env.SWARM_CONCURRENCY, 10) || 12;
+    this.concurrencyLimit = pLimit(swarmSize);
+    logger.info(`BaseVendor: Swarm Concurrency set to ${swarmSize}`);
   }
 
   // Abstract Methods

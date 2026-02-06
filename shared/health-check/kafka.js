@@ -11,6 +11,8 @@ const DEFAULT_CONFIG = {
   maxRetries: 20,
   delayMs: 3000,
   connectionTimeout: 10000,
+  numPartitions: 1,
+  replicationFactor: 1,
 };
 
 /**
@@ -19,7 +21,10 @@ const DEFAULT_CONFIG = {
  * @param {string[]} options.brokers - Kafka broker addresses
  * @param {string} [options.topic] - Topic to verify (optional)
  * @param {number} [options.maxRetries=20] - Maximum retry attempts
+ * @param {number} [options.maxRetries=20] - Maximum retry attempts
  * @param {number} [options.delayMs=3000] - Delay between retries in ms
+ * @param {number} [options.numPartitions=1] - Number of partitions for auto-creation
+ * @param {number} [options.replicationFactor=1] - Replication factor for auto-creation
  * @param {Function} [options.logger=console] - Logger instance
  * @returns {Promise<boolean>} - True if Kafka is ready
  */
@@ -30,6 +35,8 @@ async function waitForKafka(options) {
     maxRetries = DEFAULT_CONFIG.maxRetries,
     delayMs = DEFAULT_CONFIG.delayMs,
     connectionTimeout = DEFAULT_CONFIG.connectionTimeout,
+    numPartitions = DEFAULT_CONFIG.numPartitions,
+    replicationFactor = DEFAULT_CONFIG.replicationFactor,
     logger = console,
   } = options;
 
@@ -57,6 +64,26 @@ async function waitForKafka(options) {
 
       let metadata = null;
       if (topic) {
+        // Explicitly try to create the topic to avoid race conditions with auto-creation
+        try {
+          await admin.createTopics({
+            topics: [{
+              topic,
+              numPartitions,
+              replicationFactor,
+            }],
+            waitForLeaders: true,
+          });
+          log(`✅ Topic '${topic}' created successfully`);
+        } catch (e) {
+          // Ignore if topic already exists
+          if (e.type !== 'TOPIC_ALREADY_EXISTS' && !e.message.includes('Topic with this name already exists')) {
+             // For other errors, we might want to log but verify later via metadata
+             // Some older Kafka versions or configs might restrict creation
+             // logError(`⚠️ Failed to create topic '${topic}': ${e.message}`);
+          }
+        }
+
         // Verify topic exists and has leaders
         metadata = await admin.fetchTopicMetadata({ topics: [topic] });
         const topicData = metadata.topics[0];
@@ -68,8 +95,8 @@ async function waitForKafka(options) {
           }
           log(`✅ Kafka ready - topic '${topic}' has ${topicData.partitions.length} partitions with leaders`);
         } else {
-          // Topic doesn't exist yet - broker is ready but topic will be auto-created
-          log(`✅ Kafka broker ready (topic '${topic}' will be auto-created)`);
+             // Should not happen if createTopics succeeded or topic existed, but good simply to retry
+             throw new Error(`Topic '${topic}' metadata found but no partition info returned`);
         }
       } else {
         log('✅ Kafka broker ready');

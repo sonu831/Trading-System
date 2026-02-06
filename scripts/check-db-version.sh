@@ -11,7 +11,7 @@ set -e
 DB_CONTAINER="timescaledb"
 DB_USER="trading"
 DB_NAME="nifty50"
-VERSION_FILE="/Volumes/Yogi-External/personal/trading-data/timescaledb/.tsdb_version"
+VERSION_FILE="data/timescaledb/.tsdb_version"
 EXPECTED_VERSION="2.24.0"  # Must match docker-compose.infra.yml
 
 # Colors
@@ -58,7 +58,7 @@ if [ -f "$VERSION_FILE" ]; then
         echo ""
         echo "   Commands:"
         echo "   Option 1: Change image to timescale/timescaledb:$DATA_VERSION-pg15"
-        echo "   Option 2: rm -rf /Volumes/Yogi-External/personal/trading-data/timescaledb/*"
+        echo "   Option 2: rm -rf data/timescaledb/*"
         echo "             make infra && make restore"
         exit 1
     fi

@@ -251,12 +251,17 @@ async function initialize() {
     });
 
     marketDataVendor.init();
-    await marketDataVendor.connect();
 
-    const marketStatus = marketHours.isMarketOpen();
-    const statusText = marketStatus ? 'Market is OPEN - Stream active' : 'Market is CLOSED - Idle';
-    await logToRedis(`📡 Connected to MStock. ${statusText}`);
-    logger.info(`🎯 Subscribed to ${subscriptionList.length} Nifty 50 symbols (Stream Mode)`);
+    // Only connect WebSocket if NOT in forced historical mode
+    if (process.env.FORCE_HISTORICAL_MODE !== 'true') {
+      await marketDataVendor.connect();
+      const marketStatus = marketHours.isMarketOpen();
+      const statusText = marketStatus ? 'Market is OPEN - Stream active' : 'Market is CLOSED - Idle';
+      await logToRedis(`📡 Connected to MStock. ${statusText}`);
+      logger.info(`🎯 Subscribed to ${subscriptionList.length} Nifty 50 symbols (Stream Mode)`);
+    } else {
+      logger.info('📊 HISTORICAL MODE: Skipping WebSocket connection.');
+    }
 
 
 
@@ -336,10 +341,15 @@ async function initialize() {
     // PHASE 3: Historical Data Sync - DISABLED
     // ═══════════════════════════════════════════════════════════════
     // User Request: Disable startup scan entirely.
-    if (!marketHours.isMarketOpen()) {
+    const forceHistorical = process.env.FORCE_HISTORICAL_MODE === 'true';
+    if (forceHistorical || !marketHours.isMarketOpen()) {
        logger.info('');
        logger.info('╔════════════════════════════════════════════════════════════╗');
-       logger.info('║  🌙 MARKET CLOSED - SERVICE IDLE (Waiting for Trigger)     ║');
+       if (forceHistorical) {
+         logger.info('║  📊 HISTORICAL MODE FORCED - Live Stream Disabled          ║');
+       } else {
+         logger.info('║  🌙 MARKET CLOSED - SERVICE IDLE (Waiting for Trigger)     ║');
+       }
        logger.info('╚════════════════════════════════════════════════════════════╝');
     } else {
        logger.info('☀️ Market is OPEN - Live Stream Active');

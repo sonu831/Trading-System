@@ -52,6 +52,10 @@ async function systemRoutes(fastify, options) {
     handler: systemController.updateDataAvailability,
   });
 
+  fastify.get('/api/v1/data/stats', {
+    handler: systemController.getDataStats,
+  });
+
   fastify.get('/api/v1/data/gaps', {
     handler: systemController.getSymbolsWithGaps,
   });

@@ -61,6 +61,24 @@ class SystemController extends BaseController {
       return this.sendError(reply, err);
     }
   };
+  /**
+   * @method getDataStats
+   * @description Get real-time data statistics from the database.
+   * Currently returns the total count of rows in the `candles_1m` table.
+   * This is used by the frontend to display the "DB Sync" progress.
+   * 
+   * @route GET /api/v1/data/stats
+   * @returns {Object} { candles_1m: number }
+   */
+  getDataStats = async (req, reply) => {
+    try {
+      // Get candle count from repository via service
+      const count = await this.systemService.systemRepository.getCandleCount();
+      return this.sendSuccess(reply, { candles_1m: Number(count) });
+    } catch (err) {
+      return this.sendError(reply, err);
+    }
+  };
 
   // ═══════════════════════════════════════════════════════════════
   // DATA AVAILABILITY ENDPOINTS

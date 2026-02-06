@@ -105,21 +105,26 @@ class SystemService extends BaseService {
   // ═══════════════════════════════════════════════════════════════
 
   /**
-   * Get data availability summary
+   * Get data availability summary + list of symbols
+   * This logic maps raw DB records to the format expected by the frontend.
+   * 
    * @param {string?} symbol - Optional symbol filter
    */
   async getDataAvailability(symbol = null) {
     const records = await this.systemRepository.getDataAvailability(symbol);
 
     // Map records to match Frontend expectations (BackfillPanel.jsx)
+    // - total_candles: used for "DB Sync" progress calculation
+    // - earliest/latest: used for determining gaps
     const mappedRecords = records.map(r => ({
       ...r,
-      total_candles: r.total_records ? Number(r.total_records) : 0, // Frontend expects total_candles
-      earliest: r.first_date, // Frontend expects earliest
-      latest: r.last_date,    // Frontend expects latest
+      total_candles: r.total_records ? Number(r.total_records) : 0, 
+      earliest: r.first_date, 
+      latest: r.last_date,    
     }));
 
-    // Calculate summary
+    // Calculate aggregated summary for the entire dataset
+    // This provides the "Grand Total" used in the dashboard progress bar
     const summary = {
       totalSymbols: records.length,
       totalRecords: records.reduce((sum, r) => sum + Number(r.total_records || 0), 0),

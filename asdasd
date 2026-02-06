@@ -1,0 +1,23 @@
+check","error":"This server does not host this topic-partition","correlationId":2,"size":79}
+
+[2026-02-05 18:32:26.345 +0000] INFO: ⏳ Waiting for Kafka... (2/20) - This server does not host this topic-partition
+
+{"level":"ERROR","timestamp":"2026-02-05T18:32:29.351Z","logger":"kafkajs","message":"[Connection] Response Metadata(key: 3, version: 6)","broker":"kafka:29092","clientId":"health-check","error":"This server does not host this topic-partition","correlationId":3,"size":79}
+
+[2026-02-05 18:32:29.351 +0000] INFO: ⏳ Waiting for Kafka... (3/20) - This server does not host this topic-partition
+
+{"level":"ERROR","timestamp":"2026-02-05T18:32:32.356Z","logger":"kafkajs","message":"[Connection] Response Metadata(key: 3, version: 6)","broker":"kafka:29092","clientId":"health-check","error":"This server does not host this topic-partition","correlationId":4,"size":79}
+
+[2026-02-05 18:32:32.357 +0000] INFO: ⏳ Waiting for Kafka... (4/20) - This server does not host this topic-partition
+
+{"level":"ERROR","timestamp":"2026-02-05T18:32:35.360Z","logger":"kafkajs","message":"[Connection] Response Metadata(key: 3, version: 6)","broker":"kafka:29092","clientId":"health-check","error":"This server does not host this topic-partition","correlationId":5,"size":79}
+
+[2026-02-05 18:32:35.361 +0000] INFO: ⏳ Waiting for Kafka... (5/20) - This server does not host this topic-partition
+
+{"level":"ERROR","timestamp":"2026-02-05T18:32:38.377Z","logger":"kafkajs","message":"[Connection] Response Metadata(key: 3, version: 6)","broker":"kafka:29092","clientId":"health-check","error":"This server does not host this topic-partition","correlationId":6,"size":79}
+
+[2026-02-05 18:32:38.378 +0000] INFO: ⏳ Waiting for Kafka... (6/20) - This server does not host this topic-partition
+
+{"level":"ERROR","timestamp":"2026-02-05T18:32:41.381Z","logger":"kafkajs","message":"[Connection] Response Metadata(key: 3, version: 6)","broker":"kafka:29092","clientId":"health-check","error":"This server does not host this topic-partition","correlationId":7,"size":79}
+
+[2026-02-05 18:32:41.381 +0000] INFO: ⏳ Waiting for Kafka... (7/20) - This server does not host

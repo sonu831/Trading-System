@@ -118,31 +118,41 @@ class SystemRepository extends BaseRepository {
   // ═══════════════════════════════════════════════════════════════
 
   /**
-   * Update or create data availability record (upsert)
+   * Update or create data availability record (Upsert Logic)
+   * Called by Ingestion Service (Layer 1) after processing a batch.
+   * 
+   * Logic:
+   * - If record exists: Expand date range (min/max) and ADD to total_records count.
+   * - If new: Create fresh record.
+   * 
    * @param {Object} params - { symbol, timeframe, firstDate, lastDate, recordCount }
    * @returns {Promise<Object>} The updated record
    */
   async updateDataAvailability(params) {
     const { symbol, timeframe = '1m', firstDate, lastDate, recordCount } = params;
     
-    // Try to find existing record
+    // Check if record exists for this symbol + timeframe
     const existing = await this.prisma.data_availability.findFirst({
       where: { symbol, timeframe },
     });
 
     if (existing) {
-      // Update: extend date range, add to record count
+      // UPDATE: Smart merge of data availability
+      // - first_date: take the earlier of the two
+      // - last_date: take the later of the two
+      // - total_records: increment the count
       return this.prisma.data_availability.update({
         where: { id: existing.id },
         data: {
           first_date: firstDate < existing.first_date ? new Date(firstDate) : existing.first_date,
           last_date: lastDate > existing.last_date ? new Date(lastDate) : existing.last_date,
+          // BigInt addition for safety
           total_records: (existing.total_records || BigInt(0)) + BigInt(recordCount || 0),
           updated_at: new Date(),
         },
       });
     } else {
-      // Insert new record
+      // INSERT: New symbol tracking
       return this.prisma.data_availability.create({
         data: {
           symbol,

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useCallback } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
@@ -8,16 +8,32 @@ import {
   IndicatorPanel,
   TimeframeSelector,
   MultiTimeframeSummary,
+  EnhancedMultiTFSummary,
+  CandlePatternBadges,
+  PCRPanel,
+  AIPredictionPanel,
+  BacktestPanel,
+  IndicatorOverlayToggle,
 } from '@/components/features/Analysis';
 import { Card, Badge } from '@/components/ui';
 
 /**
  * Stock Detail & Technical Analysis Page
+ * Enhanced with multi-factor analysis, AI predictions, and backtesting
  * Dynamic route: /analysis/[symbol]
  */
 export default function AnalysisPage() {
   const router = useRouter();
   const { symbol: symbolParam } = router.query;
+
+  // Chart overlay state
+  const [overlays, setOverlays] = useState({
+    ema: true,
+    bollinger: false,
+    supertrend: false,
+    volume: true,
+    support: false,
+  });
 
   const {
     symbol,
@@ -25,13 +41,38 @@ export default function AnalysisPage() {
     candleData,
     indicators,
     summary,
+    patterns,
     overview,
     multiTF,
+    enhancedMultiTF,
+    optionsData,
     loading,
     error,
     changeInterval,
     refresh,
+    refreshAll,
+    // AI Prediction
+    aiPrediction,
+    aiLoading,
+    aiError,
+    fetchAIPrediction,
+    // Backtest
+    backtestResults,
+    backtestLoading,
+    backtestError,
+    fetchBacktest,
+    clearBacktest,
   } = useAnalysis(symbolParam);
+
+  const handleOverlayToggle = useCallback((key) => {
+    setOverlays((prev) => ({ ...prev, [key]: !prev[key] }));
+  }, []);
+
+  const handleFetchAI = useCallback(() => {
+    if (symbol) {
+      fetchAIPrediction(symbol);
+    }
+  }, [symbol, fetchAIPrediction]);
 
   const getSignalBadgeColor = (color) => {
     switch (color) {
@@ -70,18 +111,20 @@ export default function AnalysisPage() {
                 System
               </Link>
             </nav>
-            <button
-              onClick={refresh}
-              className="text-sm text-text-tertiary hover:text-primary transition-colors"
-            >
-              🔄 Refresh
-            </button>
+            <div className="flex items-center gap-4">
+              <button
+                onClick={refreshAll}
+                className="text-sm text-text-tertiary hover:text-primary transition-colors"
+              >
+                🔄 Refresh All
+              </button>
+            </div>
           </div>
         </header>
 
         {/* Main Content */}
         <div className="max-w-7xl mx-auto px-4 py-6 space-y-6">
-          {/* Stock Header */}
+          {/* Stock Header Card */}
           <Card className="border-border bg-surface p-6">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div className="flex items-center gap-4">
@@ -116,13 +159,14 @@ export default function AnalysisPage() {
             </div>
           </Card>
 
-          {/* Timeframe Selector */}
-          <div className="flex items-center justify-between gap-4">
+          {/* Timeframe Selector + Overlay Toggles */}
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <TimeframeSelector
               selected={interval}
               onChange={changeInterval}
               disabled={loading}
             />
+            <IndicatorOverlayToggle overlays={overlays} onToggle={handleOverlayToggle} />
             {loading && (
               <span className="text-sm text-text-tertiary flex items-center gap-2">
                 <span className="w-3 h-3 border-2 border-primary border-t-transparent rounded-full animate-spin"></span>
@@ -156,20 +200,34 @@ export default function AnalysisPage() {
                 </span>
               </div>
               <div className="p-2">
-                <StockChart candles={candleData} indicators={indicators} height={450} />
+                <StockChart
+                  candles={candleData}
+                  indicators={indicators}
+                  height={450}
+                  showEMA={overlays.ema}
+                  showBollinger={overlays.bollinger}
+                  showSupertrend={overlays.supertrend}
+                  showVolume={overlays.volume}
+                  showSupportResistance={overlays.support}
+                />
               </div>
             </Card>
           )}
 
-          {/* Indicator Panels */}
+          {/* Candle Pattern Badges */}
+          {!error && <CandlePatternBadges patterns={patterns} maxDisplay={5} />}
+
+          {/* Indicator Panels (RSI, MACD, Volume) */}
           {!error && indicators && (
             <IndicatorPanel candles={candleData} indicators={indicators} height={120} />
           )}
 
-          {/* Bottom Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Multi-Timeframe Summary */}
-            <MultiTimeframeSummary data={multiTF} />
+          {/* Multi-Timeframe Analysis Row */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Enhanced Multi-TF Summary (spans 2 cols) */}
+            <div className="lg:col-span-2">
+              <EnhancedMultiTFSummary data={enhancedMultiTF} />
+            </div>
 
             {/* Signal Breakdown */}
             {summary && (
@@ -190,10 +248,36 @@ export default function AnalysisPage() {
                       {summary.latestRSI?.toFixed(1)} ({summary.trendState})
                     </span>
                   </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-text-secondary">Trend Direction</span>
-                    <span className="text-text-primary">{summary.trendState}</span>
-                  </div>
+                  {indicators?.macd && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-text-secondary">MACD Histogram</span>
+                      <span
+                        className={`font-mono ${
+                          indicators.macd.histogram?.[indicators.macd.histogram.length - 1] > 0
+                            ? 'text-success'
+                            : 'text-error'
+                        }`}
+                      >
+                        {indicators.macd.histogram?.[indicators.macd.histogram.length - 1]?.toFixed(2)}
+                      </span>
+                    </div>
+                  )}
+                  {indicators?.supertrend && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-text-secondary">Supertrend</span>
+                      <span
+                        className={`font-mono ${
+                          indicators.supertrend.direction?.[indicators.supertrend.direction.length - 1] === 1
+                            ? 'text-success'
+                            : 'text-error'
+                        }`}
+                      >
+                        {indicators.supertrend.direction?.[indicators.supertrend.direction.length - 1] === 1
+                          ? '▲ Bullish'
+                          : '▼ Bearish'}
+                      </span>
+                    </div>
+                  )}
                   <div className="flex justify-between items-center">
                     <span className="text-text-secondary">Signal</span>
                     <Badge variant={getSignalBadgeColor(summary.signalBadge?.color)}>
@@ -204,12 +288,43 @@ export default function AnalysisPage() {
               </Card>
             )}
           </div>
+
+          {/* AI Prediction + Options PCR Row */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* AI Prediction Panel */}
+            <AIPredictionPanel
+              data={aiPrediction}
+              loading={aiLoading}
+              error={aiError}
+              onFetch={handleFetchAI}
+            />
+
+            {/* Options PCR Panel (hidden if no data) */}
+            <PCRPanel data={optionsData} />
+          </div>
+
+          {/* Historical Backtest Panel (Full Width) */}
+          <BacktestPanel
+            results={backtestResults}
+            loading={backtestLoading}
+            error={backtestError}
+            onRunBacktest={fetchBacktest}
+            onClear={clearBacktest}
+            symbol={symbol}
+          />
+
+          {/* Legacy Multi-TF for backward compatibility (hidden by default) */}
+          {multiTF && !enhancedMultiTF && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <MultiTimeframeSummary data={multiTF} />
+            </div>
+          )}
         </div>
 
         {/* Footer */}
         <footer className="border-t border-border py-4 mt-8">
           <div className="max-w-7xl mx-auto px-4 text-center text-text-tertiary text-xs">
-            Trading System • Technical Analysis Dashboard
+            Trading System • Technical Analysis Dashboard • AI-Powered Insights
           </div>
         </footer>
       </main>

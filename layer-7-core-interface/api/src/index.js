@@ -5,17 +5,37 @@ BigInt.prototype.toJSON = function() {
   return Number(this);
 };
 
-const fastify = require('fastify')({
-  logger: {
+// Build logger config - use pino-loki in production when LOKI_URL is set,
+// otherwise use simple stdout without transport (no pino-pretty dependency)
+const buildLoggerConfig = () => {
+  const lokiUrl = process.env.LOKI_URL;
+  const useStdout = process.env.LOG_TO_STDOUT === 'true' || !lokiUrl;
+
+  if (useStdout) {
+    // Simple stdout logger - no transport dependency required
+    return {
+      level: 'info',
+    };
+  }
+
+  // Use pino-loki with async batching to prevent blocking
+  return {
     level: 'info',
     transport: {
       target: 'pino-loki',
       options: {
-        host: process.env.LOKI_URL || 'http://loki:3100', // Docker service URL
+        host: lokiUrl,
         labels: { app: 'layer-7-api' },
+        batching: true,
+        interval: 5,
+        silenceErrors: true, // Don't throw if Loki is unavailable
       },
     },
-  },
+  };
+};
+
+const fastify = require('fastify')({
+  logger: buildLoggerConfig(),
   ajv: {
     customOptions: {
       strict: false,

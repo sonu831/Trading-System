@@ -60,6 +60,9 @@ help:
 # 2. LIFECYCLE MANAGEMENT
 # ===========================================================
 
+deploy: app-build ui notify-build
+	@echo "✅ Deployment complete!"
+
 up: infra wait-kafka observe notify app ui check-restore
 	@echo "🚀 Full stack running!"
 	@echo ""
@@ -81,7 +84,14 @@ up: infra wait-kafka observe notify app ui check-restore
 	@echo "🔧 Infrastructure:"
 	@echo "   (Run 'make infra' to see DB/Kafka details)"
 
-down: backup
+down:
+	@echo "🔄 Intelligent Shutdown Sequence Initiated..."
+	@echo "1️⃣  Cleaning old backups..."
+	@make clean-backups
+	@echo "2️⃣  Backing up Schema..."
+	@make backup-schema
+	@echo "3️⃣  Backing up Data..."
+	@make backup-data
 	@echo "🛑 Stopping all containers..."
 	-$(DC) -f $(COMPOSE_DIR)/docker-compose.gateway.yml down
 	-$(DC) -f $(COMPOSE_DIR)/docker-compose.notify.yml down
@@ -91,7 +101,7 @@ down: backup
 	-$(DC) -f $(COMPOSE_DIR)/docker-compose.infra.yml down
 	@echo "🗑️ Cleaning data folder..."
 	@rm -rf data/*
-	@echo "✅ Stopped and cleaned."
+	@echo "✅ Stopped, Backed Up, and Cleaned."
 
 dev-nodb:
 	@echo "🔄 Restarting Applications (Keeping DB/Kafka running)..."
@@ -234,10 +244,17 @@ backup:
 		FILE=$$DIR/Stock_Market_Live_Data.sql; \
 		echo "📦 Saving to $$DIR..."; \
 		if docker exec timescaledb pg_dump -U trading nifty50 > $$FILE; then \
-			echo "✅ Backup saved: $$FILE"; \
+			if [ -s $$FILE ]; then \
+				echo "✅ Backup SAVED & VERIFIED: $$FILE ($$(du -h $$FILE | cut -f1))"; \
+			else \
+				echo "❌ Backup FAILED: File is empty!"; \
+				rm -rf $$DIR; \
+				exit 1; \
+			fi; \
 		else \
-			echo "⚠️  Backup failed."; \
+			echo "⚠️  Backup command failed."; \
 			rm -rf $$DIR; \
+			exit 1; \
 		fi; \
 	fi
 
@@ -249,9 +266,15 @@ backup-data:
 	FILE=$$DIR/Stock_Market_Live_Data_DataOnly.sql; \
 	echo "💾 Backing up TimescaleDB DATA ONLY to $$DIR..."; \
 	if docker exec timescaledb pg_dump -U trading nifty50 --data-only > $$FILE; then \
-		echo "✅ Data-only backup saved: $$FILE"; \
+		if [ -s $$FILE ]; then \
+			echo "✅ Data Backup SAVED & VERIFIED: $$FILE ($$(du -h $$FILE | cut -f1))"; \
+		else \
+			echo "❌ Data Backup FAILED: File is empty!"; \
+			rm -rf $$DIR; \
+			exit 1; \
+		fi; \
 	else \
-		echo "❌ Backup failed! Removing empty directory..."; \
+		echo "❌ Backup command failed! Removing empty directory..."; \
 		rm -rf $$DIR; \
 		exit 1; \
 	fi
@@ -263,9 +286,15 @@ backup-schema:
 	FILE=$$DIR/Stock_Market_Live_Data_SchemaOnly.sql; \
 	echo "💾 Backing up TimescaleDB SCHEMA ONLY to $$DIR..."; \
 	if docker exec timescaledb pg_dump -U trading nifty50 --schema-only > $$FILE; then \
-		echo "✅ Schema-only backup saved: $$FILE"; \
+		if [ -s $$FILE ]; then \
+			echo "✅ Schema Backup SAVED & VERIFIED: $$FILE ($$(du -h $$FILE | cut -f1))"; \
+		else \
+			echo "❌ Schema Backup FAILED: File is empty!"; \
+			rm -rf $$DIR; \
+			exit 1; \
+		fi; \
 	else \
-		echo "❌ Backup failed! Removing empty directory..."; \
+		echo "❌ Backup command failed! Removing empty directory..."; \
 		rm -rf $$DIR; \
 		exit 1; \
 	fi

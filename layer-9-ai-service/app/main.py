@@ -8,11 +8,17 @@ from app.engines.heuristic import HeuristicEngine
 from app.engines.openai_engine import OpenAIEngine
 from app.engines.claude_engine import ClaudeEngine
 from app.engines.ollama_engine import OllamaEngine
-from app.engines.ollama_engine import OllamaEngine
 from prometheus_fastapi_instrumentator import Instrumentator
 from prometheus_client import Counter, Histogram
 import time
 import json
+import torch  # For MPS check
+
+# Fix missing import if PyTorch is used
+try:
+    from app.engines.pytorch_engine import PyTorchEngine
+except ImportError:
+    pass # Might not be installed in all envs
 
 
 # Configure Logging
@@ -37,7 +43,17 @@ elif AI_PROVIDER == "ollama":
     engine = OllamaEngine()
 else:
     logger.info("🧠 Loading Heuristic Engine (Default)...")
+    logger.info("🧠 Loading Heuristic Engine (Default)...")
     engine = HeuristicEngine()
+
+# --- Hardware Acceleration Check (M4-Max) ---
+if torch.backends.mps.is_available():
+    logger.info(f"🚀 Apple Silicon MPS (Metal) Acceleration: ENABLED")
+    logger.info(f"   Device: {torch.device('mps')}")
+elif torch.cuda.is_available():
+    logger.info(f"🚀 NVIDIA CUDA Acceleration: ENABLED")
+else:
+    logger.warning("⚠️  Running on CPU. Performance may be limited.")
 
 # --- Metrics ---
 TOKEN_USAGE = Counter(
@@ -62,6 +78,7 @@ class PredictionResponse(BaseModel):
     symbol: str
     prediction: float
     confidence: float
+    reasoning: str = ""
     model_version: str
     prompt_tokens: int
     completion_tokens: int
@@ -110,6 +127,7 @@ def predict(request: PredictionRequest):
             "symbol": request.symbol,
             "prediction": result.prediction,
             "confidence": result.confidence,
+            "reasoning": result.reasoning,
             "model_version": result.model_version,
             "prompt_tokens": result.prompt_tokens,
             "completion_tokens": result.completion_tokens

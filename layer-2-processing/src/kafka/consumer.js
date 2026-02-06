@@ -5,7 +5,9 @@ const logger = require('../utils/logger');
 const { waitForKafka } = require('/app/shared/health-check');
 
 const KAFKA_BROKERS = (process.env.KAFKA_BROKERS || 'localhost:9092').split(',');
-const GROUP_ID = 'layer-2-processing-group-v3'; // Incremented after Kafka cluster reset
+// GROUP_ID is crucial for ensuring we don't re-process old messages if the service restarts.
+// We incremented this to 'v3' after the Kafka Cluster Reset to ensure a clean slate.
+const GROUP_ID = 'layer-2-processing-group-v3'; 
 const TOPIC = process.env.KAFKA_TOPIC || 'raw-ticks'; // Aligned with Layer 1 ingestion producer
 
 const kafka = new Kafka({
@@ -16,7 +18,7 @@ const kafka = new Kafka({
   retry: {
     initialRetryTime: 500,
     retries: 15,
-    maxRetryTime: 30000,
+    maxRetryTime: 30000, // Aggressive retry policy for resiliency
   },
 });
 
@@ -42,6 +44,8 @@ async function startConsumer(messageHandler) {
     await consumer.connect();
     logger.info(`Kafka Consumer connected to: ${KAFKA_BROKERS.join(', ')}`);
 
+    // fromBeginning: false -> Only consume NEW messages when the service starts.
+    // This assumes historical data is backfilled separately or handled by offset commits.
     await consumer.subscribe({ topic: TOPIC, fromBeginning: false });
     logger.info(`Subscribed to topic: ${TOPIC}`);
 
@@ -52,6 +56,8 @@ async function startConsumer(messageHandler) {
           logger.debug({ topic, preview: value.substring(0, 100) }, 'Received message');
           const data = JSON.parse(value);
 
+          // Delegate to the business logic handler
+          // Note: Deduplication should happen in the handler or DB layer (idempotency)
           await messageHandler(data);
         } catch (err) {
           logger.error({ err }, 'Error processing message');

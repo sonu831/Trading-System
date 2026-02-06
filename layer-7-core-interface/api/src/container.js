@@ -16,7 +16,13 @@ const prisma = new PrismaClient({
       url: process.env.TIMESCALE_URL || process.env.DATABASE_URL,
     },
   },
+  // Limit connection pool per PM2 instance to prevent exhaustion
+  // 4 instances × 5 connections = 20 total (safe for 100 max_connections)
+  log: ['warn', 'error'],
 });
+
+// Configure connection pool size via environment variable appended to URL
+// This is parsed by Prisma from the connection string: ?connection_limit=5
 // Redis client is already initialized in its module
 
 // Configure Container

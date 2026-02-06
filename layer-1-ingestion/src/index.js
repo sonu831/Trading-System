@@ -51,23 +51,49 @@ const PORT = process.env.INGESTION_PORT || 3001;
 const BACKEND_API_URL = process.env.BACKEND_API_URL || 'http://backend-api:4000';
 
 // Helper for Backend API calls
+// Acts as a bridge between Ingestion Service controls and the Central Backend API
 const backendApi = {
+  /**
+   * Trigger a backfill job via Backend API
+   * @param {Object} params - { symbol, days, timeframe, force }
+   */
   async triggerBackfill(params) {
     const res = await axios.post(`${BACKEND_API_URL}/api/v1/system/backfill/trigger`, params);
     return res.data?.data;
   },
+
+  /**
+   * Get symbols that have data gaps (missing candles)
+   * @param {number} days - Number of days to look back
+   */
   async getSymbolsWithGaps(days = 5) {
     const res = await axios.get(`${BACKEND_API_URL}/api/v1/data/gaps?days=${days}`);
     return res.data?.data?.symbols || [];
   },
+
+  /**
+   * Fetch status of a specific backfill job
+   * @param {string} jobId 
+   */
   async getBackfillJob(jobId) {
     const res = await axios.get(`${BACKEND_API_URL}/api/v1/backfill/${jobId}`);
     return res.data?.data;
   },
+
+  /**
+   * Update job status (e.g., mark as COMPLETED or FAILED)
+   * @param {string} jobId 
+   * @param {Object} params - { status, progress, error, metadata }
+   */
   async updateBackfillJob(jobId, params) {
     const res = await axios.patch(`${BACKEND_API_URL}/api/v1/backfill/${jobId}`, params);
     return res.data?.data;
   },
+
+  /**
+   * Update Data Availability stats (earliest/latest dates, counts)
+   * @param {Object} params - { symbol, timeframe, earliest, latest, total_records }
+   */
   async updateDataAvailability(params) {
     const res = await axios.put(`${BACKEND_API_URL}/api/v1/data/availability`, params);
     return res.data?.data;
@@ -251,12 +277,17 @@ async function initialize() {
     });
 
     marketDataVendor.init();
-    await marketDataVendor.connect();
 
-    const marketStatus = marketHours.isMarketOpen();
-    const statusText = marketStatus ? 'Market is OPEN - Stream active' : 'Market is CLOSED - Idle';
-    await logToRedis(`📡 Connected to MStock. ${statusText}`);
-    logger.info(`🎯 Subscribed to ${subscriptionList.length} Nifty 50 symbols (Stream Mode)`);
+    // Only connect WebSocket if NOT in forced historical mode
+    if (process.env.FORCE_HISTORICAL_MODE !== 'true') {
+      await marketDataVendor.connect();
+      const marketStatus = marketHours.isMarketOpen();
+      const statusText = marketStatus ? 'Market is OPEN - Stream active' : 'Market is CLOSED - Idle';
+      await logToRedis(`📡 Connected to MStock. ${statusText}`);
+      logger.info(`🎯 Subscribed to ${subscriptionList.length} Nifty 50 symbols (Stream Mode)`);
+    } else {
+      logger.info('📊 HISTORICAL MODE: Skipping WebSocket connection.');
+    }
 
 
 
@@ -286,12 +317,51 @@ async function initialize() {
       logger.error('❌ Failed to connect Command Listener:', e);
     }
 
+    // --------------------------------------------------------------------------
+    // NOTIFICATION TRIGGER
+    // --------------------------------------------------------------------------
+    // We only send the completion notification via Telegram after verifying
+    // that the backend DB has actually synced the data.
+    // This prevents "False Positives" where ingestion says done, but DB is empty.
+    try {
+      logger.info(`🔍 Verifying DB Sync for job ${jobId} before notifying...`);
+
+      // Poll backend for final row count
+      const dbStats = await axios.get(`${BACKEND_API_URL}/api/v1/data/stats`);
+      const currentCount = dbStats.data?.data?.candles_1m || 0;
+
+      // Send Telegram Alert with detailed stats
+      // The processing layer/notification service picks this up
+      await producer.send({
+        topic: 'system-notifications',
+        messages: [
+          {
+            key: 'backfill-alert',
+            value: JSON.stringify({
+              type: 'BACKFILL_COMPLETED',
+              data: {
+                symbol: 'ALL_SYMBOLS',
+                count: totalCandles,  // Messages produced to Kafka
+                dbCount: currentCount, // Validated rows in DB
+                duration: `${finalDuration}s`,
+                status: 'SUCCESS'
+              },
+              timestamp: Date.now(),
+            }),
+          },
+        ],
+      });
+      logger.info('✅ Notification sent to system-notifications topic');
+
+    } catch (alertErr) {
+      logger.error('⚠️ Failed to send notification:', alertErr.message);
+    }
     // ═══════════════════════════════════════════════════════════════
     // PHASE 2.5: Scheduled Cron Job (Daily at 6:00 AM IST)
     // ═══════════════════════════════════════════════════════════════
     logger.info('');
     logger.info('📋 Setting up Scheduled Backfill Job...');
-    
+
     // 6:00 AM IST = 0:30 UTC (IST is UTC+5:30)
     cron.schedule('30 0 * * 1-5', async () => {
       logger.info('⏰ CRON: 6 AM IST - Triggering scheduled daily backfill...');
@@ -336,10 +406,15 @@ async function initialize() {
     // PHASE 3: Historical Data Sync - DISABLED
     // ═══════════════════════════════════════════════════════════════
     // User Request: Disable startup scan entirely.
-    if (!marketHours.isMarketOpen()) {
+    const forceHistorical = process.env.FORCE_HISTORICAL_MODE === 'true';
+    if (forceHistorical || !marketHours.isMarketOpen()) {
        logger.info('');
        logger.info('╔════════════════════════════════════════════════════════════╗');
-       logger.info('║  🌙 MARKET CLOSED - SERVICE IDLE (Waiting for Trigger)     ║');
+       if (forceHistorical) {
+         logger.info('║  📊 HISTORICAL MODE FORCED - Live Stream Disabled          ║');
+       } else {
+         logger.info('║  🌙 MARKET CLOSED - SERVICE IDLE (Waiting for Trigger)     ║');
+       }
        logger.info('╚════════════════════════════════════════════════════════════╝');
     } else {
        logger.info('☀️ Market is OPEN - Live Stream Active');
@@ -485,14 +560,41 @@ const runBackfill = async (startParams = {}) => {
     const feedArgs = symbol ? ['--symbol', symbol] : [];
     await runScriptWithIPC(feedScript, feedArgs);
 
+    // Step 3: Verification & Notification
+    logger.info('⏳ Step 3: Verifying Database Sync...');
+    await updateBackfillStatus(2, 80, 'Verifying Database...');
+    
+    // Poll Backend until count stabilizes or timeout
+    let finalCount = 0;
+    let retries = 30; // 30 * 2s = 60s timeout
+    const initialStats = await axios.get(`${process.env.BACKEND_API_URL}/api/v1/data/stats`).then(r => r.data.data).catch(() => ({}));
+    let prevCount = initialStats.candles_1m || 0;
+
+    while (retries > 0) {
+      await new Promise(r => setTimeout(r, 2000));
+      const stats = await axios.get(`${process.env.BACKEND_API_URL}/api/v1/data/stats`).then(r => r.data.data).catch(() => ({}));
+      const currentCount = stats.candles_1m || 0;
+
+      if (currentCount > prevCount) {
+        prevCount = currentCount; // Still increasing
+        logger.info(`📈 Database Syncing: ${currentCount} rows...`);
+      } else {
+        // Stabilized
+        finalCount = currentCount;
+        break;
+      }
+      retries--;
+    }
+
     const duration = (Date.now() - startTime) / 1000;
     metrics.batchJobDuration.observe({ job_type: 'historical_backfill', status: 'success' }, duration);
     
     await updateBackfillStatus(2, 100, 'Backfill Complete');
-    if (jobId) await backendApi.updateBackfillJob(jobId, { status: 'COMPLETED' }).catch(() => {});
+    if (jobId) await backendApi.updateBackfillJob(jobId, { status: 'COMPLETED', details: `Synced: ${finalCount} candles` }).catch(() => {});
     
     logger.info('✅ Backfill Complete.');
-    await logToRedis(`✅ Backfill Complete: ${symbolMsg}`);
+    const countMsg = `🕯️ DB Total: ${finalCount.toLocaleString()} candles`;
+    await logToRedis(`✅ Backfill Complete: ${symbolMsg}. ${countMsg}`);
     
   } catch (err) {
     await updateBackfillStatus(3, 0, err.message);

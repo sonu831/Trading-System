@@ -4,7 +4,6 @@ data/
 node_modules/
 dist/
 coverage/
-backups/
 
 # Environment files
 .env
@@ -65,4 +64,6 @@ project.tar.gz
 *.antigravity
 *.antigravity.lock
 .antigravity/
-.claude/
+
+# Backups
+backups/

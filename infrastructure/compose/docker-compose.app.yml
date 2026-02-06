@@ -30,6 +30,8 @@ services:
       - FLATTRADE_API_KEY=${FLATTRADE_API_KEY}
       - FLATTRADE_ACTID=${FLATTRADE_ACTID}
       - SKIP_HISTORICAL_SYNC=false
+      - SWARM_CONCURRENCY=${SWARM_CONCURRENCY:-12}
+      - FORCE_HISTORICAL_MODE=${FORCE_HISTORICAL_MODE:-false}
     volumes:
       - ../../vendor:/app/vendor:ro
       - ../../shared:/app/shared:ro
@@ -39,11 +41,10 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '0.5'
-          memory: 512M
+          memory: 2G
         reservations:
           cpus: '0.25'
-          memory: 256M
+          memory: 1G
 
   # Layer 1: FlatTrade Python Ingestion (Sidecar)
   flattrade-ingestion:
@@ -77,7 +78,7 @@ services:
       - PORT=3002
       - KAFKA_BROKERS=kafka:29092
       - REDIS_URL=redis://redis:6379
-      - TIMESCALE_URL=postgresql://${POSTGRES_USER:-trading}:${POSTGRES_PASSWORD}@timescaledb:5432/${POSTGRES_DB:-nifty50}
+      - TIMESCALE_URL=postgresql://${POSTGRES_USER:-trading}:${POSTGRES_PASSWORD:-trading123}@timescaledb:5432/${POSTGRES_DB:-nifty50}
     volumes:
       - ../../shared:/app/shared:ro
     networks:
@@ -86,11 +87,9 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '0.75'
-          memory: 768M
+          memory: 6GB
         reservations:
-          cpus: '0.5'
-          memory: 384M
+          memory: 2G
 
   # Layer 4: Analysis Engine (Go)
   analysis:
@@ -103,7 +102,7 @@ services:
     environment:
       - REDIS_URL=redis://redis:6379
       - KAFKA_BROKERS=kafka:29092
-      - TIMESCALE_URL=postgresql://${POSTGRES_USER:-trading}:${POSTGRES_PASSWORD}@timescaledb:5432/${POSTGRES_DB:-nifty50}
+      - TIMESCALE_URL=postgresql://${POSTGRES_USER:-trading}:${POSTGRES_PASSWORD:-trading123}@timescaledb:5432/${POSTGRES_DB:-nifty50}
     volumes:
       - ../../vendor:/app/vendor:ro
     networks:
@@ -112,11 +111,9 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '2'
-          memory: 1536M
+          memory: 4G
         reservations:
-          cpus: '1'
-          memory: 768M
+          memory: 1G
 
   # Layer 5: Aggregation (Go)
   aggregation:
@@ -128,7 +125,7 @@ services:
       - '8080:8080'
     environment:
       - REDIS_URL=redis://redis:6379
-      - TIMESCALE_URL=postgresql://${POSTGRES_USER:-trading}:${POSTGRES_PASSWORD}@timescaledb:5432/${POSTGRES_DB:-nifty50}
+      - TIMESCALE_URL=postgresql://${POSTGRES_USER:-trading}:${POSTGRES_PASSWORD:-trading123}@timescaledb:5432/${POSTGRES_DB:-nifty50}
     networks:
       - trading-network
     restart: unless-stopped
@@ -151,7 +148,7 @@ services:
       - '8082:8082'
     environment:
       - REDIS_URL=redis://redis:6379
-      - TIMESCALE_URL=postgresql://${POSTGRES_USER:-trading}:${POSTGRES_PASSWORD}@timescaledb:5432/${POSTGRES_DB:-nifty50}
+      - TIMESCALE_URL=postgresql://${POSTGRES_USER:-trading}:${POSTGRES_PASSWORD:-trading123}@timescaledb:5432/${POSTGRES_DB:-nifty50}
     volumes:
       - ../../shared:/app/shared:ro
     networks:
@@ -177,7 +174,7 @@ services:
       - '4000:4000'
     environment:
       - REDIS_URL=redis://redis:6379
-      - TIMESCALE_URL=postgresql://${POSTGRES_USER:-trading}:${POSTGRES_PASSWORD}@timescaledb:5432/${POSTGRES_DB:-nifty50}
+      - TIMESCALE_URL=postgresql://${POSTGRES_USER:-trading}:${POSTGRES_PASSWORD:-trading123}@timescaledb:5432/${POSTGRES_DB:-nifty50}
     volumes:
       - ../../layer-7-core-interface/api/src:/app/src
       - ../../shared:/app/shared:ro
@@ -187,11 +184,9 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '1'
-          memory: 1024M
+          memory: 12G
         reservations:
-          cpus: '0.5'
-          memory: 512M
+          memory: 4G
 
   # Layer 9: AI Inference Service (Python/PyTorch)
   ai-inference:
@@ -213,13 +208,9 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '1'
-          memory: 2048M
-        reservations:
-          cpus: '0.5'
-          memory: 1024M
+          memory: 16G
 
-  # Layer 9 Extension: Local LLM Provider
+  # Ollama (Local LLM)
   ollama:
     image: ollama/ollama:latest
     container_name: ollama

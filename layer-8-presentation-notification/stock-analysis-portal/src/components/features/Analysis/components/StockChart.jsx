@@ -3,9 +3,19 @@ import PropTypes from 'prop-types';
 
 /**
  * StockChart Component
- * Renders candlestick chart with EMA overlays using TradingView Lightweight Charts v5
+ * Renders candlestick chart with multiple overlay options using TradingView Lightweight Charts v5
+ * Supports: EMA, Bollinger Bands, Supertrend overlays
  */
-export default function StockChart({ candles, indicators, height = 400 }) {
+export default function StockChart({
+  candles,
+  indicators,
+  height = 400,
+  showEMA = true,
+  showBollinger = false,
+  showSupertrend = false,
+  showVolume = false,
+  showSupportResistance = false,
+}) {
   const chartContainerRef = useRef(null);
   const chartRef = useRef(null);
   const isDisposedRef = useRef(false);
@@ -90,7 +100,7 @@ export default function StockChart({ candles, indicators, height = 400 }) {
     candlestickSeries.setData(formattedCandles);
 
     // Add EMA overlays
-    if (indicators?.ema) {
+    if (showEMA && indicators?.ema) {
       const emaColors = {
         ema20: '#f59e0b', // Amber
         ema50: '#3b82f6', // Blue
@@ -121,6 +131,94 @@ export default function StockChart({ candles, indicators, height = 400 }) {
       });
     }
 
+    // Add Bollinger Bands overlay
+    if (showBollinger && indicators?.bb) {
+      const bbColors = {
+        upper: '#ef4444',   // Red
+        middle: '#6b7280',  // Gray
+        lower: '#10b981',   // Green
+      };
+
+      ['upper', 'middle', 'lower'].forEach((band) => {
+        const values = indicators.bb[band];
+        if (!values || values.length === 0) return;
+
+        const lineSeries = chart.addSeries(LineSeries, {
+          color: bbColors[band],
+          lineWidth: band === 'middle' ? 1 : 1,
+          lineStyle: band === 'middle' ? 2 : 0, // Dashed for middle
+          crosshairMarkerVisible: false,
+          priceLineVisible: false,
+          lastValueVisible: false,
+        });
+
+        const lineData = values
+          .map((v, i) => ({
+            time: Math.floor(new Date(candles[i]?.time).getTime() / 1000),
+            value: v,
+          }))
+          .filter((d) => d.value !== null && !isNaN(d.time));
+
+        if (lineData.length > 0) {
+          lineSeries.setData(lineData);
+        }
+      });
+    }
+
+    // Add Supertrend overlay
+    if (showSupertrend && indicators?.supertrend?.value) {
+      const supertrendData = indicators.supertrend.value
+        .map((v, i) => {
+          if (v === null) return null;
+          const direction = indicators.supertrend.direction?.[i];
+          return {
+            time: Math.floor(new Date(candles[i]?.time).getTime() / 1000),
+            value: v,
+            color: direction === 1 ? '#10b981' : '#ef4444',
+          };
+        })
+        .filter((d) => d !== null && !isNaN(d.time));
+
+      if (supertrendData.length > 0) {
+        // Split into bullish and bearish segments for proper coloring
+        const bullishSeries = chart.addSeries(LineSeries, {
+          color: '#10b981',
+          lineWidth: 2,
+          crosshairMarkerVisible: false,
+          priceLineVisible: false,
+          lastValueVisible: false,
+        });
+
+        const bearishSeries = chart.addSeries(LineSeries, {
+          color: '#ef4444',
+          lineWidth: 2,
+          crosshairMarkerVisible: false,
+          priceLineVisible: false,
+          lastValueVisible: false,
+        });
+
+        const bullishData = [];
+        const bearishData = [];
+
+        supertrendData.forEach((d, i) => {
+          const direction = indicators.supertrend.direction?.[candles.findIndex(c =>
+            Math.floor(new Date(c.time).getTime() / 1000) === d.time
+          )];
+
+          if (direction === 1) {
+            bullishData.push({ time: d.time, value: d.value });
+            bearishData.push({ time: d.time, value: NaN });
+          } else {
+            bearishData.push({ time: d.time, value: d.value });
+            bullishData.push({ time: d.time, value: NaN });
+          }
+        });
+
+        if (bullishData.length > 0) bullishSeries.setData(bullishData.filter(d => !isNaN(d.value)));
+        if (bearishData.length > 0) bearishSeries.setData(bearishData.filter(d => !isNaN(d.value)));
+      }
+    }
+
     // Fit content
     chart.timeScale().fitContent();
 
@@ -145,7 +243,7 @@ export default function StockChart({ candles, indicators, height = 400 }) {
         chartRef.current = null;
       }
     };
-  }, [chartModule, candles, indicators, height]);
+  }, [chartModule, candles, indicators, height, showEMA, showBollinger, showSupertrend]);
 
   if (!candles || candles.length === 0) {
     return (
@@ -160,17 +258,39 @@ export default function StockChart({ candles, indicators, height = 400 }) {
 
   return (
     <div className="relative">
-      {/* EMA Legend */}
-      <div className="absolute top-2 left-2 z-10 flex gap-4 text-xs bg-background/80 px-2 py-1 rounded">
-        <span className="flex items-center gap-1">
-          <span className="w-3 h-0.5 bg-amber-500"></span> EMA 20
-        </span>
-        <span className="flex items-center gap-1">
-          <span className="w-3 h-0.5 bg-blue-500"></span> EMA 50
-        </span>
-        <span className="flex items-center gap-1">
-          <span className="w-3 h-0.5 bg-purple-500"></span> EMA 200
-        </span>
+      {/* Overlay Legend */}
+      <div className="absolute top-2 left-2 z-10 flex flex-wrap gap-4 text-xs bg-background/80 px-2 py-1 rounded">
+        {showEMA && (
+          <>
+            <span className="flex items-center gap-1">
+              <span className="w-3 h-0.5 bg-amber-500"></span> EMA 20
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="w-3 h-0.5 bg-blue-500"></span> EMA 50
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="w-3 h-0.5 bg-purple-500"></span> EMA 200
+            </span>
+          </>
+        )}
+        {showBollinger && (
+          <>
+            <span className="flex items-center gap-1">
+              <span className="w-3 h-0.5 bg-red-500"></span> BB Upper
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="w-3 h-0.5 bg-gray-500"></span> BB Middle
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="w-3 h-0.5 bg-green-500"></span> BB Lower
+            </span>
+          </>
+        )}
+        {showSupertrend && (
+          <span className="flex items-center gap-1">
+            <span className="w-3 h-0.5 bg-gradient-to-r from-green-500 to-red-500"></span> Supertrend
+          </span>
+        )}
       </div>
       <div ref={chartContainerRef} className="rounded-lg overflow-hidden" />
     </div>
@@ -189,6 +309,13 @@ StockChart.propTypes = {
   ),
   indicators: PropTypes.shape({
     ema: PropTypes.object,
+    bb: PropTypes.object,
+    supertrend: PropTypes.object,
   }),
   height: PropTypes.number,
+  showEMA: PropTypes.bool,
+  showBollinger: PropTypes.bool,
+  showSupertrend: PropTypes.bool,
+  showVolume: PropTypes.bool,
+  showSupportResistance: PropTypes.bool,
 };

@@ -9,8 +9,8 @@ RUN npm config set strict-ssl false
 COPY package*.json ./
 COPY prisma ./prisma/
 
-# Install all dependencies (including dev for prisma CLI)
-RUN npm install --legacy-peer-deps && npm install fastify@5 --save-exact
+# Install all dependencies (including dev for prisma CLI) AND PM2 globally
+RUN npm install --legacy-peer-deps && npm install fastify@5 --save-exact && npm install pm2 -g
 
 # Generate Prisma Client (disable SSL verification for binary download)
 RUN NODE_TLS_REJECT_UNAUTHORIZED=0 npx prisma generate
@@ -26,4 +26,5 @@ USER node
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD wget --no-verbose --tries=1 --spider http://localhost:4000/health || exit 1
 
-CMD ["node", "src/index.js"]
+# Run with PM2 in production for clustering and zero-downtime reloads
+CMD ["pm2-runtime", "ecosystem.config.js"]

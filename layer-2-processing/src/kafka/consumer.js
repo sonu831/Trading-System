@@ -44,9 +44,9 @@ async function startConsumer(messageHandler) {
     await consumer.connect();
     logger.info(`Kafka Consumer connected to: ${KAFKA_BROKERS.join(', ')}`);
 
-    // fromBeginning: false -> Only consume NEW messages when the service starts.
-    // This assumes historical data is backfilled separately or handled by offset commits.
-    await consumer.subscribe({ topic: TOPIC, fromBeginning: false });
+    // fromBeginning: true -> Consume all available messages from the beginning of the topic.
+    // This ensures no messages are missed, even if the service was down.
+    await consumer.subscribe({ topic: TOPIC, fromBeginning: true });
     logger.info(`Subscribed to topic: ${TOPIC}`);
 
     await consumer.run({

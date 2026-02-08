@@ -545,6 +545,11 @@ const runBackfill = async (startParams = {}) => {
     else scriptArgs.push('--days', '5');
     if (jobId) scriptArgs.push('--job-id', jobId);
     
+    // Pass Force Flag
+    if (startParams.force) {
+      scriptArgs.push('--force');
+    }
+    
     // Pass Swarm Flag
     if (startParams.useSwarm !== undefined) {
       scriptArgs.push('--use-swarm', String(startParams.useSwarm));
@@ -625,12 +630,12 @@ app.get('/api/backfill/swarm/status', async (req, res) => {
 
 app.post('/api/backfill/historical', async (req, res) => {
   try {
-    const { symbol, fromDate, toDate } = req.body;
+    const { symbol, fromDate, toDate, force } = req.body;
     // Allow null symbol -> "All Symbols"
     // if (!symbol) return res.status(400).json({ error: 'Symbol is required' });
 
-    logger.info(`🎯 Received Historical Backfill Request: ${symbol}`);
-    runBackfill({ symbol, fromDate, toDate }).catch(err => logger.error('Backfill Error', err));
+    logger.info(`🎯 Received Historical Backfill Request: ${symbol} (Force: ${force})`);
+    runBackfill({ symbol, fromDate, toDate, force }).catch(err => logger.error('Backfill Error', err));
 
     res.json({ success: true, message: `Started backfill for ${symbol}` });
   } catch (err) {

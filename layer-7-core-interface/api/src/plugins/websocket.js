@@ -25,7 +25,11 @@ async function socketPlugin(fastify, options) {
     const io = fastify.io;
 
     // Initialize Service handling logic
-    const socketService = new SocketService(io);
+    // Initialize SocketService with notificationService for persistence and systemService for data refresh
+    const notificationService = fastify.container.resolve('notificationService');
+    const systemService = fastify.container.resolve('systemService');
+    const logger = fastify.container.resolve('logger');
+    const socketService = new SocketService(io, notificationService, systemService, logger);
 
     // Make service available via DI/Decorators if needed
     // fastify.decorate('socketService', socketService);

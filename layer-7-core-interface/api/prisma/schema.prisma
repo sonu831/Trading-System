@@ -71,6 +71,7 @@ model candles_1m {
   created_at DateTime? @default(now()) @db.Timestamptz(6)
 
   @@id([time, symbol])
+  @@unique([symbol, time], map: "unique_candle_per_minute")
   @@index([time(sort: Desc)])
   @@index([symbol, time(sort: Desc)], map: "idx_candles_1m_symbol_time")
 }
@@ -392,4 +393,16 @@ model users {
 
   @@index([email], map: "idx_users_email")
   @@index([telegram_id], map: "idx_users_telegram")
+}
+
+model system_notifications {
+  id         Int       @id @default(autoincrement())
+  type       String
+  message    String    
+  metadata   Json?     @default("{}")
+  is_read    Boolean   @default(false)
+  created_at DateTime  @default(now()) @db.Timestamptz(6)
+
+  @@index([created_at(sort: Desc)])
+  @@index([is_read])
 }

@@ -24,7 +24,8 @@ help:
 	@echo "🚀 Nifty 50 Trading System"
 	@echo ""
 	@echo "📦 LIFECYCLE (Docker)"
-	@echo "  make up             Start full stack"
+	@echo "  make up             Production mode (all services with resource limits)"
+	@echo "  make up-dev         Development mode (minimal resources, no email/telegram/AI)"
 	@echo "  make down           Stop everything (Auto-Backup)"
 	@echo "  make dev-nodb       Restart Apps (Keep DB/Kafka running)"
 	@echo "  make stop-all       Force Stop (Skip Backup)"
@@ -63,45 +64,135 @@ help:
 deploy: app-build ui notify-build
 	@echo "✅ Deployment complete!"
 
-up: infra wait-kafka observe notify app ui check-restore
-	@echo "🚀 Full stack running!"
+# ===========================================================
+# PHASED STARTUP SEQUENCE
+# ===========================================================
+
+# Phase 1: Core Infrastructure (DB, Redis, Zookeeper)
+infra-core:
+	@echo "🔧 Phase 1: Starting Core Infrastructure..."
+	$(DC) -f $(COMPOSE_DIR)/docker-compose.infra.yml up -d timescaledb redis zookeeper pgadmin redis-commander
+	@echo "⏳ Waiting for services to be healthy..."
+	@./scripts/wait-for-health.sh timescaledb redis zookeeper
+
+# Phase 2: Interactive Data Restore
+restore-check:
+	@echo "🔍 Phase 2: Checking database..."
+	@if ! docker exec timescaledb psql -U trading nifty50 -c "SELECT 1 FROM instruments LIMIT 1;" > /dev/null 2>&1; then \
+		echo "⚠️  Database is empty!"; \
+		if [ -d "backups" ] && [ "$$(find backups -name '*.sql' | wc -l)" -gt 0 ]; then \
+			echo ""; \
+			read -p "📦 Restore SCHEMA? (y/N): " schema_res; \
+			if [ "$$schema_res" = "y" ] || [ "$$schema_res" = "Y" ]; then \
+				make restore-schema; \
+			fi; \
+			echo ""; \
+			read -p "📦 Restore DATA? (y/N): " data_res; \
+			if [ "$$data_res" = "y" ] || [ "$$data_res" = "Y" ]; then \
+				make restore-data; \
+			fi; \
+		else \
+			echo "ℹ️  No backups found. Continuing with empty database."; \
+		fi; \
+	else \
+		echo "✅ Database has data."; \
+	fi
+
+# Phase 3: Kafka
+infra-kafka:
+	@echo "🔧 Phase 3: Starting Kafka..."
+	$(DC) -f $(COMPOSE_DIR)/docker-compose.infra.yml up -d kafka kafka-ui
+	@if ! make wait-kafka; then \
+		echo ""; \
+		echo "⚠️  Kafka failed to start!"; \
+		read -p "🔧 Run 'make fix-kafka' to resolve? (y/N): " fix; \
+		if [ "$$fix" = "y" ] || [ "$$fix" = "Y" ]; then \
+			make fix-kafka; \
+			echo "⏳ Retrying Kafka startup..."; \
+			$(DC) -f $(COMPOSE_DIR)/docker-compose.infra.yml up -d kafka kafka-ui; \
+			make wait-kafka; \
+		else \
+			echo "❌ Kafka startup failed. Cannot continue."; \
+			exit 1; \
+		fi; \
+	fi
+
+# Phase 4a: Backend API (creates schema)
+app-backend:
+	@echo "🔧 Phase 4a: Starting Backend API..."
+	$(DC) -f $(COMPOSE_DIR)/docker-compose.app.yml up -d backend-api
+	@echo "⏳ Waiting for schema creation..."
+	@sleep 5
+
+# Phase 4b: Processing Layer
+app-processing:
+	@echo "🔧 Phase 4b: Starting Processing Layer..."
+	$(DC) -f $(COMPOSE_DIR)/docker-compose.app.yml up -d processing
+
+# Phase 4c: Remaining App Services
+app-rest:
+	@echo "🔧 Phase 4c: Starting Remaining Services..."
+	$(DC) -f $(COMPOSE_DIR)/docker-compose.app.yml up -d
+
+# Phase 5: UI & Monitoring
+ui-and-observe:
+	@echo "🔧 Phase 5: Starting UI & Monitoring..."
+	$(DC) -f $(COMPOSE_DIR)/docker-compose.ui.yml up -d
+	$(DC) -f $(COMPOSE_DIR)/docker-compose.observe.yml up -d
+
+# Production: Full Stack with Notifications
+up: infra-core restore-check infra-kafka app-backend app-processing app-rest ui-and-observe ai gateway notify
+	@echo "✅ Production stack running!"
 	@echo ""
-	@echo "🌐 Frontend:"
-	@echo "   - Dashboard:       http://localhost:3000"
-	@echo "   - Gateway:         http://localhost:8088"
+	@echo "🌐 Available Services:"
+	@echo "   - Dashboard:    http://localhost:3000"
+	@echo "   - Backend API:  http://localhost:4000"
+	@echo "   - Gateway:      http://localhost:8088"
+	@echo "   - Grafana:      http://localhost:3001"
+	@echo "   - PgAdmin:      http://localhost:5051"
+	@echo "   - Kafka UI:     http://localhost:8090"
 	@echo ""
-	@echo "🔌 APIs & Services:"
-	@echo "   - Backend API:     http://localhost:4000"
-	@echo "   - AI Service:      http://localhost:8000"
-	@echo "   - Email Service:   http://localhost:7001"
-	@echo "   - Telegram Bot:    http://localhost:7000"
+	@echo "📧 Notifications: Enabled (Email + Telegram)"
+
+# Development: All Services Except Notifications
+up-dev: infra-core restore-check infra-kafka app-backend app-processing app-rest ui-and-observe ai gateway
+	@echo "✅ Development mode running!"
 	@echo ""
-	@echo "📊 Observability:"
-	@echo "   - Grafana:         http://localhost:3001"
-	@echo "   - Prometheus:      http://localhost:9090"
-	@echo "   - Loki:            http://localhost:3100"
+	@echo "🌐 Available Services:"
+	@echo "   - Dashboard:    http://localhost:3000"
+	@echo "   - Backend API:  http://localhost:4000"
+	@echo "   - Gateway:      http://localhost:8088"
+	@echo "   - Grafana:      http://localhost:3001"
+	@echo "   - PgAdmin:      http://localhost:5051"
+	@echo "   - AI Services:  Running"
 	@echo ""
-	@echo "🔧 Infrastructure:"
-	@echo "   (Run 'make infra' to see DB/Kafka details)"
+	@echo "📊 Services DISABLED:"
+	@echo "   ❌ Email Service"
+	@echo "   ❌ Telegram Bot"
 
 down:
-	@echo "🔄 Intelligent Shutdown Sequence Initiated..."
-	@echo "1️⃣  Cleaning old backups..."
-	@make clean-backups
-	@echo "2️⃣  Backing up Schema..."
-	@make backup-schema
-	@echo "3️⃣  Backing up Data..."
-	@make backup-data
-	@echo "🛑 Stopping all containers..."
+	@echo "🔄 Intelligent Shutdown Sequence..."
+	@echo "1️⃣  Stopping UI & Monitoring (frees memory)..."
+	-$(DC) -f $(COMPOSE_DIR)/docker-compose.ui.yml down
+	-$(DC) -f $(COMPOSE_DIR)/docker-compose.observe.yml down
+	@echo "2️⃣  Stopping Gateway & Notifications..."
 	-$(DC) -f $(COMPOSE_DIR)/docker-compose.gateway.yml down
 	-$(DC) -f $(COMPOSE_DIR)/docker-compose.notify.yml down
-	-$(DC) -f $(COMPOSE_DIR)/docker-compose.ui.yml down
+	@echo "3️⃣  Stopping AI Services..."
+	-$(DC) -f $(COMPOSE_DIR)/docker-compose.ai.yml down
+	@echo "4️⃣  Stopping Application Services..."
 	-$(DC) -f $(COMPOSE_DIR)/docker-compose.app.yml down
-	-$(DC) -f $(COMPOSE_DIR)/docker-compose.observe.yml down
+	@echo "5️⃣  Backing up database (more memory available now)..."
+	@make backup-schema
+	@make backup-data
+	@echo "6️⃣  Stopping Kafka & Message Queue..."
+	-docker stop kafka kafka-ui 2>/dev/null || true
+	@echo "7️⃣  Stopping Database & Infrastructure (last)..."
+	-docker stop timescaledb redis zookeeper pgadmin redis-commander 2>/dev/null || true
 	-$(DC) -f $(COMPOSE_DIR)/docker-compose.infra.yml down
-	@echo "🗑️ Cleaning data folder..."
+	@echo "8️⃣  Cleaning data folder..."
 	@rm -rf data/*
-	@echo "✅ Stopped, Backed Up, and Cleaned."
+	@echo "✅ Shutdown complete! Database stopped last after backup."
 
 dev-nodb:
 	@echo "🔄 Restarting Applications (Keeping DB/Kafka running)..."
@@ -218,16 +309,16 @@ gateway:
 
 ai:
 	@echo "🧠 Starting AI Stack (Inference + Ollama)..."
-	$(DC) -f $(COMPOSE_DIR)/docker-compose.app.yml up -d ai-inference ollama
+	$(DC) -f $(COMPOSE_DIR)/docker-compose.ai.yml up -d --build
 	@echo "✅ AI Services running."
 
 ai-restart:
 	@echo "🔄 Restarting AI Stack..."
-	$(DC) -f $(COMPOSE_DIR)/docker-compose.app.yml restart ai-inference ollama
+	$(DC) -f $(COMPOSE_DIR)/docker-compose.ai.yml restart
 	@echo "✅ AI Services restarted."
 
 ai-logs:
-	@$(DC) -f $(COMPOSE_DIR)/docker-compose.app.yml logs -f ai-inference ollama
+	$(DC) -f $(COMPOSE_DIR)/docker-compose.ai.yml logs -f
 
 # ===========================================================
 # 4. DATABASE OPERATIONS
@@ -260,14 +351,33 @@ backup:
 
 
 backup-data:
+	@echo "💾 Creating new backup..."
 	@TS=$$(date "+%d-%b-%Y_%I-%M-%S_%p"); \
 	DIR="backups/Stock_Market_Live_Data_DataOnly_$$TS"; \
 	mkdir -p $$DIR; \
 	FILE=$$DIR/Stock_Market_Live_Data_DataOnly.sql; \
-	echo "💾 Backing up TimescaleDB DATA ONLY to $$DIR..."; \
+	echo "📦 Backing up TimescaleDB DATA ONLY to $$DIR..."; \
 	if docker exec timescaledb pg_dump -U trading nifty50 --data-only > $$FILE; then \
 		if [ -s $$FILE ]; then \
 			echo "✅ Data Backup SAVED & VERIFIED: $$FILE ($$(du -h $$FILE | cut -f1))"; \
+			echo ""; \
+			echo "🗑️  Checking for old backups..."; \
+			OLD_COUNT=$$(find backups -name "Stock_Market_Live_Data_DataOnly_*" -type d | wc -l | tr -d ' '); \
+			if [ $$OLD_COUNT -gt 5 ]; then \
+				echo "📊 Found $$OLD_COUNT data backups (keeping last 5)"; \
+				find backups -name "Stock_Market_Live_Data_DataOnly_*" -type d | head -n -5; \
+				echo ""; \
+				read -p "❓ Delete old backups? (y/N): " confirm; \
+				if [ "$$confirm" = "y" ] || [ "$$confirm" = "Y" ]; then \
+					echo "🗑️  Removing old backups..."; \
+					find backups -name "Stock_Market_Live_Data_DataOnly_*" -type d | head -n -5 | xargs rm -rf; \
+					echo "✅ Old backups removed!"; \
+				else \
+					echo "⏭️  Skipped cleanup. You have $$OLD_COUNT backups."; \
+				fi; \
+			else \
+				echo "✅ Only $$OLD_COUNT backups found. No cleanup needed."; \
+			fi; \
 		else \
 			echo "❌ Data Backup FAILED: File is empty!"; \
 			rm -rf $$DIR; \
@@ -280,14 +390,33 @@ backup-data:
 	fi
 
 backup-schema:
+	@echo "💾 Creating new schema backup..."
 	@TS=$$(date "+%d-%b-%Y_%I-%M-%S_%p"); \
 	DIR="backups/Stock_Market_Live_Data_SchemaOnly_$$TS"; \
 	mkdir -p $$DIR; \
 	FILE=$$DIR/Stock_Market_Live_Data_SchemaOnly.sql; \
-	echo "💾 Backing up TimescaleDB SCHEMA ONLY to $$DIR..."; \
+	echo "� Backing up TimescaleDB SCHEMA ONLY to $$DIR..."; \
 	if docker exec timescaledb pg_dump -U trading nifty50 --schema-only > $$FILE; then \
 		if [ -s $$FILE ]; then \
 			echo "✅ Schema Backup SAVED & VERIFIED: $$FILE ($$(du -h $$FILE | cut -f1))"; \
+			echo ""; \
+			echo "🗑️  Checking for old schema backups..."; \
+			OLD_COUNT=$$(find backups -name "Stock_Market_Live_Data_SchemaOnly_*" -type d | wc -l | tr -d ' '); \
+			if [ $$OLD_COUNT -gt 3 ]; then \
+				echo "📊 Found $$OLD_COUNT schema backups (keeping last 3)"; \
+				find backups -name "Stock_Market_Live_Data_SchemaOnly_*" -type d | head -n -3; \
+				echo ""; \
+				read -p "❓ Delete old schema backups? (y/N): " confirm; \
+				if [ "$$confirm" = "y" ] || [ "$$confirm" = "Y" ]; then \
+					echo "🗑️  Removing old backups..."; \
+					find backups -name "Stock_Market_Live_Data_SchemaOnly_*" -type d | head -n -3 | xargs rm -rf; \
+					echo "✅ Old schema backups removed!"; \
+				else \
+					echo "⏭️  Skipped cleanup. You have $$OLD_COUNT schema backups."; \
+				fi; \
+			else \
+				echo "✅ Only $$OLD_COUNT schema backups found. No cleanup needed."; \
+			fi; \
 		else \
 			echo "❌ Schema Backup FAILED: File is empty!"; \
 			rm -rf $$DIR; \
@@ -335,26 +464,57 @@ redis-clear:
 	@docker exec redis redis-cli FLUSHALL
 	@echo "✅ Redis cache cleared!"
 
-# ───────────────────────────────────────────────────────────────
-# clear-data: Clear market data tables (keeps schema intact)
-# Use this when you want to re-import data without full db-reset
-# Tables cleared: candles_1m, data_availability
-# ───────────────────────────────────────────────────────────────
-clear-data:
-	@echo "🗑️ Clearing market data tables..."
-	@docker exec timescaledb psql -U trading -d nifty50 -c "TRUNCATE candles_1m CASCADE;"
-	@docker exec timescaledb psql -U trading -d nifty50 -c "TRUNCATE data_availability;"
-	@echo "🗑️ Clearing Redis cache..."
-	@docker exec redis redis-cli FLUSHALL
-	@echo "✅ Data cleared! Tables: candles_1m, data_availability + Redis cache"
+clean-notifications:
+	@echo "🗑️ Cleaning old system notifications..."
+	@docker exec timescaledb psql -U trading -d nifty50 -c "DELETE FROM system_notifications WHERE created_at < NOW() - INTERVAL '5 days';"
+	@docker exec timescaledb psql -U trading -d nifty50 -c "VACUUM system_notifications;"
+	@echo "✅ Old notifications removed (kept last 5 days)"
+
+truncate-notifications:
+	@echo "🗑️  TRUNCATING system_notifications (Instant & Clean)..."
+	@docker exec timescaledb psql -U trading -d nifty50 -c "TRUNCATE TABLE system_notifications;"
+	@docker exec timescaledb psql -U trading -d nifty50 -c "VACUUM system_notifications;"
+	@echo "✅ All notifications cleared! Table size is now 0."
+
+restore-schema:
+	@echo "📂 Available SCHEMA backups:"
+	@find backups -name "*SchemaOnly*.sql" -maxdepth 2 | sort -r | head -5 || echo "No schema backups found!"
+	@echo ""
+	@read -p "Enter schema backup filepath (or Enter for latest): " file; \
+	if [ -z "$$file" ]; then \
+		file=$$(find backups -name "*SchemaOnly*.sql" -maxdepth 2 | sort -r | head -1); \
+	fi; \
+	if [ -z "$$file" ]; then \
+		echo "❌ No schema backup found!"; \
+	else \
+		echo "🔄 Restoring SCHEMA from $$file..."; \
+		docker exec -i timescaledb psql -U trading nifty50 < $$file; \
+		echo "✅ Schema restore complete!"; \
+	fi
+
+restore-data:
+	@echo "📂 Available DATA backups:"
+	@find backups -name "*DataOnly*.sql" -maxdepth 2 | sort -r | head -5 || echo "No data backups found!"
+	@echo ""
+	@read -p "Enter data backup filepath (or Enter for latest): " file; \
+	if [ -z "$$file" ]; then \
+		file=$$(find backups -name "*DataOnly*.sql" -maxdepth 2 | sort -r | head -1); \
+	fi; \
+	if [ -z "$$file" ]; then \
+		echo "❌ No data backup found!"; \
+	else \
+		echo "🔄 Restoring DATA from $$file..."; \
+		docker exec -i timescaledb psql -U trading nifty50 < $$file; \
+		echo "✅ Data restore complete!"; \
+	fi
 
 restore:
-	@echo "📂 Available backups:"
-	@find backups -name "*.sql" -maxdepth 2 | sort -r | head -10 || echo "No backups found!"
+	@echo "📂 Available FULL backups:"
+	@find backups -name "*.sql" -not -name "*SchemaOnly*" -not -name "*DataOnly*" -maxdepth 2 | sort -r | head -10 || echo "No full backups found!"
 	@echo ""
 	@read -p "Enter backup filepath (or press Enter for latest): " file; \
 	if [ -z "$$file" ]; then \
-		file=$$(find backups -name "*.sql" -maxdepth 2 | sort -r | head -1); \
+		file=$$(find backups -name "*.sql" -not -name "*SchemaOnly*" -not -name "*DataOnly*" -maxdepth 2 | sort -r | head -1); \
 	fi; \
 	if [ -z "$$file" ]; then \
 		echo "❌ No backup file found!"; exit 1; \

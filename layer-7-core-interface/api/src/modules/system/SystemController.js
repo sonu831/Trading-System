@@ -10,10 +10,12 @@ class SystemController extends BaseController {
   /**
    * @param {Object} dependencies - Dependency injection container
    * @param {SystemService} dependencies.systemService - Service for system logic
+   * @param {Object} dependencies.dataSyncJob - Data Sync Cron Job instance
    */
-  constructor({ systemService }) {
+  constructor({ systemService, dataSyncJob }) {
     super({ service: systemService });
     this.systemService = systemService;
+    this.dataSyncJob = dataSyncJob;
   }
 
   /**
@@ -43,6 +45,47 @@ class SystemController extends BaseController {
     try {
       const result = await this.systemService.triggerBackfill(req.body);
       return this.sendSuccess(reply, result);
+    } catch (err) {
+      return this.sendError(reply, err);
+    }
+  };
+
+  /**
+   * @method getDataSyncStatus
+   * @description Get status of the periodic Data Sync Cron Job
+   */
+  getDataSyncStatus = async (req, reply) => {
+    try {
+      const status = await this.systemService.getDataSyncStatus();
+      return this.sendSuccess(reply, status);
+    } catch (err) {
+      return this.sendError(reply, err);
+    }
+  };
+
+  /**
+   * @method triggerDataSync
+   * @description Manually trigger the Data Sync Job
+   */
+  triggerDataSync = async (req, reply) => {
+    try {
+      req.log.info({ hasDataSyncJob: !!this.dataSyncJob }, 'DEBUG: triggerDataSync called');
+      // Use the job instance logic (updates Redis status too)
+      if (this.dataSyncJob) {
+        this.dataSyncJob.runJob().catch(err => {
+          req.log.error({ err }, 'Manual data sync failed');
+        });
+      } else {
+        // Fallback if dataSyncJob not injected (shouldn't happen)
+        this.systemService.syncAllDataAvailability().catch(err => {
+          req.log.error({ err }, 'Manual data sync failed (direct service call)');
+        });
+      }
+      
+      return this.sendSuccess(reply, { 
+        message: 'Data Sync triggered. Check status endpoint for progress.',
+        timestamp: new Date() 
+      });
     } catch (err) {
       return this.sendError(reply, err);
     }
@@ -170,6 +213,18 @@ class SystemController extends BaseController {
       const tradingDays = parseInt(req.query.days) || 5;
       const symbols = await this.systemService.getSymbolsWithGaps(tradingDays);
       return this.sendSuccess(reply, { symbols });
+    } catch (err) {
+      return this.sendError(reply, err);
+    }
+  };
+  /**
+   * @method clearCache
+   * @description Clear API Caches for System and Data Availability
+   */
+  clearCache = async (req, reply) => {
+    try {
+      const result = await this.systemService.clearSystemCache();
+      return this.sendSuccess(reply, result);
     } catch (err) {
       return this.sendError(reply, err);
     }

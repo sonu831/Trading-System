@@ -84,7 +84,7 @@ export default function useBackfillManager() {
   const laggingSymbols = symbols.filter((s) => s.status !== 'healthy');
 
   // Trigger backfill for a single symbol
-  const triggerBackfill = async (symbol, fromDate, toDate) => {
+  const triggerBackfill = async (symbol, fromDate, toDate, force = false) => {
     setBackfillInProgress((prev) => ({ ...prev, [symbol]: true }));
     setMessage(null);
 
@@ -96,6 +96,7 @@ export default function useBackfillManager() {
           symbol,
           fromDate,
           toDate,
+          force, // Pass force flag
         }),
       });
 
@@ -122,46 +123,87 @@ export default function useBackfillManager() {
     }
   };
 
-  // Trigger bulk backfill for all lagging symbols
-  const triggerBulkBackfill = async (fromDate, toDate) => {
+  // Trigger bulk backfill with modes (Missing vs All)
+  const triggerBulkBackfill = async (fromDate, toDate, mode = 'missing', force = false) => {
     setMessage(null);
     const lagging = laggingSymbols.map((s) => s.symbol);
     
-    if (lagging.length === 0) {
+    // Check if missing mode has targets
+    if (mode === 'missing' && lagging.length === 0) {
       setMessage({ type: 'info', text: 'No lagging symbols to backfill.' });
       return;
     }
 
-    // Mark all as in progress
+    // Set Loading State
     const inProgressMap = {};
-    lagging.forEach((s) => {
-      inProgressMap[s] = true;
-    });
+    if (mode === 'missing') {
+      lagging.forEach((s) => { inProgressMap[s] = true; });
+    } else {
+      // For ALL, we mark everyone potentially, or just show global spinner?
+      // Mark all symbols as in progress for visual feedback
+      symbols.forEach((s) => { inProgressMap[s.symbol] = true; });
+    }
     setBackfillInProgress((prev) => ({ ...prev, ...inProgressMap }));
 
     try {
-      // Trigger backfill for ALL symbols (null means all)
-      const res = await fetch(`${API_URL}/api/v1/system/backfill/trigger`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          symbol: null, // All symbols
-          fromDate,
-          toDate,
-        }),
-      });
+      if (mode === 'missing') {
+        // Option A: Specific Symbols Loop
+        // We trigger individual jobs for each lagging symbol to ensure specific targeting
+        let successCount = 0;
+        const promises = lagging.map(async (symbol) => {
+          try {
+            const res = await fetch(`${API_URL}/api/v1/system/backfill/trigger`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                symbol,
+                fromDate,
+                toDate,
+                force, // Pass force flag
+              }),
+            });
+            if (res.ok) successCount++;
+            return res.ok;
+          } catch (e) {
+            console.error(`Failed individual backfill for ${symbol}`, e);
+            return false;
+          }
+        });
 
-      const data = await res.json();
-
-      if (res.ok) {
+        await Promise.all(promises);
+        
         setMessage({
           type: 'success',
-          text: `✅ Bulk backfill started for ${lagging.length} lagging symbols! Job ID: ${data.data?.jobId || 'N/A'}`,
+          text: `✅ Started backfill for ${successCount}/${lagging.length} symbols. Check status indicators.`,
         });
-        setTimeout(fetchCoverage, 10000);
+
       } else {
-        throw new Error(data.error || 'Failed to trigger bulk backfill');
+        // Option B: ALL Symbols (One Job)
+        const res = await fetch(`${API_URL}/api/v1/system/backfill/trigger`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            symbol: null, // Mean ALL
+            fromDate,
+            toDate,
+            force, // Pass force flag
+          }),
+        });
+
+        const data = await res.json();
+        if (res.ok) {
+          setMessage({
+            type: 'success',
+            text: `✅ Bulk backfill started for ALL symbols! Job ID: ${data.data?.jobId || 'N/A'}`,
+          });
+        } else {
+          throw new Error(data.error || 'Failed to trigger bulk backfill');
+        }
       }
+
+      // Refresh after delay
+      setTimeout(fetchCoverage, 10000);
+
     } catch (e) {
       setMessage({
         type: 'error',

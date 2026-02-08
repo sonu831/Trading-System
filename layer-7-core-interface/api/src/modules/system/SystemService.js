@@ -73,6 +73,7 @@ class SystemService extends BaseService {
           symbol: payload.symbol,
           fromDate: payload.fromDate,
           toDate: payload.toDate,
+          force: payload.force, // Pass force flag
           jobId: job.job_id,
         });
 
@@ -166,6 +167,27 @@ class SystemService extends BaseService {
    * Update data availability after ingestion
    * @param {Object} params - { symbol, timeframe, firstDate, lastDate, recordCount }
    */
+  /**
+   * Refresh data availability from source of truth
+   */
+  async refreshDataAvailability(symbol) {
+    return this.systemRepository.refreshDataAvailability(symbol);
+  }
+
+  /**
+   * Sync all data availability (Cron Job)
+   */
+  async syncAllDataAvailability() {
+    return this.systemRepository.syncAllDataAvailability();
+  }
+
+  /**
+   * Get Data Sync Job Status
+   */
+  async getDataSyncStatus() {
+    return this.systemRepository.getDataSyncJobStatus();
+  }
+
   async updateDataAvailability(params) {
     return this.systemRepository.updateDataAvailability(params);
   }

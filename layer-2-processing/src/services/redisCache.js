@@ -130,4 +130,18 @@ module.exports = {
       logger.error({ err: e }, 'Metric publish error');
     }
   },
+
+  /**
+   * Publish an event to a specific channel
+   * @param {string} channel
+   * @param {Object} message
+   */
+  publishEvent: async (channel, message) => {
+    if (!client) return;
+    try {
+      await client.publish(channel, JSON.stringify(message));
+    } catch (e) {
+      logger.error({ err: e, channel }, 'Event publish error');
+    }
+  },
 };

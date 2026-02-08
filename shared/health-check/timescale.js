@@ -35,8 +35,8 @@ async function waitForTimescale(options) {
 
   // Normalize logger - support both console (log) and pino (info)
   const log = (msg) => (logger.info || log).call(logger, msg);
-  const logWarn = (msg) => (logWarn || log).call(logger, msg);
-  const logError = (msg) => (logError || log).call(logger, msg);
+  const logWarn = (msg) => (logger.warn || log).call(logger, msg);
+  const logError = (msg) => (logger.error || log).call(logger, msg);
 
   if (!connectionString) {
     throw new Error('TimescaleDB connection string is required');

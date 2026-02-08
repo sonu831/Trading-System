@@ -5,37 +5,11 @@ BigInt.prototype.toJSON = function() {
   return Number(this);
 };
 
-// Build logger config - use pino-loki in production when LOKI_URL is set,
-// otherwise use simple stdout without transport (no pino-pretty dependency)
-const buildLoggerConfig = () => {
-  const lokiUrl = process.env.LOKI_URL;
-  const useStdout = process.env.LOG_TO_STDOUT === 'true' || !lokiUrl;
-
-  if (useStdout) {
-    // Simple stdout logger - no transport dependency required
-    return {
-      level: 'info',
-    };
-  }
-
-  // Use pino-loki with async batching to prevent blocking
-  return {
-    level: 'info',
-    transport: {
-      target: 'pino-loki',
-      options: {
-        host: lokiUrl,
-        labels: { app: 'layer-7-api' },
-        batching: true,
-        interval: 5,
-        silenceErrors: true, // Don't throw if Loki is unavailable
-      },
-    },
-  };
-};
+const { loggerConfig } = require('./common/logger');
+const { asValue } = require('awilix');
 
 const fastify = require('fastify')({
-  logger: buildLoggerConfig(),
+  logger: loggerConfig,
   ajv: {
     customOptions: {
       strict: false,
@@ -45,6 +19,9 @@ const fastify = require('fastify')({
 });
 const container = require('./container');
 const { waitForAll } = require('/app/shared/health-check');
+
+// Register the Fastify logger instance into the container
+container.register('logger', asValue(fastify.log));
 
 // Decorate Fastify with DI Container
 fastify.decorate('container', container);
@@ -159,6 +136,7 @@ fastify.register(require('./modules/system/routes'));
 fastify.register(require('./modules/market/routes'));
 // fastify.register(require('./modules/data/routes'));
 fastify.register(require('./modules/analysis/routes'));
+fastify.register(require('./modules/notifications/routes'));
 
 // Suggestions Endpoint (Refactored to Prisma) -> Leaving inline as it belongs to User Domain (next phase)
 fastify.post('/api/v1/suggestions', async (req, reply) => {
@@ -232,6 +210,10 @@ const start = async () => {
     await redis.connect();
     // DB Schema Init via Prisma Migration usually, but we check connection
     // Prisma client connects lazily or on first request.
+
+    // Start Background Jobs
+    // Resolving singleton instantiates it, and constructor calls init() to schedule cron
+    container.resolve('dataSyncJob');
 
     await fastify.listen({ port: PORT, host: '0.0.0.0' });
     fastify.log.info(`Server listening on ${fastify.server.address().port}`);

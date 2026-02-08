@@ -31,6 +31,8 @@ export default function BackfillManager({
   const [bulkFromDate, setBulkFromDate] = useState('');
   const [bulkToDate, setBulkToDate] = useState('');
   const [showBulkModal, setShowBulkModal] = useState(false);
+  const [bulkBackfillMode, setBulkBackfillMode] = useState('missing');
+  const [forceRefetch, setForceRefetch] = useState(false);
 
   // Initialize dates on mount
   React.useEffect(() => {
@@ -81,13 +83,13 @@ export default function BackfillManager({
 
   const handleBackfillSubmit = () => {
     if (selectedSymbol && fromDate && toDate) {
-      onTriggerBackfill(selectedSymbol, fromDate, toDate);
+      onTriggerBackfill(selectedSymbol, fromDate, toDate, forceRefetch);
     }
   };
 
   const handleBulkBackfillSubmit = () => {
     if (bulkFromDate && bulkToDate) {
-      onTriggerBulkBackfill(bulkFromDate, bulkToDate);
+      onTriggerBulkBackfill(bulkFromDate, bulkToDate, bulkBackfillMode, forceRefetch);
       setShowBulkModal(false);
     }
   };
@@ -132,9 +134,6 @@ export default function BackfillManager({
               </p>
             </div>
             <div className="flex gap-3">
-              <Button variant="secondary" onClick={onRefresh} size="sm">
-                🔄 Refresh
-              </Button>
               <Button 
                 variant="primary" 
                 onClick={() => setShowBulkModal(true)}
@@ -304,6 +303,21 @@ export default function BackfillManager({
               required
             />
           </div>
+
+          {/* Force Refetch Option */}
+          <div className="mt-4">
+            <label className="flex items-center gap-2 cursor-pointer select-none">
+              <input 
+                type="checkbox" 
+                checked={forceRefetch}
+                onChange={(e) => setForceRefetch(e.target.checked)}
+                className="rounded border-border bg-surface text-primary focus:ring-primary"
+              />
+              <span className="text-sm text-text-primary">
+                <strong>Force Refetch</strong> (Overwrite existing data)
+              </span>
+            </label>
+          </div>
           <p className="text-xs text-text-tertiary mt-4">
             ⚠️ Large date ranges may take several minutes. Check Telegram for progress updates.
           </p>
@@ -323,30 +337,103 @@ export default function BackfillManager({
       </Modal>
 
       {/* Bulk Backfill Modal */}
-      <Modal isOpen={showBulkModal} onClose={() => setShowBulkModal(false)} size="md">
+      <Modal 
+        isOpen={showBulkModal} 
+        onClose={() => setShowBulkModal(false)} 
+        size="md"
+      >
         <Modal.Header onClose={() => setShowBulkModal(false)}>
-          🚀 Bulk Backfill - {laggingSymbols.length} Symbols
+          🚀 Bulk Backfill Manager
         </Modal.Header>
         <Modal.Body>
-          <p className="text-text-secondary mb-4">
-            Trigger backfill for <strong className="text-warning">{laggingSymbols.length}</strong> lagging symbols.
-          </p>
-          
-          <div className="bg-background/50 p-3 rounded-lg border border-border mb-4 max-h-32 overflow-y-auto">
-            <div className="flex flex-wrap gap-2">
-              {laggingSymbols.map((s) => (
-                <Badge 
-                  key={s.symbol} 
-                  variant={s.status === 'critical' ? 'error' : 'warning'} 
-                  size="sm"
-                >
-                  {s.symbol}
-                </Badge>
-              ))}
+          {/* Mode Selection */}
+          <div className="mb-6 space-y-3">
+            <label className="text-sm font-bold text-text-primary block mb-2">Backfill Scope</label>
+            
+            {/* Option A: Missing Only */}
+            <div 
+              className={`p-3 rounded-lg border cursor-pointer transition-colors ${
+                bulkBackfillMode === 'missing' 
+                  ? 'bg-primary/10 border-primary' 
+                  : 'bg-background border-border hover:bg-surface-hover'
+              }`}
+              onClick={() => setBulkBackfillMode('missing')}
+            >
+              <div className="flex items-center gap-3">
+                <input 
+                  type="radio" 
+                  checked={bulkBackfillMode === 'missing'}
+                  onChange={() => setBulkBackfillMode('missing')}
+                  className="w-4 h-4 text-primary"
+                />
+                <div>
+                  <div className="font-bold text-text-primary">Backfill Missing Only (Recommended)</div>
+                  <div className="text-xs text-text-secondary">
+                    Only process the <strong className="text-warning">{laggingSymbols.length}</strong> lagging symbols.
+                    Safe and fast.
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Option B: All Symbols */}
+            <div 
+              className={`p-3 rounded-lg border cursor-pointer transition-colors ${
+                bulkBackfillMode === 'all' 
+                  ? 'bg-primary/10 border-primary' 
+                  : 'bg-background border-border hover:bg-surface-hover'
+              }`}
+              onClick={() => setBulkBackfillMode('all')}
+            >
+              <div className="flex items-center gap-3">
+                <input 
+                  type="radio" 
+                  checked={bulkBackfillMode === 'all'}
+                  onChange={() => setBulkBackfillMode('all')}
+                  className="w-4 h-4 text-primary"
+                />
+                <div>
+                  <div className="font-bold text-text-primary">Backfill ALL Symbols</div>
+                  <div className="text-xs text-text-secondary">
+                    Process all {symbols.length} Nifty 50 symbols.
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          {/* Conditional Warning for ALL */}
+          {bulkBackfillMode === 'all' && (
+            <div className="mb-4 bg-error/10 border border-error/30 p-3 rounded-lg flex gap-3 items-start">
+              <span className="text-2xl">⚠️</span>
+              <div className="text-xs text-error">
+                <strong className="block text-sm mb-1">Time Warning</strong>
+                Pulling all records for a large time frame (e.g., 1 year) will take <strong>~2 hours</strong>. 
+                Proceed with caution as this puts load on the ingestion system.
+              </div>
+            </div>
+          )}
+
+          {/* Force Refetch Option */}
+          <div className="mb-6">
+            <label className="flex items-center gap-2 cursor-pointer select-none">
+              <input 
+                type="checkbox" 
+                checked={forceRefetch}
+                onChange={(e) => setForceRefetch(e.target.checked)}
+                className="rounded border-border bg-surface text-primary focus:ring-primary"
+              />
+              <span className="text-sm text-text-primary">
+                <strong>Force Refetch</strong> (Overwrite existing data)
+              </span>
+            </label>
+            <p className="text-xs text-text-tertiary ml-6 mt-1">
+              Check this if you want to re-download data even if the DB says it exists.
+            </p>
+          </div>
+
+          {/* Date Selection */}
+          <div className="grid grid-cols-2 gap-4 mb-4">
             <Input
               label="From Date"
               type="date"
@@ -362,9 +449,25 @@ export default function BackfillManager({
               required
             />
           </div>
-          <p className="text-xs text-text-tertiary mt-4">
-            ⚠️ This will trigger a full backfill for ALL 50 stocks. Progress will be sent via Telegram.
-          </p>
+
+          {/* Preview of Symbols (Only if Missing Mode) */}
+          {bulkBackfillMode === 'missing' && laggingSymbols.length > 0 && (
+            <div className="mb-4">
+              <label className="text-xs text-text-secondary block mb-2">Target Symbols:</label>
+              <div className="bg-background/50 p-2 rounded border border-border max-h-24 overflow-y-auto flex flex-wrap gap-1">
+                {laggingSymbols.map((s) => (
+                  <Badge 
+                    key={s.symbol} 
+                    variant={s.status === 'critical' ? 'error' : 'warning'} 
+                    size="xs"
+                  >
+                    {s.symbol}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          )}
+
         </Modal.Body>
         <Modal.Footer>
           <Button variant="secondary" onClick={() => setShowBulkModal(false)}>
@@ -375,7 +478,9 @@ export default function BackfillManager({
             onClick={handleBulkBackfillSubmit}
             disabled={!bulkFromDate || !bulkToDate}
           >
-            🚀 Start Bulk Backfill
+            {bulkBackfillMode === 'all' 
+              ? `🚀 Start Bulk Backfill (ALL)` 
+              : `🚀 Backfill ${laggingSymbols.length} Symbols`}
           </Button>
         </Modal.Footer>
       </Modal>

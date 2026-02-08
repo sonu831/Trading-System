@@ -52,6 +52,9 @@ services:
       KAFKA_ZOOKEEPER_CONNECTION_TIMEOUT_MS: 6000
       # Suppress verbose logs
       KAFKA_LOG4J_LOGGERS: "kafka.coordinator.group=WARN"
+      # Retention Settings
+      KAFKA_LOG_RETENTION_MS: 604800000 # 7 Days
+      KAFKA_LOG_RETENTION_BYTES: -1
     volumes:
       - ../../data/kafka:/var/lib/kafka/data
     networks:
@@ -126,10 +129,15 @@ services:
       - '5432:5432'
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-trading}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD} # REQUIRED: Set in .env file
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-trading123}
       POSTGRES_DB: ${POSTGRES_DB:-nifty50}
+      # Increase max connections to prevent "too many clients" errors
+      # Default is 100, increase to 200 for multiple services + backups
+      POSTGRES_ARGS: "-c max_connections=200"
     command:
       - postgres
+      - -c
+      - max_connections=200 # Increased from default 100 for multiple services + backups
       - -c
       - shared_buffers=6GB # ULTRA: 35-40% of 16GB RAM
       - -c
@@ -145,13 +153,19 @@ services:
       - -c
       - random_page_cost=1.0 # ULTRA: NVMe native speed
       - -c
-      - effective_io_concurrency=300 # ULTRA: High IOPS
+      - effective_io_concurrency=300 # ULTRA: NVMe parallelism
       - -c
-      - max_worker_processes=32 # ULTRA: Support heavy background load
+      - wal_buffers=64MB # ULTRA: Large WAL buffer
       - -c
-      - max_parallel_workers_per_gather=8 # ULTRA: Use ALL 8 CORES for a single query
+      - default_statistics_target=500 # ULTRA: Better query plans
       - -c
-      - max_parallel_workers=16 # ULTRA: High concurrency parallelism
+      - max_worker_processes=8 # ULTRA: Full CPU utilization
+      - -c
+      - max_parallel_workers_per_gather=4 # ULTRA: Parallel queries
+      - -c
+      - max_parallel_workers=8 # ULTRA: Match worker processes
+      - -c
+      - max_parallel_maintenance_workers=4 # ULTRA: Parallel index builds
       - -c
       - synchronous_commit=off # EXTREME: Sacrifice safety for raw SPEED (50L/sec target)
       - -c
@@ -170,6 +184,7 @@ services:
       - jit=on # EXTREME READ: JIT Compilation for complex aggregations
       - -c
       - default_statistics_target=500 # EXTREME READ: Better planner stats for large tables
+    shm_size: 10gb # Prevent "could not resize shared memory segment" errors
     volumes:
       - ../../data/timescaledb:/var/lib/postgresql/data
       # - ../../layer-3-storage/timescaledb/migrations:/docker-entrypoint-initdb.d

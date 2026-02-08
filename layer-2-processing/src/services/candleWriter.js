@@ -33,9 +33,11 @@ async function insertCandle(candle) {
   ];
 
   try {
-    await pool.query(query, values);
+    const res = await pool.query(query, values);
+    return res.rowCount > 0; // Return true if inserted, false if ignored (conflict)
   } catch (err) {
     logger.error({ err, symbol: candle.symbol }, 'Insert failed');
+    return false;
   }
 }
 
@@ -44,9 +46,11 @@ async function insertCandle(candle) {
  * @param {Array<Object>} candles - Array of candle objects
  */
 async function insertCandlesBatch(candles) {
-  if (!candles || candles.length === 0) return;
+  if (!candles || candles.length === 0) return { inserted: 0, ignored: 0 };
 
   const client = await pool.connect();
+  let insertedCount = 0;
+
   try {
     await client.query('BEGIN');
 
@@ -66,14 +70,21 @@ async function insertCandlesBatch(candles) {
         candle.close,
         candle.volume,
       ];
-      await client.query(query, values);
+      const res = await client.query(query, values);
+      insertedCount += res.rowCount; // rowCount is 1 if inserted, 0 if conflict
     }
 
     await client.query('COMMIT');
-    logger.info({ count: candles.length }, 'Inserted candle batch');
+    
+    const ignoredCount = candles.length - insertedCount;
+    logger.info({ inserted: insertedCount, ignored: ignoredCount, total: candles.length }, 'Batch Insert Metrics');
+    
+    return { inserted: insertedCount, ignored: ignoredCount };
+
   } catch (err) {
     await client.query('ROLLBACK');
     logger.error({ err }, 'Batch insert failed');
+    throw err; // Re-throw to handle upstream
   } finally {
     client.release();
   }

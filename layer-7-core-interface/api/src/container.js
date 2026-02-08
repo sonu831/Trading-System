@@ -32,6 +32,9 @@ container.register({
   // 1. External dependencies
   prisma: asValue(prisma),
   redis: asValue(redis),
+  // 1. External dependencies
+  prisma: asValue(prisma),
+  redis: asValue(redis),
 
   // 2. Base Classes
   baseRepo: asClass(BaseRepository),
@@ -59,6 +62,14 @@ container.register({
   analysisRepository: asClass(require('./modules/analysis/AnalysisRepository')).singleton(),
   analysisService: asClass(require('./modules/analysis/AnalysisService')).singleton(),
   analysisController: asClass(require('./modules/analysis/AnalysisController')).singleton(),
+
+  // Notifications
+  notificationRepository: asClass(require('./modules/notifications/NotificationRepository')).singleton(),
+  notificationService: asClass(require('./modules/notifications/NotificationService')).singleton(),
+  notificationController: asClass(require('./modules/notifications/NotificationController')).singleton(),
+
+  // Jobs
+  dataSyncJob: asClass(require('./jobs/DataSyncJob')).singleton(),
 });
 
 module.exports = container;

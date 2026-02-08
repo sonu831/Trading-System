@@ -1,7 +1,8 @@
 class BaseRepository {
-  constructor({ prisma, redis }) {
+  constructor({ prisma, redis, logger }) {
     this.prisma = prisma;
     this.redis = redis;
+    this.logger = logger;
   }
 
   // Helper to access Prisma model delegate dynamically

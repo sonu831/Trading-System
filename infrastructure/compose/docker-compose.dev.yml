@@ -1,0 +1,131 @@
+services:
+  # Core infrastructure only - no monitoring, no telegram, no AI
+
+  # Override resource limits for development (lighter)
+  timescaledb:
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 4G
+        reservations:
+          cpus: '1.0'
+          memory: 2G
+
+  redis:
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+
+  kafka:
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+
+  backend-api:
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+    environment:
+      - PM2_INSTANCES=1 # Single instance for dev
+
+  processing:
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 1G
+        reservations:
+          cpus: '0.25'
+          memory: 512M
+
+  ingestion:
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+
+  # Disable non-essential services
+  telegram-bot:
+    profiles:
+      - full
+
+  grafana:
+    profiles:
+      - full
+
+  prometheus:
+    profiles:
+      - full
+
+  loki:
+    profiles:
+      - full
+
+  promtail:
+    profiles:
+      - full
+
+  otel-collector:
+    profiles:
+      - full
+
+  cadvisor:
+    profiles:
+      - full
+
+  redis-exporter:
+    profiles:
+      - full
+
+  postgres-exporter:
+    profiles:
+      - full
+
+  prometheus-pushgateway:
+    profiles:
+      - full
+
+  ai-inference:
+    profiles:
+      - full
+
+  ollama:
+    profiles:
+      - full
+
+  analysis:
+    profiles:
+      - full
+
+  aggregation:
+    profiles:
+      - full
+
+  signal:
+    profiles:
+      - full
+
+networks:
+  trading-network:
+    external: true
+    name: local-trading-network

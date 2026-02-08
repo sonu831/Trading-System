@@ -32,6 +32,8 @@ services:
       - SKIP_HISTORICAL_SYNC=false
       - SWARM_CONCURRENCY=${SWARM_CONCURRENCY:-12}
       - FORCE_HISTORICAL_MODE=${FORCE_HISTORICAL_MODE:-false}
+      - KAFKA_LOG_RETENTION_MS=604800000 # 7 Days
+      - KAFKA_LOG_RETENTION_BYTES=-1
     volumes:
       - ../../vendor:/app/vendor:ro
       - ../../shared:/app/shared:ro
@@ -187,40 +189,6 @@ services:
           memory: 12G
         reservations:
           memory: 4G
-
-  # Layer 9: AI Inference Service (Python/PyTorch)
-  ai-inference:
-    build:
-      context: ../../layer-9-ai-service
-      dockerfile: Dockerfile
-    container_name: ai-inference
-    ports:
-      - '8000:8000'
-    environment:
-      - AI_PROVIDER=${AI_PROVIDER:-ollama}
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
-      - OLLAMA_URL=http://ollama:11434
-      - OLLAMA_MODEL=llama3
-    networks:
-      - trading-network
-    restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          memory: 16G
-
-  # Ollama (Local LLM)
-  ollama:
-    image: ollama/ollama:latest
-    container_name: ollama
-    ports:
-      - "11434:11434"
-    volumes:
-      - ../../data/ollama:/root/.ollama
-    networks:
-      - trading-network
-    restart: unless-stopped
 
   # Layer 8: API Gateway
   gateway:

@@ -1,0 +1,58 @@
+services:
+  # ===========================================
+  # AI SERVICES
+  # ===========================================
+
+  # Layer 9: AI Inference Service (Python/PyTorch)
+  ai-inference:
+    build:
+      context: ../../layer-9-ai-service
+      dockerfile: Dockerfile
+    container_name: ai-inference
+    ports:
+      - '8000:8000'
+    environment:
+      - AI_PROVIDER=${AI_PROVIDER:-ollama}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - OLLAMA_URL=http://ollama:11434
+      - OLLAMA_MODEL=llama3
+    networks:
+      - trading-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+        reservations:
+          cpus: '1.0'
+          memory: 1G
+
+  # Ollama (Local LLM)
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ../../data/ollama:/root/.ollama
+    networks:
+      - trading-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 4G
+        reservations:
+          cpus: '1.0'
+          memory: 2G
+
+# ===========================================
+# NETWORKS (External - shared with infra)
+# ===========================================
+networks:
+  trading-network:
+    external: true
+    name: local-trading-network

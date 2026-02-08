@@ -1,6 +1,7 @@
 class BaseService {
-  constructor({ redis }) {
+  constructor({ redis, logger }) {
     this.redis = redis;
+    this.logger = logger;
   }
 
   // Caching Helper

@@ -106,7 +106,58 @@ async function handleMessage(message) {
       };
 
       // 1. Persist to TimescaleDB
-      await insertCandle(candle);
+      const inserted = await insertCandle(candle);
+
+      // Track duplicate vs fresh
+      const statKey = `stats:${message.symbol}`;
+      if (!global.backfillStats) global.backfillStats = {};
+      if (!global.backfillStats[message.symbol]) global.backfillStats[message.symbol] = { inserted: 0, ignored: 0 };
+      
+      if (inserted) {
+        global.backfillStats[message.symbol].inserted++;
+      } else {
+        global.backfillStats[message.symbol].ignored++;
+      }
+
+      // Publish comprehensive stats to Redis periodically (every 1000 ticks per symbol)
+      const totalProcessed = global.backfillStats[message.symbol].inserted + global.backfillStats[message.symbol].ignored;
+      if (totalProcessed % 1000 === 0) {
+         const { publishEvent } = require('./services/redisCache');
+         
+         // Comprehensive notification payload following best practices
+         publishEvent('system:notifications', {
+            type: 'BACKFILL_STATS',
+            message: `Processed ${totalProcessed} candles for ${message.symbol}`,
+            metadata: {
+               // Source identification
+               source: 'layer-2-processing',
+               layer: 2,
+               service: 'candle-processor',
+               
+               // Core metrics
+               metrics: {
+                  symbol: message.symbol,
+                  inserted: global.backfillStats[message.symbol].inserted,
+                  ignored: global.backfillStats[message.symbol].ignored,
+                  total: totalProcessed,
+                  insertionRate: (global.backfillStats[message.symbol].inserted / totalProcessed * 100).toFixed(2) + '%',
+                  duplicateRate: (global.backfillStats[message.symbol].ignored / totalProcessed * 100).toFixed(2) + '%'
+               },
+               
+               // Processing context
+               context: {
+                  messageType: message.type,
+                  exchange: message.exchange || 'NSE',
+                  latestTimestamp: message.timestamp,
+                  processingMode: message.type === 'historical_candle' ? 'backfill' : 'live'
+               },
+               
+               // Timestamp for tracking
+               timestamp: Date.now(),
+               timestampISO: new Date().toISOString()
+            }
+         });
+      }
 
       // 2. Update Redis Hot Cache (LTP & Latest Candle)
       await setLatestPrice(message.symbol, {
@@ -123,6 +174,34 @@ async function handleMessage(message) {
     }
   } catch (err) {
     logger.error({ err }, '❌ Failed to process message');
+    
+    // Publish error notification for critical failures
+    try {
+      const { publishEvent } = require('./services/redisCache');
+      publishEvent('system:notifications', {
+        type: 'ERROR',
+        message: `Failed to process candle for ${message?.symbol || 'UNKNOWN'}`,
+        metadata: {
+          source: 'layer-2-processing',
+          layer: 2,
+          service: 'candle-processor',
+          error: {
+            message: err.message,
+            stack: err.stack,
+            code: err.code
+          },
+          context: {
+            symbol: message?.symbol,
+            messageType: message?.type,
+            timestamp: message?.timestamp
+          },
+          timestamp: Date.now(),
+          timestampISO: new Date().toISOString()
+        }
+      });
+    } catch (notifErr) {
+      logger.error({ err: notifErr }, 'Failed to publish error notification');
+    }
   } finally {
     end();
   }

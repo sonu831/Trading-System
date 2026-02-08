@@ -32,9 +32,7 @@ container.register({
   // 1. External dependencies
   prisma: asValue(prisma),
   redis: asValue(redis),
-  // 1. External dependencies
-  prisma: asValue(prisma),
-  redis: asValue(redis),
+  logger: asValue(require('./common/logger')),
 
   // 2. Base Classes
   baseRepo: asClass(BaseRepository),

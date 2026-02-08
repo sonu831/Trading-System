@@ -187,7 +187,7 @@ services:
     shm_size: 10gb # Prevent "could not resize shared memory segment" errors
     volumes:
       - ../../data/timescaledb:/var/lib/postgresql/data
-      # - ../../layer-3-storage/timescaledb/migrations:/docker-entrypoint-initdb.d
+      - ../../layer-3-storage/timescaledb/migrations:/docker-entrypoint-initdb.d
     networks:
       - trading-network
     healthcheck:

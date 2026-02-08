@@ -75,7 +75,12 @@ class RedisClient {
     if (!this.isConnected) await this.connect();
     return this.publisher.del(key);
   }
-  
+
+  async scan(cursor, options = {}) {
+    if (!this.isConnected) await this.connect();
+    return this.publisher.scan(cursor, options);
+  }
+
   // Expose raw client for advanced usage
   get raw() {
     return this.publisher;

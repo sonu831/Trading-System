@@ -11,6 +11,7 @@ export default function BackfillPanel() {
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
   const [symbol, setSymbol] = useState('');
+  const [force, setForce] = useState(false);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState(null);
   const [coverage, setCoverage] = useState([]);
@@ -75,6 +76,7 @@ export default function BackfillPanel() {
           fromDate,
           toDate,
           symbol: symbol || null,
+          force,
         }),
       });
 
@@ -153,6 +155,19 @@ export default function BackfillPanel() {
           />
         </div>
 
+        <div className="flex items-center gap-2 mb-4">
+          <input
+            type="checkbox"
+            id="force-backfill"
+            checked={force}
+            onChange={(e) => setForce(e.target.checked)}
+            className="w-4 h-4 text-primary bg-gray-700 border-gray-600 rounded focus:ring-primary focus:ring-2"
+          />
+          <label htmlFor="force-backfill" className="text-sm text-text-secondary select-none cursor-pointer">
+            Force Refetch (Overwrite existing data)
+          </label>
+        </div>
+
         <Button
           type="submit"
           disabled={
@@ -163,17 +178,21 @@ export default function BackfillPanel() {
           className={`w-full transition-opacity ${
             backfillStatus && (backfillStatus.status === 'running' || backfillStatus.status === 1)
               ? 'bg-surface border border-border text-text-tertiary cursor-not-allowed'
-              : 'bg-gradient-to-r from-primary to-accent hover:opacity-90'
+              : force 
+                  ? 'bg-warning hover:bg-warning-hover text-black' 
+                  : 'bg-gradient-to-r from-primary to-accent hover:opacity-90'
           }`}
         >
           {loading
             ? 'Starting...'
             : backfillStatus && (backfillStatus.status === 'running' || backfillStatus.status === 1)
               ? '⏳ Backfill in Progress...'
-              : '🚀 Start Backfill'}
+              : force 
+                  ? '⚠️ Force Start Backfill'
+                  : '🚀 Start Backfill'}
         </Button>
         <p className="text-xs text-text-tertiary mt-2">
-          Max {MAX_DAYS} days range. Telegram notifications sent on start/complete.
+          Max {MAX_DAYS} days range. {force && <span className="text-warning">Warning: Force mode will re-download data even if it exists.</span>}
         </p>
       </form>
 

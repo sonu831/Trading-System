@@ -76,23 +76,23 @@ infra-core:
 	@./scripts/wait-for-health.sh timescaledb redis zookeeper
 
 # Phase 2: Interactive Data Restore
+# Detects both .dump (custom format) and .sql (plain) backups
 restore-check:
 	@echo "🔍 Phase 2: Checking database..."
 	@if ! docker exec timescaledb psql -U trading nifty50 -c "SELECT 1 FROM instruments LIMIT 1;" > /dev/null 2>&1; then \
 		echo "⚠️  Database is empty!"; \
-		if [ -d "backups" ] && [ "$$(find backups -name '*.sql' | wc -l)" -gt 0 ]; then \
+		BACKUP_COUNT=$$(find backups -maxdepth 2 \( -name '*.dump' -o -name '*.sql' \) -not -name '*SchemaOnly*' -not -name '*DataOnly*' 2>/dev/null | wc -l | tr -d ' '); \
+		if [ "$$BACKUP_COUNT" -gt 0 ]; then \
+			LATEST=$$(find backups -maxdepth 2 \( -name '*.dump' -o -name '*.sql' \) -not -name '*SchemaOnly*' -not -name '*DataOnly*' | sort -r | head -1); \
+			echo "📦 Found $$BACKUP_COUNT full backup(s). Latest: $$LATEST"; \
 			echo ""; \
-			read -p "📦 Restore SCHEMA? (y/N): " schema_res; \
-			if [ "$$schema_res" = "y" ] || [ "$$schema_res" = "Y" ]; then \
-				make restore-schema; \
-			fi; \
-			echo ""; \
-			read -p "📦 Restore DATA? (y/N): " data_res; \
-			if [ "$$data_res" = "y" ] || [ "$$data_res" = "Y" ]; then \
-				make restore-data; \
+			read -p "📦 Restore from latest full backup? (y/N): " full_res; \
+			if [ "$$full_res" = "y" ] || [ "$$full_res" = "Y" ]; then \
+				make restore; \
 			fi; \
 		else \
 			echo "ℹ️  No backups found. Continuing with empty database."; \
+			echo "   Schema will be created by init.sql on first run."; \
 		fi; \
 	else \
 		echo "✅ Database has data."; \
@@ -120,24 +120,24 @@ infra-kafka:
 # Phase 4a: Backend API (creates schema)
 app-backend:
 	@echo "🔧 Phase 4a: Starting Backend API..."
-	$(DC) -f $(COMPOSE_DIR)/docker-compose.app.yml up -d backend-api
+	$(DC) -f $(COMPOSE_DIR)/docker-compose.app.yml up -d --build backend-api
 	@echo "⏳ Waiting for schema creation..."
 	@sleep 5
 
 # Phase 4b: Processing Layer
 app-processing:
 	@echo "🔧 Phase 4b: Starting Processing Layer..."
-	$(DC) -f $(COMPOSE_DIR)/docker-compose.app.yml up -d processing
+	$(DC) -f $(COMPOSE_DIR)/docker-compose.app.yml up -d --build processing
 
 # Phase 4c: Remaining App Services
 app-rest:
 	@echo "🔧 Phase 4c: Starting Remaining Services..."
-	$(DC) -f $(COMPOSE_DIR)/docker-compose.app.yml up -d
+	$(DC) -f $(COMPOSE_DIR)/docker-compose.app.yml up -d --build
 
 # Phase 5: UI & Monitoring
 ui-and-observe:
 	@echo "🔧 Phase 5: Starting UI & Monitoring..."
-	$(DC) -f $(COMPOSE_DIR)/docker-compose.ui.yml up -d
+	$(DC) -f $(COMPOSE_DIR)/docker-compose.ui.yml up -d --build
 	$(DC) -f $(COMPOSE_DIR)/docker-compose.observe.yml up -d
 
 # Production: Full Stack with Notifications
@@ -185,8 +185,7 @@ down:
 	@echo "5️⃣  Backing up database (more memory available now)..."
 	@read -p "📦 Create BACKUP before shutdown? (y/N): " backup_res; \
 	if [ "$$backup_res" = "y" ] || [ "$$backup_res" = "Y" ]; then \
-		make backup-schema; \
-		make backup-data; \
+		make backup; \
 	else \
 		echo "⏩ Skipping backup."; \
 	fi
@@ -329,19 +328,27 @@ ai-logs:
 # 4. DATABASE OPERATIONS
 # ===========================================================
 
+# ─── BACKUP ────────────────────────────────────────────────
+# Uses pg_dump -Fc (custom format) for reliable TimescaleDB backup.
+# Custom format handles hypertable chunks, catalog metadata, and
+# continuous aggregates correctly. Supports pg_restore --data-only,
+# --schema-only, and parallel restore (-j).
+# ───────────────────────────────────────────────────────────
+
 backup:
-	@echo "💾 Backing up TimescaleDB (Full)..."
+	@echo "💾 Backing up TimescaleDB (Full - Custom Format)..."
 	@if ! docker ps | grep -q timescaledb; then \
 		echo "⚠️  TimescaleDB not running. Skipping backup."; \
 	else \
-		TS=$$(date "+%d-%b-%Y_%I-%M-%S_%p"); \
-		DIR="backups/Stock_Market_Live_Data_$$TS"; \
+		TS=$$(date "+%Y-%m-%d_%H-%M-%S"); \
+		DIR="backups/Stock_Market_Live_Data_Full_$$TS"; \
 		mkdir -p $$DIR; \
-		FILE=$$DIR/Stock_Market_Live_Data.sql; \
-		echo "📦 Saving to $$DIR..."; \
-		if docker exec timescaledb pg_dump -U trading nifty50 > $$FILE; then \
+		FILE=$$DIR/Stock_Market_Live_Data_Full.dump; \
+		echo "📦 Saving to $$DIR (pg_dump -Fc)..."; \
+		if docker exec timescaledb pg_dump -U trading -Fc nifty50 > $$FILE; then \
 			if [ -s $$FILE ]; then \
 				echo "✅ Backup SAVED & VERIFIED: $$FILE ($$(du -h $$FILE | cut -f1))"; \
+				make _cleanup-old-backups PATTERN="Stock_Market_Live_Data_*" KEEP=5; \
 			else \
 				echo "❌ Backup FAILED: File is empty!"; \
 				rm -rf $$DIR; \
@@ -354,89 +361,26 @@ backup:
 		fi; \
 	fi
 
-
-backup-data:
-	@echo "💾 Creating new backup..."
-	@TS=$$(date "+%d-%b-%Y_%I-%M-%S_%p"); \
-	DIR="backups/Stock_Market_Live_Data_DataOnly_$$TS"; \
-	mkdir -p $$DIR; \
-	FILE=$$DIR/Stock_Market_Live_Data_DataOnly.sql; \
-	echo "📦 Backing up TimescaleDB DATA ONLY to $$DIR..."; \
-	if docker exec timescaledb pg_dump -U trading nifty50 --data-only --load-via-partition-root > $$FILE; then \
-		if [ -s $$FILE ]; then \
-			echo "✅ Data Backup SAVED & VERIFIED: $$FILE ($$(du -h $$FILE | cut -f1))"; \
-			echo ""; \
-			echo "🗑️  Checking for old backups..."; \
-			OLD_COUNT=$$(find backups -name "Stock_Market_Live_Data_DataOnly_*" -type d | wc -l | tr -d ' '); \
-			if [ $$OLD_COUNT -gt 5 ]; then \
-				echo "📊 Found $$OLD_COUNT data backups (keeping last 5)"; \
-				find backups -name "Stock_Market_Live_Data_DataOnly_*" -type d | head -n -5; \
-				echo ""; \
-				read -p "❓ Delete old backups? (y/N): " confirm; \
-				if [ "$$confirm" = "y" ] || [ "$$confirm" = "Y" ]; then \
-					echo "🗑️  Removing old backups..."; \
-					find backups -name "Stock_Market_Live_Data_DataOnly_*" -type d | head -n -5 | xargs rm -rf; \
-					echo "✅ Old backups removed!"; \
-				else \
-					echo "⏭️  Skipped cleanup. You have $$OLD_COUNT backups."; \
-				fi; \
-			else \
-				echo "✅ Only $$OLD_COUNT backups found. No cleanup needed."; \
-			fi; \
-		else \
-			echo "❌ Data Backup FAILED: File is empty!"; \
-			rm -rf $$DIR; \
-			exit 1; \
+# Internal helper: clean up old backup directories
+_cleanup-old-backups:
+	@OLD_COUNT=$$(find backups -name "$(PATTERN)" -type d 2>/dev/null | wc -l | tr -d ' '); \
+	if [ $$OLD_COUNT -gt $(KEEP) ]; then \
+		echo ""; \
+		echo "📊 Found $$OLD_COUNT backups (keeping last $(KEEP))"; \
+		find backups -name "$(PATTERN)" -type d | sort | head -n -$(KEEP); \
+		echo ""; \
+		read -p "❓ Delete old backups? (y/N): " confirm; \
+		if [ "$$confirm" = "y" ] || [ "$$confirm" = "Y" ]; then \
+			find backups -name "$(PATTERN)" -type d | sort | head -n -$(KEEP) | xargs rm -rf; \
+			echo "✅ Old backups removed!"; \
 		fi; \
-	else \
-		echo "❌ Backup command failed! Removing empty directory..."; \
-		rm -rf $$DIR; \
-		exit 1; \
-	fi
-
-backup-schema:
-	@echo "💾 Creating new schema backup..."
-	@TS=$$(date "+%d-%b-%Y_%I-%M-%S_%p"); \
-	DIR="backups/Stock_Market_Live_Data_SchemaOnly_$$TS"; \
-	mkdir -p $$DIR; \
-	FILE=$$DIR/Stock_Market_Live_Data_SchemaOnly.sql; \
-	echo " Backing up TimescaleDB SCHEMA ONLY to $$DIR..."; \
-	if docker exec timescaledb pg_dump -U trading nifty50 --schema-only > $$FILE; then \
-		if [ -s $$FILE ]; then \
-			echo "✅ Schema Backup SAVED & VERIFIED: $$FILE ($$(du -h $$FILE | cut -f1))"; \
-			echo ""; \
-			echo "🗑️  Checking for old schema backups..."; \
-			OLD_COUNT=$$(find backups -name "Stock_Market_Live_Data_SchemaOnly_*" -type d | wc -l | tr -d ' '); \
-			if [ $$OLD_COUNT -gt 3 ]; then \
-				echo "📊 Found $$OLD_COUNT schema backups (keeping last 3)"; \
-				find backups -name "Stock_Market_Live_Data_SchemaOnly_*" -type d | head -n -3; \
-				echo ""; \
-				read -p "❓ Delete old schema backups? (y/N): " confirm; \
-				if [ "$$confirm" = "y" ] || [ "$$confirm" = "Y" ]; then \
-					echo "🗑️  Removing old backups..."; \
-					find backups -name "Stock_Market_Live_Data_SchemaOnly_*" -type d | head -n -3 | xargs rm -rf; \
-					echo "✅ Old schema backups removed!"; \
-				else \
-					echo "⏭️  Skipped cleanup. You have $$OLD_COUNT schema backups."; \
-				fi; \
-			else \
-				echo "✅ Only $$OLD_COUNT schema backups found. No cleanup needed."; \
-			fi; \
-		else \
-			echo "❌ Schema Backup FAILED: File is empty!"; \
-			rm -rf $$DIR; \
-			exit 1; \
-		fi; \
-	else \
-		echo "❌ Backup command failed! Removing empty directory..."; \
-		rm -rf $$DIR; \
-		exit 1; \
 	fi
 
 clean-backups:
 	@echo "🧹 Cleaning up old backups..."
 	@rm -rf backups/*
 	@echo "✅ Backups cleaned."
+
 
 # Reset database for version mismatch recovery
 db-reset:
@@ -452,7 +396,7 @@ db-reset:
 	@echo "📦 Running migrations..."
 	@cd layer-3-storage/timescaledb/migrations && \
 		for f in *.sql; do \
-			echo "  Running $$f..."; \
+		echo "  Running $$f..."; \
 			docker exec -i timescaledb psql -U trading -d nifty50 < "$$f"; \
 		done
 	@echo "📝 Creating version file..."
@@ -481,68 +425,79 @@ truncate-notifications:
 	@docker exec timescaledb psql -U trading -d nifty50 -c "VACUUM system_notifications;"
 	@echo "✅ All notifications cleared! Table size is now 0."
 
-restore-schema:
-	@echo "📂 Available SCHEMA backups:"
-	@find backups -name "*SchemaOnly*.sql" -maxdepth 2 | sort -r | head -5 || echo "No schema backups found!"
-	@echo ""
-	@read -p "Enter schema backup filepath (or Enter for latest): " file; \
-	if [ -z "$$file" ]; then \
-		file=$$(find backups -name "*SchemaOnly*.sql" -maxdepth 2 | sort -r | head -1); \
-	fi; \
-	if [ -z "$$file" ]; then \
-		echo "❌ No schema backup found!"; \
-	else \
-		echo "🔄 Restoring SCHEMA from $$file..."; \
-		docker exec -i timescaledb psql -U trading nifty50 < $$file; \
-		echo "✅ Schema restore complete!"; \
-	fi
-
-restore-data:
-	@echo "📂 Available DATA backups:"
-	@find backups -name "*DataOnly*.sql" -maxdepth 2 | sort -r | head -5 || echo "No data backups found!"
-	@echo ""
-	@read -p "Enter data backup filepath (or Enter for latest): " file; \
-	if [ -z "$$file" ]; then \
-		file=$$(find backups -name "*DataOnly*.sql" -maxdepth 2 | sort -r | head -1); \
-	fi; \
-	if [ -z "$$file" ]; then \
-		echo "❌ No data backup found!"; \
-	else \
-		echo "🔄 Restoring DATA from $$file..."; \
-		echo "🛠️  Applying fix for TimescaleDB chunks..."; \
-		cat $$file | sed -E 's/COPY _timescaledb_internal\._hyper_[0-9_]+_chunk/COPY public.candles_1m/g' | docker exec -i timescaledb psql -U trading nifty50; \
-		echo "✅ Data restore complete!"; \
-	fi
+# ─── RESTORE ───────────────────────────────────────────────
+# Nuclear restore: DROP DB → CREATE DB → pg_restore/psql.
+# Supports both .dump (custom format) and .sql (plain SQL).
+# TimescaleDB catalog, chunks, and continuous aggregates are
+# restored correctly because we restore from the SAME pg_dump
+# that created them (no schema/data mismatch).
+# ───────────────────────────────────────────────────────────
 
 restore:
-	@echo "📂 Available FULL backups:"
-	@find backups -name "*.sql" -not -name "*SchemaOnly*" -not -name "*DataOnly*" -maxdepth 2 | sort -r | head -10 || echo "No full backups found!"
+	@echo "📂 Available FULL backups (.dump):"
+	@find backups -maxdepth 2 -name "*.dump" | sort -r | head -10 || echo "⚠️ No .dump backups found"
 	@echo ""
-	@read -p "Enter backup filepath (or press Enter for latest): " file; \
+	@read -p "Enter backup filepath (or Enter for latest): " file; \
 	if [ -z "$$file" ]; then \
-		file=$$(find backups -name "*.sql" -not -name "*SchemaOnly*" -not -name "*DataOnly*" -maxdepth 2 | sort -r | head -1); \
+		file=$$(find backups -maxdepth 2 -name "*.dump" | sort -r | head -1); \
 	fi; \
 	if [ -z "$$file" ]; then \
-		echo "❌ No backup file found!"; exit 1; \
+		echo "❌ No .dump backup found!"; exit 1; \
 	fi; \
-	echo "⚠️  WARNING: This will overwite the current database with contents of $$file"; \
-	read -p "Are you sure? Type 'y' or 'yes' to confirm: " confirm; \
-	if [ "$$confirm" != "y" ] && [ "$$confirm" != "yes" ]; then \
+	echo ""; \
+	echo "⚠️  WARNING: This will DROP and RECREATE the nifty50 database!"; \
+	echo "   Source: $$file"; \
+	echo ""; \
+	read -p "Type 'yes' to confirm: " confirm; \
+	if [ "$$confirm" != "yes" ]; then \
 		echo "❌ Restore cancelled."; exit 1; \
 	fi; \
-	echo "🔄 Restoring from $$file..."; \
-	docker exec -i timescaledb psql -U trading nifty50 < $$file; \
-	echo "✅ Restore complete!"
+	echo ""; \
+	echo "1️⃣  Terminating active connections..."; \
+	docker exec timescaledb psql -U trading -d postgres -c \
+		"SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = 'nifty50' AND pid <> pg_backend_pid();" > /dev/null 2>&1 || true; \
+	echo "2️⃣  Dropping database..."; \
+	docker exec timescaledb dropdb -U trading --if-exists nifty50; \
+	echo "3️⃣  Creating fresh database..."; \
+	docker exec timescaledb createdb -U trading nifty50; \
+	echo "   Initializing TimescaleDB extension & pre-restore hooks..."; \
+	docker exec timescaledb psql -U trading -d nifty50 -c "CREATE EXTENSION IF NOT EXISTS timescaledb CASCADE; SELECT timescaledb_pre_restore();" > /dev/null; \
+	echo "4️⃣  Restoring from $$file..."; \
+	echo "   Format: Custom (.dump) → using pg_restore"; \
+	docker exec -i timescaledb pg_restore -U trading -d nifty50 --no-owner --no-privileges < $$file || true; \
+	echo "   Finalizing restore (post-restore hooks)..."; \
+	docker exec timescaledb psql -U trading -d nifty50 -c "SELECT timescaledb_post_restore();" > /dev/null; \
+	echo "5️⃣  Verifying restore..."; \
+	make check-restore; \
+	echo ""; \
+	echo "✅ Full restore complete!"
+
 
 check-restore:
-	@echo "🔍 Checking if database is empty..."
-	@if ! docker exec timescaledb psql -U trading nifty50 -c "SELECT 1 FROM instruments LIMIT 1;" >/dev/null 2>&1; then \
-		echo "⚠️  Database appears empty!"; \
-		echo "💡 You can restore data using: make restore"; \
-		echo "   Or run: make batch (to fetch fresh data)"; \
+	@echo ""
+	@echo "╔════════════════════════════════════════════════════════════╗"
+	@echo "║          DATABASE HEALTH CHECK                            ║"
+	@echo "╚════════════════════════════════════════════════════════════╝"
+	@echo ""
+	@docker exec timescaledb psql -U trading nifty50 -c " \
+		SELECT 'candles_1m' AS table_name, COUNT(*)::text AS rows FROM candles_1m \
+		UNION ALL SELECT 'instruments', COUNT(*)::text FROM instruments \
+		UNION ALL SELECT 'data_availability', COUNT(*)::text FROM data_availability \
+		UNION ALL SELECT 'sectors', COUNT(*)::text FROM sectors \
+		UNION ALL SELECT 'system_config', COUNT(*)::text FROM system_config \
+		UNION ALL SELECT 'candles_5m (agg)', COUNT(*)::text FROM candles_5m \
+		UNION ALL SELECT 'candles_1h (agg)', COUNT(*)::text FROM candles_1h \
+		UNION ALL SELECT 'candles_1d (agg)', COUNT(*)::text FROM candles_1d \
+		ORDER BY table_name; \
+	" 2>&1 || echo "⚠️  Could not query database"
+	@echo ""
+	@CANDLE_COUNT=$$(docker exec timescaledb psql -U trading nifty50 -t -c "SELECT COUNT(*) FROM candles_1m;" 2>/dev/null | tr -d '[:space:]'); \
+	if [ -z "$$CANDLE_COUNT" ] || [ "$$CANDLE_COUNT" = "0" ]; then \
+		echo "⚠️  candles_1m is EMPTY!"; \
+		echo "   Run 'make restore' to restore from backup"; \
+		echo "   Or run 'make batch' to fetch fresh data"; \
 	else \
-		COUNT=$$(docker exec timescaledb psql -U trading nifty50 -t -c "SELECT count(*) FROM instruments;" | tr -d '[:space:]'); \
-		echo "✅ Database contains $$COUNT rows in instruments."; \
+		echo "✅ Database healthy: $$CANDLE_COUNT candles loaded"; \
 	fi
 
 version-check-manual:

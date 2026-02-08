@@ -98,6 +98,37 @@ process.on('SIGTERM', shutdown);
 process.on('SIGINT', shutdown);
 ```
 
+### Database: TimescaleDB Backup & Restore
+
+**CRITICAL: Plain SQL `pg_dump` silently loses compressed TimescaleDB data.** This is a silent data loss bug with no warning or error. Always follow these rules:
+
+1. **ALWAYS use `pg_dump -Fc` (custom format)** for backups. Never use plain SQL format for TimescaleDB databases with compression enabled.
+   ```bash
+   # CORRECT: Custom format - handles compressed chunks, catalog, aggregates
+   pg_dump -U trading -Fc nifty50 > backup.dump
+
+   # WRONG: Plain SQL - silently drops all compressed chunk data (exits 0, no warning)
+   pg_dump -U trading nifty50 --data-only > backup.sql
+   ```
+
+2. **NEVER split schema and data backups** for TimescaleDB. The catalog metadata, chunk table IDs, and row data are tightly coupled. A schema backup + separate data backup will have mismatched chunk IDs and fail silently on restore.
+
+3. **ALWAYS use `pg_restore`** for restoring `.dump` files. For nuclear restore: `DROP DB` → `CREATE DB` → `pg_restore`.
+   ```bash
+   pg_restore -U trading -d nifty50 --no-owner --no-privileges < backup.dump
+   ```
+
+4. **NEVER use `sed` to rewrite chunk table names** in COPY statements. Different hypertables have different column counts. Blindly redirecting `_hyper_10_*` (9 cols) into `candles_1m` (11 cols) causes `syntax error at or near "375"` type errors.
+
+5. **If you must use plain SQL format**, decompress ALL chunks first:
+   ```sql
+   SELECT decompress_chunk(c) FROM show_chunks('candles_1m') c;
+   ```
+
+6. **Test restores regularly**: `make backup && make db-reset && make restore && make check-restore`
+
+7. Use `make backup` (which runs `pg_dump -Fc`) for all backups. Use `make restore` for restores. See [investigation_backup.md](../investigation_backup.md) for the full forensic analysis.
+
 ### Database: Unique Constraints
 
 The `candles_1m` hypertable uses a **unique constraint on `(time, symbol)`**. All inserts must use:

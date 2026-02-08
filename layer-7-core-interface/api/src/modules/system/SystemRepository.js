@@ -100,6 +100,31 @@ class SystemRepository extends BaseRepository {
     }
   }
 
+  /**
+   * Clear keys matching a pattern
+   * @param {string} pattern - Redis key pattern (e.g. 'system:*')
+   */
+  async clearCachePattern(pattern) {
+    if (!pattern) return;
+    try {
+      let cursor = 0;
+      let keys = [];
+      do {
+        // Use scan to find keys (non-blocking)
+        const reply = await this.redis.scan(cursor, { MATCH: pattern, COUNT: 100 });
+        cursor = reply.cursor;
+        keys.push(...reply.keys);
+      } while (cursor !== 0);
+
+      if (keys.length > 0) {
+        await this.clearCache(keys);
+        this.logger.info({ pattern, count: keys.length }, '🧹 Cache Pattern Cleared');
+      }
+    } catch (err) {
+      this.logger.error({ err, pattern }, 'Failed to clear cache pattern');
+    }
+  }
+
   // ═══════════════════════════════════════════════════════════════
   // DATA AVAILABILITY METHODS (Prisma-based)
   // ═══════════════════════════════════════════════════════════════
@@ -205,10 +230,7 @@ class SystemRepository extends BaseRepository {
     // We use a specific timeframe '1m' as default for now
     await this.prisma.data_availability.upsert({
       where: {
-        symbol_timeframe: {
-          symbol: symbol,
-          timeframe: '1m',
-        },
+        symbol: symbol,
       },
       update: {
         first_date: stats._min.time,
@@ -249,6 +271,10 @@ class SystemRepository extends BaseRepository {
       }
       
       this.logger.info({ updatedCount }, '✅ Cron: Synced symbols');
+      
+      // Clear all data availability caches (list + individual symbols)
+      await this.clearCachePattern('api:data:availability:*');
+      
       return updatedCount;
     } catch (err) {
       this.logger.error({ err }, '❌ Error syncing data availability');
@@ -276,46 +302,57 @@ class SystemRepository extends BaseRepository {
    * @deprecated Use refreshDataAvailability for source-of-truth updates
    */
   async updateDataAvailability(params) {
-    const { symbol, timeframe = '1m', firstDate, lastDate } = params;
+    let { symbol, timeframe = '1m', firstDate, lastDate } = params;
+
+    // Normalize timeframe
+    if (timeframe === 'ONE_MINUTE') timeframe = '1m';
 
     // 1. Get ACTUAL count from candles_1m table (Source of Truth)
-    // This prevents "double counting" drift when backfilling existing data
     const actualCount = await this.prisma.candles_1m.count({
       where: { symbol }
     });
-    
-    // Check if record exists for this symbol + timeframe
-    const existing = await this.prisma.data_availability.findFirst({
-      where: { symbol, timeframe },
+
+    // 2. Fetch existing record to perform "Smart Date Merging"
+    // We need this because Prisma upsert 'update' cannot reference existing DB values directly.
+    const existing = await this.prisma.data_availability.findUnique({
+      where: { symbol },
     });
 
+    let finalFirstDate = new Date(firstDate);
+    let finalLastDate = new Date(lastDate);
+
     if (existing) {
-      // UPDATE: Smart merge of data availability
-      // - first_date: take the earlier of the two
-      // - last_date: take the later of the two
-      // - total_records: SET to actual count (not increment)
-      return this.prisma.data_availability.update({
-        where: { id: existing.id },
-        data: {
-          first_date: firstDate < existing.first_date ? new Date(firstDate) : existing.first_date,
-          last_date: lastDate > existing.last_date ? new Date(lastDate) : existing.last_date,
-          total_records: BigInt(actualCount),
-          updated_at: new Date(),
-        },
-      });
-    } else {
-      // INSERT: New symbol tracking
-      return this.prisma.data_availability.create({
-        data: {
-          symbol,
-          timeframe,
-          first_date: new Date(firstDate),
-          last_date: new Date(lastDate),
-          total_records: BigInt(actualCount),
-          updated_at: new Date(),
-        },
-      });
+      // If record exists, ensure we expand the range, not shrink it.
+      // Take the EARLIER of the two start dates
+      if (existing.first_date < finalFirstDate) {
+        finalFirstDate = existing.first_date;
+      }
+      // Take the LATER of the two end dates
+      if (existing.last_date > finalLastDate) {
+        finalLastDate = existing.last_date;
+      }
     }
+
+    // 3. Upsert using the new UNIQUE(symbol) constraint
+    // This handles both new records and updates atomically, preventing duplicates.
+    return this.prisma.data_availability.upsert({
+      where: { symbol },
+      update: {
+        first_date: finalFirstDate,
+        last_date: finalLastDate,
+        total_records: BigInt(actualCount),
+        updated_at: new Date(),
+        timeframe: '1m', // Enforce standard
+      },
+      create: {
+        symbol,
+        timeframe: '1m',
+        first_date: new Date(firstDate),
+        last_date: new Date(lastDate),
+        total_records: BigInt(actualCount),
+        updated_at: new Date(),
+      },
+    });
   }
 
   /**

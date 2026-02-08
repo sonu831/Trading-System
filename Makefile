@@ -357,7 +357,7 @@ backup-data:
 	mkdir -p $$DIR; \
 	FILE=$$DIR/Stock_Market_Live_Data_DataOnly.sql; \
 	echo "📦 Backing up TimescaleDB DATA ONLY to $$DIR..."; \
-	if docker exec timescaledb pg_dump -U trading nifty50 --data-only > $$FILE; then \
+	if docker exec timescaledb pg_dump -U trading nifty50 --data-only --load-via-partition-root > $$FILE; then \
 		if [ -s $$FILE ]; then \
 			echo "✅ Data Backup SAVED & VERIFIED: $$FILE ($$(du -h $$FILE | cut -f1))"; \
 			echo ""; \
@@ -395,7 +395,7 @@ backup-schema:
 	DIR="backups/Stock_Market_Live_Data_SchemaOnly_$$TS"; \
 	mkdir -p $$DIR; \
 	FILE=$$DIR/Stock_Market_Live_Data_SchemaOnly.sql; \
-	echo "� Backing up TimescaleDB SCHEMA ONLY to $$DIR..."; \
+	echo " Backing up TimescaleDB SCHEMA ONLY to $$DIR..."; \
 	if docker exec timescaledb pg_dump -U trading nifty50 --schema-only > $$FILE; then \
 		if [ -s $$FILE ]; then \
 			echo "✅ Schema Backup SAVED & VERIFIED: $$FILE ($$(du -h $$FILE | cut -f1))"; \
@@ -504,7 +504,8 @@ restore-data:
 		echo "❌ No data backup found!"; \
 	else \
 		echo "🔄 Restoring DATA from $$file..."; \
-		docker exec -i timescaledb psql -U trading nifty50 < $$file; \
+		echo "🛠️  Applying fix for TimescaleDB chunks..."; \
+		cat $$file | sed -E 's/COPY _timescaledb_internal\._hyper_[0-9_]+_chunk/COPY public.candles_1m/g' | docker exec -i timescaledb psql -U trading nifty50; \
 		echo "✅ Data restore complete!"; \
 	fi
 

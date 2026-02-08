@@ -205,9 +205,27 @@ class SystemService extends BaseService {
    * Get symbols with data gaps
    * @param {number} tradingDays - Number of trading days to check
    */
-  async getSymbolsWithGaps(tradingDays = 5) {
-    const records = await this.systemRepository.getSymbolsWithGaps(tradingDays);
-    return records.map(r => r.symbol);
+  async getSymbolsWithGaps(tradingDays) {
+    return this.systemRepository.getSymbolsWithGaps(tradingDays);
+  }
+
+  /**
+   * Clear System Caches
+   * Called by API POST /system/cache/clear
+   */
+  async clearSystemCache() {
+    this.logger.info('🧹 Manual Cache Clear Requested');
+    
+    // Clear Data Availability Cache
+    await this.systemRepository.clearCachePattern('api:data:*');
+    
+    // Clear System Metrics Cache
+    await this.systemRepository.clearCachePattern('system:metrics:*');
+    
+    // Clear Job Status Cache (optional, but good for fresh state)
+    // await this.systemRepository.clearCachePattern('system:jobs:*');
+
+    return { message: 'Cache cleared successfully', timestamp: new Date() };
   }
 }
 

@@ -183,8 +183,13 @@ down:
 	@echo "4️⃣  Stopping Application Services..."
 	-$(DC) -f $(COMPOSE_DIR)/docker-compose.app.yml down
 	@echo "5️⃣  Backing up database (more memory available now)..."
-	@make backup-schema
-	@make backup-data
+	@read -p "📦 Create BACKUP before shutdown? (y/N): " backup_res; \
+	if [ "$$backup_res" = "y" ] || [ "$$backup_res" = "Y" ]; then \
+		make backup-schema; \
+		make backup-data; \
+	else \
+		echo "⏩ Skipping backup."; \
+	fi
 	@echo "6️⃣  Stopping Kafka & Message Queue..."
 	-docker stop kafka kafka-ui 2>/dev/null || true
 	@echo "7️⃣  Stopping Database & Infrastructure (last)..."

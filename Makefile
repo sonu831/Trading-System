@@ -194,8 +194,8 @@ down:
 	@echo "7️⃣  Stopping Database & Infrastructure (last)..."
 	-docker stop timescaledb redis zookeeper pgadmin redis-commander 2>/dev/null || true
 	-$(DC) -f $(COMPOSE_DIR)/docker-compose.infra.yml down
-	@echo "8️⃣  Cleaning data folder..."
-	@rm -rf data/*
+	@echo "8️⃣  Preserving data folder..."
+	# @rm -rf data/* <-- DISABLED: Preserves database across restarts
 	@echo "✅ Shutdown complete! Database stopped last after backup."
 
 dev-nodb:

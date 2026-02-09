@@ -2,7 +2,7 @@
  * Stocks Controller - API handlers for stock data
  */
 class StocksController {
-  constructor(stocksService) {
+  constructor({ stocksService }) {
     this.stocksService = stocksService;
     
     // Bind methods

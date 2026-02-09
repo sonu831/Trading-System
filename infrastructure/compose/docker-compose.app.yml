@@ -106,7 +106,7 @@ services:
       - KAFKA_BROKERS=kafka:29092
       - TIMESCALE_URL=postgresql://${POSTGRES_USER:-trading}:${POSTGRES_PASSWORD:-trading123}@timescaledb:5432/${POSTGRES_DB:-nifty50}
     volumes:
-      - ../../vendor:/app/vendor:ro
+      - ../../shared:/app/shared:ro
     networks:
       - trading-network
     restart: unless-stopped
@@ -128,6 +128,8 @@ services:
     environment:
       - REDIS_URL=redis://redis:6379
       - TIMESCALE_URL=postgresql://${POSTGRES_USER:-trading}:${POSTGRES_PASSWORD:-trading123}@timescaledb:5432/${POSTGRES_DB:-nifty50}
+    volumes:
+      - ../../shared:/app/shared:ro
     networks:
       - trading-network
     restart: unless-stopped

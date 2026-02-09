@@ -3,7 +3,29 @@
  * Single source of truth via shared/stocks/loader.js
  */
 const path = require('path');
-const stockLoader = require('../../../../../shared/stocks/loader');
+const fs = require('fs');
+
+// Determine loader path (Docker vs local)
+const dockerPath = '/app/shared/stocks/loader.js';
+const localPath = path.resolve(__dirname, '../../../../../shared/stocks/loader.js');
+const loaderPath = fs.existsSync(dockerPath) ? dockerPath : localPath;
+
+let stockLoader;
+try {
+  stockLoader = require(loaderPath);
+} catch (err) {
+  console.error('Failed to load stock loader, using inline fallback');
+  // Inline fallback if loader is missing
+  stockLoader = {
+    getSymbols: () => ['RELIANCE', 'TCS', 'HDFCBANK', 'INFY', 'ICICIBANK'],
+    getAllStocks: () => [],
+    getStockBySymbol: () => null,
+    getSectorMap: () => ({}),
+    getStocksBySector: () => ({}),
+    getSectors: () => [],
+    getToken: () => null,
+  };
+}
 
 class StocksService {
   /**

@@ -35,7 +35,7 @@ fastify.register(require('@fastify/swagger'), {
       description: 'Layer 7 Core Interface for Nifty 50 Trading System',
       version: '1.0.0',
     },
-    host: 'localhost',
+    host: 'localhost:4000',
     schemes: ['http'],
     consumes: ['application/json'],
     produces: ['application/json'],

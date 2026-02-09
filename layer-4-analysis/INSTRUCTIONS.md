@@ -9,7 +9,7 @@ This is the core calculation engine of the system. It analyzes all 50 Nifty stoc
 ### Go Standards
 
 - **Version**: Go 1.21+
-- **Module Name**: `github.com/utkarsh-pandey/nifty50-trading-system/layer-4-analysis`
+- **Module Name**: `github.com/sonu831/Trading-System/layer-4-analysis`
 - **Linter**: Use `golangci-lint` with default settings + `errcheck`, `gocritic`.
 
 ### Concurrency Patterns

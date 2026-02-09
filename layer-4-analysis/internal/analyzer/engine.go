@@ -8,28 +8,80 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"runtime"
 	"sort"
 	"sync"
+	"sync/atomic"
 	"time"
 
-	"github.com/utkarsh-pandey/nifty50-trading-system/layer-4-analysis/internal/ai"
-	"github.com/utkarsh-pandey/nifty50-trading-system/layer-4-analysis/internal/db"
-	"github.com/utkarsh-pandey/nifty50-trading-system/layer-4-analysis/internal/indicators"
-	redisClient "github.com/utkarsh-pandey/nifty50-trading-system/layer-4-analysis/internal/redis"
+	"github.com/sonu831/Trading-System/layer-4-analysis/internal/ai"
+	"github.com/sonu831/Trading-System/layer-4-analysis/internal/db"
+	"github.com/sonu831/Trading-System/layer-4-analysis/internal/indicators"
+	redisClient "github.com/sonu831/Trading-System/layer-4-analysis/internal/redis"
 )
 
-// Nifty50 stocks list
-var Nifty50Symbols = []string{
-	"RELIANCE", "TCS", "HDFCBANK", "INFY", "ICICIBANK",
-	"HINDUNILVR", "SBIN", "BHARTIARTL", "KOTAKBANK", "ITC",
-	"LT", "AXISBANK", "BAJFINANCE", "ASIANPAINT", "MARUTI",
-	"HCLTECH", "TITAN", "WIPRO", "SUNPHARMA", "ULTRACEMCO",
-	"ONGC", "NTPC", "POWERGRID", "TATAMOTORS", "M&M",
-	"BAJAJFINSV", "ADANIPORTS", "COALINDIA", "TATASTEEL", "TECHM",
-	"JSWSTEEL", "INDUSINDBK", "HINDALCO", "DRREDDY", "DIVISLAB",
-	"CIPLA", "GRASIM", "BRITANNIA", "NESTLEIND", "EICHERMOT",
-	"APOLLOHOSP", "BPCL", "HEROMOTOCO", "SBILIFE", "HDFCLIFE",
-	"BAJAJ-AUTO", "TATACONSUM", "ADANIENT", "LTIM", "SHRIRAMFIN",
+// Stock represents a stock entry from the shared JSON
+type StockEntry struct {
+	Symbol   string            `json:"symbol"`
+	Exchange string            `json:"exchange"`
+	Sector   string            `json:"sector"`
+	Tokens   map[string]string `json:"tokens"`
+}
+
+// Nifty50Symbols - loaded from shared/stocks/nifty50_shared.json
+var Nifty50Symbols = loadNifty50Symbols()
+
+// loadNifty50Symbols loads symbols from the shared JSON file
+func loadNifty50Symbols() []string {
+	// Try Docker path first, then local dev path
+	paths := []string{
+		"/app/shared/stocks/nifty50_shared.json",             // Docker path
+		"../../shared/stocks/nifty50_shared.json",            // Local dev path
+		"../../../shared/stocks/nifty50_shared.json",         // Alternative local path
+	}
+
+	var data []byte
+	var err error
+	for _, path := range paths {
+		data, err = ioutil.ReadFile(path)
+		if err == nil {
+			break
+		}
+	}
+
+	if err != nil {
+		log.Printf("⚠️ Failed to load symbols from JSON, using fallback: %v", err)
+		return getFallbackSymbols()
+	}
+
+	var stocks []StockEntry
+	if err := json.Unmarshal(data, &stocks); err != nil {
+		log.Printf("⚠️ Failed to parse symbols JSON, using fallback: %v", err)
+		return getFallbackSymbols()
+	}
+
+	symbols := make([]string, len(stocks))
+	for i, s := range stocks {
+		symbols[i] = s.Symbol
+	}
+	log.Printf("✅ Loaded %d symbols from shared JSON", len(symbols))
+	return symbols
+}
+
+// getFallbackSymbols returns hardcoded symbols as fallback
+func getFallbackSymbols() []string {
+	return []string{
+		"RELIANCE", "TCS", "HDFCBANK", "INFY", "ICICIBANK",
+		"HINDUNILVR", "SBIN", "BHARTIARTL", "KOTAKBANK", "ITC",
+		"LT", "AXISBANK", "BAJFINANCE", "ASIANPAINT", "MARUTI",
+		"HCLTECH", "TITAN", "WIPRO", "SUNPHARMA", "ULTRACEMCO",
+		"ONGC", "NTPC", "POWERGRID", "TATAMOTORS", "M&M",
+		"BAJAJFINSV", "ADANIPORTS", "COALINDIA", "TATASTEEL", "TECHM",
+		"JSWSTEEL", "INDUSINDBK", "HINDALCO", "DRREDDY", "DIVISLAB",
+		"CIPLA", "GRASIM", "BRITANNIA", "NESTLEIND", "EICHERMOT",
+		"APOLLOHOSP", "BPCL", "HEROMOTOCO", "SBILIFE", "HDFCLIFE",
+		"BAJAJ-AUTO", "TATACONSUM", "ADANIENT", "LTIM", "SHRIRAMFIN",
+	}
 }
 
 // StockAnalysis represents the complete analysis result for a stock
@@ -65,14 +117,14 @@ type Engine struct {
 	workers  int
 	results  chan StockAnalysis
 	wg       sync.WaitGroup
-	running  bool
-	mu       sync.Mutex
+	isAnalyzing atomic.Bool  // Lock-free cycle guard (§3c)
+	mu       sync.RWMutex   // RWMutex for read-heavy cache (§7a)
 	dbClient *db.Client
 	redis    *redisClient.Client
 	aiClient *ai.Client
 	symbols  []string
 
-	// Cache for Market Sentiment
+	// Cache for Market Sentiment (§12)
 	lastAnalysis map[string]StockAnalysis
 }
 
@@ -139,15 +191,6 @@ func NewEngine(ctx context.Context) (*Engine, error) {
 
 // Start begins the analysis engine
 func (e *Engine) Start() error {
-	e.mu.Lock()
-	defer e.mu.Unlock()
-
-	if e.running {
-		return nil
-	}
-
-	e.running = true
-
 	// Start result collector
 	go e.collectResults()
 
@@ -158,28 +201,40 @@ func (e *Engine) Start() error {
 }
 
 // analysisLoop triggers analysis on every new candle
+// Implements backpressure pattern per §3c
 func (e *Engine) analysisLoop() {
 	ticker := time.NewTicker(1 * time.Minute)
 	defer ticker.Stop()
 
 	// Run immediately once
-	e.runAnalysis()
+	e.runAnalysis(e.ctx)
 
 	for {
 		select {
 		case <-e.ctx.Done():
 			return
 		case <-ticker.C:
-			e.runAnalysis()
+			// Backpressure: skip if previous cycle still running (§3c)
+			if e.isAnalyzing.Load() {
+				log.Println("⚠️ Previous analysis still running, skipping cycle")
+				continue
+			}
+			e.runAnalysis(e.ctx)
 		}
 	}
 }
 
 // runAnalysis performs parallel analysis of all stocks
-func (e *Engine) runAnalysis() {
+// Uses semaphore pattern per §3a for bounded concurrency
+func (e *Engine) runAnalysis(ctx context.Context) {
+	e.isAnalyzing.Store(true)
+	defer e.isAnalyzing.Store(false)
+
 	startTime := time.Now()
 	log.Printf("📊 Starting analysis of %d stocks...", len(e.symbols))
 
+	// Semaphore: bound concurrency to NumCPU * 4 (§3a)
+	sem := make(chan struct{}, runtime.NumCPU()*4)
 	var wg sync.WaitGroup
 
 	// Fan-out: Start a goroutine for each stock
@@ -187,7 +242,14 @@ func (e *Engine) runAnalysis() {
 		wg.Add(1)
 		go func(sym string) {
 			defer wg.Done()
-			e.analyzeStock(sym)
+			sem <- struct{}{}        // Acquire slot
+			defer func() { <-sem }() // Release slot
+
+			// Respect cancellation before expensive work (§3a)
+			if ctx.Err() != nil {
+				return
+			}
+			e.analyzeStock(ctx, sym)
 		}(symbol)
 	}
 
@@ -199,11 +261,12 @@ func (e *Engine) runAnalysis() {
 }
 
 // analyzeStock performs analysis for a single stock
-func (e *Engine) analyzeStock(symbol string) {
+// Context propagation per §7b - all I/O functions take ctx as first param
+func (e *Engine) analyzeStock(ctx context.Context, symbol string) {
 	startTime := time.Now()
 
 	// Fetch candle data from DB
-	candles := e.fetchCandles(symbol)
+	candles := e.fetchCandles(ctx, symbol)
 
 	if len(candles) < 200 {
 		return // Not enough data
@@ -300,7 +363,7 @@ func (e *Engine) analyzeStock(symbol string) {
 
 	var aiReasoning string
 
-	prediction, err := e.aiClient.Predict(symbol, features)
+	prediction, err := e.aiClient.Predict(ctx, symbol, features)
 	if err != nil {
 		// Log but don't fail the whole analysis (Soft fail)
 		log.Printf("⚠️ AI Prediction failed for %s: %v", symbol, err)
@@ -354,9 +417,10 @@ func (e *Engine) analyzeStock(symbol string) {
 }
 
 // GetMarketSentiment returns aggregated market sentiment with Top Picks
+// Uses RLock for read-heavy cache access per §7a
 func (e *Engine) GetMarketSentiment() map[string]interface{} {
-	e.mu.Lock()
-	defer e.mu.Unlock()
+	e.mu.RLock()
+	defer e.mu.RUnlock()
 
 	var allStocks []StockAnalysis
 	bullish := 0
@@ -422,8 +486,8 @@ func (e *Engine) GetMarketSentiment() map[string]interface{} {
 	}
 	marketSummary := "Market analysis based on technical indicators."
 
-	// Call AI for Advanced Analysis
-	aiResult, err := e.aiClient.AnalyzeMarket(summaries)
+	// Call AI for Advanced Analysis (pass context for timeout handling)
+	aiResult, err := e.aiClient.AnalyzeMarket(context.Background(), summaries)
 	if err == nil && aiResult != nil {
 		log.Printf("🤖 AI Market Analysis: %s", aiResult.Sentiment)
 		sentiment = aiResult.Sentiment
@@ -444,8 +508,9 @@ func (e *Engine) GetMarketSentiment() map[string]interface{} {
 }
 
 // fetchCandles retrieves candle data from TimescaleDB
-func (e *Engine) fetchCandles(symbol string) []Candle {
-	dbCandles, err := e.dbClient.FetchCandles(e.ctx, symbol, 300)
+// Context propagation per §7b
+func (e *Engine) fetchCandles(ctx context.Context, symbol string) []Candle {
+	dbCandles, err := e.dbClient.FetchCandles(ctx, symbol, 300)
 	if err != nil {
 		log.Printf("⚠️ Failed to fetch candles for %s: %v", symbol, err)
 		return nil
@@ -490,16 +555,10 @@ func (e *Engine) collectResults() {
 }
 
 // Stop gracefully stops the engine
+// Cancels context which signals all goroutines to exit (§14)
 func (e *Engine) Stop() {
-	e.mu.Lock()
-	defer e.mu.Unlock()
-
-	if !e.running {
-		return
-	}
-
 	e.cancel()
-	e.running = false
+	// Resources are cleaned up via deferred closes in main
 }
 
 // PublishRuntimeMetrics publishes runtime metrics like goroutine count

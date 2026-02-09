@@ -26,21 +26,38 @@ type Client struct {
 	pool *pgxpool.Pool
 }
 
-// NewClient creates a new TimescaleDB client
+// NewClient creates a new TimescaleDB client with optimized pool configuration
+// Pool sizing per instruction §5a: 50 concurrent analysis queries + 10 headroom
 func NewClient(ctx context.Context) (*Client, error) {
 	connURL := os.Getenv("TIMESCALE_URL")
 	if connURL == "" {
 		connURL = "postgresql://trading:trading123@localhost:5432/nifty50"
 	}
 
-	pool, err := pgxpool.New(ctx, connURL)
+	// For local dev override (when running outside Docker)
+	if os.Getenv("GO_ENV") == "local" {
+		connURL = "postgresql://trading:trading123@localhost:5432/nifty50"
+	}
+	config, err := pgxpool.ParseConfig(connURL)
 	if err != nil {
-		return nil, fmt.Errorf("failed to connect to TimescaleDB: %w", err)
+		return nil, fmt.Errorf("parse db config: %w", err)
+	}
+
+	// Pool configuration per instruction §5a
+	config.MaxConns = 60                          // 50 analysis + 10 headroom for API/metrics
+	config.MinConns = 10                          // Keep warm connections for low-latency first query
+	config.MaxConnLifetime = 30 * time.Minute     // Recycle connections periodically
+	config.MaxConnIdleTime = 5 * time.Minute      // Release idle connections
+	config.HealthCheckPeriod = 30 * time.Second   // Periodic health checks
+
+	pool, err := pgxpool.NewWithConfig(ctx, config)
+	if err != nil {
+		return nil, fmt.Errorf("create db pool: %w", err)
 	}
 
 	// Test connection
 	if err := pool.Ping(ctx); err != nil {
-		return nil, fmt.Errorf("failed to ping TimescaleDB: %w", err)
+		return nil, fmt.Errorf("ping TimescaleDB: %w", err)
 	}
 
 	return &Client{pool: pool}, nil
@@ -62,7 +79,8 @@ func (c *Client) FetchCandles(ctx context.Context, symbol string, limit int) ([]
 	}
 	defer rows.Close()
 
-	var candles []Candle
+	// Pre-allocate with known capacity to reduce GC pressure (§4a)
+	candles := make([]Candle, 0, limit)
 	for rows.Next() {
 		var candle Candle
 		if err := rows.Scan(
@@ -74,7 +92,7 @@ func (c *Client) FetchCandles(ctx context.Context, symbol string, limit int) ([]
 			&candle.Close,
 			&candle.Volume,
 		); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("scan candle row: %w", err)
 		}
 		candles = append(candles, candle)
 	}

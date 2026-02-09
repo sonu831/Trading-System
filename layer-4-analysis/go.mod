@@ -1,4 +1,4 @@
-module github.com/utkarsh-pandey/nifty50-trading-system/layer-4-analysis
+module github.com/sonu831/Trading-System/layer-4-analysis
 
 go 1.23.0
 

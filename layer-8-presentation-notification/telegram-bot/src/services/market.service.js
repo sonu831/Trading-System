@@ -2,63 +2,56 @@ const redis = require('../core/redis');
 const logger = require('../core/logger');
 const stringSimilarity = require('string-similarity');
 
-// Hardcoded Nifty 50 for Fuzzy Matching (Single Source of Truth: vendor/json is best, but this is fast fallback)
-const NIFTY_50 = [
-  'RELIANCE',
-  'TCS',
-  'HDFCBANK',
-  'INFY',
-  'ICICIBANK',
-  'HINDUNILVR',
-  'SBIN',
-  'BHARTIARTL',
-  'KOTAKBANK',
-  'ITC',
-  'LT',
-  'AXISBANK',
-  'BAJFINANCE',
-  'ASIANPAINT',
-  'MARUTI',
-  'HCLTECH',
-  'TITAN',
-  'WIPRO',
-  'SUNPHARMA',
-  'ULTRACEMCO',
-  'ONGC',
-  'NTPC',
-  'POWERGRID',
-  'TATAMOTORS',
-  'M&M',
-  'BAJAJFINSV',
-  'ADANIPORTS',
-  'COALINDIA',
-  'TATASTEEL',
-  'TECHM',
-  'JSWSTEEL',
-  'INDUSINDBK',
-  'HINDALCO',
-  'DRREDDY',
-  'DIVISLAB',
-  'CIPLA',
-  'GRASIM',
-  'BRITANNIA',
-  'NESTLEIND',
-  'EICHERMOT',
-  'APOLLOHOSP',
-  'BPCL',
-  'HEROMOTOCO',
-  'SBILIFE',
-  'HDFCLIFE',
-  'BAJAJ-AUTO',
-  'TATACONSUM',
-  'ADANIENT',
-  'LTIM',
-  'SHRIRAMFIN',
-];
+// Nifty50 symbols - loaded from Layer 7 API (single source of truth)
+let NIFTY_50 = [];
+const BACKEND_API_URL = process.env.BACKEND_API_URL || 'http://backend-api:4000';
+
+// Initialize symbols from API
+async function loadSymbols() {
+  try {
+    const response = await fetch(`${BACKEND_API_URL}/api/v1/stocks/symbols`);
+    if (response.ok) {
+      const data = await response.json();
+      NIFTY_50 = data.symbols || [];
+      logger.info(`Loaded ${NIFTY_50.length} symbols from Layer 7 API`);
+    } else {
+      logger.warn('Failed to load symbols from API, using fallback');
+      NIFTY_50 = getFallbackSymbols();
+    }
+  } catch (err) {
+    logger.warn({ err }, 'API unavailable, using fallback symbols');
+    NIFTY_50 = getFallbackSymbols();
+  }
+}
+
+// Fallback for when API is unavailable (e.g., during startup)
+function getFallbackSymbols() {
+  return [
+    'RELIANCE', 'TCS', 'HDFCBANK', 'INFY', 'ICICIBANK', 'HINDUNILVR', 'SBIN',
+    'BHARTIARTL', 'KOTAKBANK', 'ITC', 'LT', 'AXISBANK', 'BAJFINANCE', 'ASIANPAINT',
+    'MARUTI', 'HCLTECH', 'TITAN', 'WIPRO', 'SUNPHARMA', 'ULTRACEMCO', 'ONGC',
+    'NTPC', 'POWERGRID', 'TATAMOTORS', 'M&M', 'BAJAJFINSV', 'ADANIPORTS', 'COALINDIA',
+    'TATASTEEL', 'TECHM', 'JSWSTEEL', 'INDUSINDBK', 'HINDALCO', 'DRREDDY', 'DIVISLAB',
+    'CIPLA', 'GRASIM', 'BRITANNIA', 'NESTLEIND', 'EICHERMOT', 'APOLLOHOSP', 'BPCL',
+    'HEROMOTOCO', 'SBILIFE', 'HDFCLIFE', 'BAJAJ-AUTO', 'TATACONSUM', 'ADANIENT', 'LTIM', 'SHRIRAMFIN',
+  ];
+}
+
+// Load symbols on module load
+loadSymbols();
 
 class MarketService {
   constructor() {
     this.redis = redis;
+  }
+
+  // Refresh symbols from API (call periodically or on demand)
+  async refreshSymbols() {
+    await loadSymbols();
+  }
+
+  getSymbols() {
+    return NIFTY_50;
   }
 
   findClosestSymbol(input) {

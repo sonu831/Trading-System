@@ -6,7 +6,7 @@ import (
 
 	"github.com/sdcoffey/big"
 	"github.com/sdcoffey/techan"
-	"github.com/utkarsh-pandey/nifty50-trading-system/layer-4-analysis/internal/db"
+	"github.com/sonu831/Trading-System/layer-4-analysis/internal/db"
 )
 
 // ScorecardResult represents the technical analysis scorecard

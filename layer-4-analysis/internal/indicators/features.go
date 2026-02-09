@@ -4,7 +4,7 @@ package indicators
 import (
 	"math"
 
-	"github.com/utkarsh-pandey/nifty50-trading-system/layer-4-analysis/internal/db"
+	"github.com/sonu831/Trading-System/layer-4-analysis/internal/db"
 )
 
 // FeatureVector holds all indicator values for AI consumption

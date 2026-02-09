@@ -1,75 +1,85 @@
 // Package sectors provides sector mapping and grouping for Nifty 50 stocks
+// Loads data from shared/stocks/nifty50_shared.json (single source of truth)
 package sectors
 
-// SectorMap maps stocks to their sectors
-var SectorMap = map[string]string{
-	// Banking & Financial Services
-	"HDFCBANK":   "Banking",
-	"ICICIBANK":  "Banking",
-	"SBIN":       "Banking",
-	"KOTAKBANK":  "Banking",
-	"AXISBANK":   "Banking",
-	"INDUSINDBK": "Banking",
-	"BAJFINANCE": "Financial Services",
-	"BAJAJFINSV": "Financial Services",
-	"HDFCLIFE":   "Financial Services",
-	"SBILIFE":    "Financial Services",
+import (
+	"encoding/json"
+	"io/ioutil"
+	"log"
+	"sync"
+)
 
-	// IT & Technology
-	"TCS":     "IT",
-	"INFY":    "IT",
-	"HCLTECH": "IT",
-	"WIPRO":   "IT",
-	"TECHM":   "IT",
-	"LTIM":    "IT",
+// StockEntry represents a stock from the shared JSON
+type StockEntry struct {
+	Symbol   string            `json:"symbol"`
+	Exchange string            `json:"exchange"`
+	Sector   string            `json:"sector"`
+	Tokens   map[string]string `json:"tokens"`
+}
 
-	// Oil & Gas / Energy
-	"RELIANCE":  "Energy",
-	"ONGC":      "Energy",
-	"BPCL":      "Energy",
-	"NTPC":      "Power",
-	"POWERGRID": "Power",
-	"COALINDIA": "Mining",
+// SectorMap maps stocks to their sectors - loaded from shared JSON
+var (
+	SectorMap     map[string]string
+	loadOnce      sync.Once
+	fallbackMap   = map[string]string{
+		"HDFCBANK": "Banking", "ICICIBANK": "Banking", "SBIN": "Banking",
+		"KOTAKBANK": "Banking", "AXISBANK": "Banking", "INDUSINDBK": "Banking",
+		"BAJFINANCE": "Finance", "BAJAJFINSV": "Finance", "HDFCLIFE": "Insurance",
+		"SBILIFE": "Insurance", "TCS": "IT", "INFY": "IT", "HCLTECH": "IT",
+		"WIPRO": "IT", "TECHM": "IT", "LTIM": "IT", "RELIANCE": "Energy",
+		"ONGC": "Energy", "BPCL": "Energy", "NTPC": "Power", "POWERGRID": "Power",
+		"COALINDIA": "Mining", "TATAMOTORS": "Auto", "MARUTI": "Auto", "M&M": "Auto",
+		"BAJAJ-AUTO": "Auto", "HEROMOTOCO": "Auto", "EICHERMOT": "Auto",
+		"HINDUNILVR": "FMCG", "ITC": "FMCG", "NESTLEIND": "FMCG",
+		"BRITANNIA": "FMCG", "TATACONSUM": "FMCG", "TITAN": "Consumer",
+		"TATASTEEL": "Metal", "JSWSTEEL": "Metal", "HINDALCO": "Metal",
+		"ULTRACEMCO": "Cement", "GRASIM": "Cement", "SUNPHARMA": "Pharma",
+		"DRREDDY": "Pharma", "CIPLA": "Pharma", "DIVISLAB": "Pharma",
+		"APOLLOHOSP": "Healthcare", "BHARTIARTL": "Telecom", "LT": "Infrastructure",
+		"ADANIPORTS": "Infrastructure", "ADANIENT": "Infrastructure",
+		"ASIANPAINT": "Consumer", "SHRIRAMFIN": "Finance",
+	}
+)
 
-	// Automobile
-	"TATAMOTORS": "Automobile",
-	"MARUTI":     "Automobile",
-	"M&M":        "Automobile",
-	"BAJAJ-AUTO": "Automobile",
-	"HEROMOTOCO": "Automobile",
-	"EICHERMOT":  "Automobile",
+func init() {
+	loadOnce.Do(loadSectorMap)
+}
 
-	// FMCG & Consumer
-	"HINDUNILVR": "FMCG",
-	"ITC":        "FMCG",
-	"NESTLEIND":  "FMCG",
-	"BRITANNIA":  "FMCG",
-	"TATACONSUM": "FMCG",
-	"TITAN":      "Consumer",
+// loadSectorMap loads sectors from the shared JSON file
+func loadSectorMap() {
+	paths := []string{
+		"/app/shared/stocks/nifty50_shared.json",     // Docker path
+		"../../shared/stocks/nifty50_shared.json",    // Local dev path
+		"../../../shared/stocks/nifty50_shared.json", // Alternative local path
+	}
 
-	// Metals & Materials
-	"TATASTEEL":  "Metals",
-	"JSWSTEEL":   "Metals",
-	"HINDALCO":   "Metals",
-	"ULTRACEMCO": "Cement",
-	"GRASIM":     "Cement",
+	var data []byte
+	var err error
+	for _, path := range paths {
+		data, err = ioutil.ReadFile(path)
+		if err == nil {
+			break
+		}
+	}
 
-	// Pharma & Healthcare
-	"SUNPHARMA":  "Pharma",
-	"DRREDDY":    "Pharma",
-	"CIPLA":      "Pharma",
-	"DIVISLAB":   "Pharma",
-	"APOLLOHOSP": "Healthcare",
+	if err != nil {
+		log.Printf("⚠️ Failed to load sectors from JSON, using fallback: %v", err)
+		SectorMap = fallbackMap
+		return
+	}
 
-	// Telecom & Infrastructure
-	"BHARTIARTL": "Telecom",
-	"LT":         "Infrastructure",
-	"ADANIPORTS": "Infrastructure",
-	"ADANIENT":   "Conglomerate",
+	var stocks []StockEntry
+	if err := json.Unmarshal(data, &stocks); err != nil {
+		log.Printf("⚠️ Failed to parse sectors JSON, using fallback: %v", err)
+		SectorMap = fallbackMap
+		return
+	}
 
-	// Others
-	"ASIANPAINT": "Paints",
-	"SHRIRAMFIN": "Financial Services",
+	SectorMap = make(map[string]string, len(stocks))
+	for _, s := range stocks {
+		SectorMap[s.Symbol] = s.Sector
+	}
+	log.Printf("✅ Loaded %d sector mappings from shared JSON", len(SectorMap))
 }
 
 // AllSectors returns list of unique sectors
@@ -94,7 +104,7 @@ func GetSector(symbol string) string {
 	return "Other"
 }
 
-// GroupBySecctor groups stocks by their sector
+// GroupBySector groups stocks by their sector
 func GroupBySector(symbols []string) map[string][]string {
 	result := make(map[string][]string)
 	for _, symbol := range symbols {

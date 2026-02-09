@@ -11,7 +11,7 @@
 #
 # ===========================================================
 
-.PHONY: help up down infra wait-kafka app ui observe logs clean backup restore
+.PHONY: help up down infra wait-kafka app ui observe logs clean backup restore layer-4-analysis
 
 COMPOSE_DIR := infrastructure/compose
 DC := docker-compose --env-file .env
@@ -324,6 +324,7 @@ ai-restart:
 ai-logs:
 	$(DC) -f $(COMPOSE_DIR)/docker-compose.ai.yml logs -f
 
+
 # ===========================================================
 # 4. DATABASE OPERATIONS
 # ===========================================================
@@ -594,6 +595,10 @@ layer-7-backend-api:
 	@echo "🚀 Starting Backend API (Layer 7 Core Interface)..."
 	@export $$(cat .env | grep -v '^#' | xargs) && cd layer-7-core-interface/api && npm run dev
 
+layer-4-analysis:
+	@echo "🚀 Starting Layer 4 (Analysis)..."
+	@export GO_ENV=local $$(cat .env | grep -v '^#' | xargs) && cd layer-4-analysis && go mod tidy && go build -o main cmd/main.go && ./main
+
 # ===========================================================
 # 7. OBSERVABILITY & LOGS
 # ===========================================================
@@ -658,6 +663,7 @@ restart-ingestion:
 	@echo "✅ Ingestion restarted with latest .env values"
 	@sleep 3
 	@docker logs ingestion --tail 10
+	
 
 # ===========================================================
 # 9. SHARING (GATEWAY)

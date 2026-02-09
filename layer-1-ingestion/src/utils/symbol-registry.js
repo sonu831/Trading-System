@@ -23,19 +23,20 @@ class SymbolRegistry {
    * Load and parse the shared symbol map
    * @param {string} [customPath] - Optional override path
    */
-  load(customPath) {
+  async load(customPath) {
     if (this.isLoaded) return;
 
     try {
-      // 1. Determine Path (Priority: Arg > Env > Default Local/Docker)
+      // 1. Try loading from file first
       let mapPath = customPath;
 
       if (!mapPath) {
-        // Docker path or relative path
+        // Shared folder paths (prioritize shared/stocks over vendor)
         const potentials = [
-          path.resolve('/app/vendor/nifty50_shared.json'), // Docker
-          path.resolve(__dirname, '../../../vendor/nifty50_shared.json'), // Local dev relative
-          path.resolve(process.cwd(), 'vendor/nifty50_shared.json'), // Root relative
+          path.resolve('/app/shared/stocks/nifty50_shared.json'), // Docker
+          path.resolve(__dirname, '../../../shared/stocks/nifty50_shared.json'), // Local dev
+          path.resolve(process.cwd(), 'shared/stocks/nifty50_shared.json'), // Root relative
+          path.resolve(__dirname, '../../config/symbols.json'), // Legacy local config
         ];
 
         for (const p of potentials) {
@@ -46,15 +47,28 @@ class SymbolRegistry {
         }
       }
 
-      if (!mapPath || !fs.existsSync(mapPath)) {
-        throw new Error(`Master Map not found. Scanned paths.`);
+      let items = [];
+
+      if (mapPath && fs.existsSync(mapPath)) {
+        logger.info(`📋 SymbolRegistry: Loading map from ${mapPath}`);
+        const rawData = fs.readFileSync(mapPath, 'utf-8');
+        items = JSON.parse(rawData);
+        // Handle legacy symbols.json format { nifty50: [...] }
+        if (items.nifty50) items = items.nifty50;
+      } else {
+        // 2. Fallback to Layer 7 API
+        logger.info(`📋 SymbolRegistry: Loading from Layer 7 API...`);
+        const apiUrl = process.env.BACKEND_API_URL || 'http://backend-api:4000';
+        const response = await fetch(`${apiUrl}/api/v1/stocks`);
+        if (response.ok) {
+          const data = await response.json();
+          items = data.stocks || [];
+        } else {
+          throw new Error(`API returned ${response.status}`);
+        }
       }
 
-      logger.info(`📋 SymbolRegistry: Loading map from ${mapPath}`);
-      const rawData = fs.readFileSync(mapPath, 'utf-8');
-      const items = JSON.parse(rawData);
-
-      // 2. Build Lookup Maps
+      // 3. Build Lookup Maps
       let count = 0;
       items.forEach((item) => {
         // Store master info
@@ -78,7 +92,6 @@ class SymbolRegistry {
     } catch (e) {
       logger.error(`❌ SymbolRegistry Load Failed: ${e.message}`);
       // Don't crash here, might be retried or optional?
-      // User requirement implies critical, so we might want to crash or handle upstream.
     }
   }
 

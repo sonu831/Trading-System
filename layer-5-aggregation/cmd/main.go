@@ -17,7 +17,7 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/utkarsh-pandey/nifty50-trading-system/layer-5-aggregation/internal/aggregator"
+	"github.com/sonu831/Trading-System/layer-5-aggregation/internal/aggregator"
 )
 
 func main() {

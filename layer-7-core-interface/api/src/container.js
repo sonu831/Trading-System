@@ -66,6 +66,10 @@ container.register({
   notificationService: asClass(require('./modules/notifications/NotificationService')).singleton(),
   notificationController: asClass(require('./modules/notifications/NotificationController')).singleton(),
 
+  // Stocks (Nifty50 from shared loader)
+  stocksService: asClass(require('./modules/stocks/StocksService')).singleton(),
+  stocksController: asClass(require('./modules/stocks/StocksController')).singleton(),
+
   // Jobs
   dataSyncJob: asClass(require('./jobs/DataSyncJob')).singleton(),
 });

@@ -9,7 +9,7 @@ This layer aggregates the individual stock analysis from Layer 4 to form a "Mark
 ### Go Standards
 
 - **Version**: Go 1.21+
-- **Module Name**: `github.com/utkarsh-pandey/nifty50-trading-system/layer-5-aggregation`
+- **Module Name**: `github.com/sonu831/Trading-System/layer-5-aggregation`
 
 ### Business Logic
 

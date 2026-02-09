@@ -4,14 +4,15 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	_ "net/http/pprof" // pprof endpoints per instruction §11
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/gorilla/mux"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/utkarsh-pandey/nifty50-trading-system/layer-4-analysis/internal/analyzer"
-	"github.com/utkarsh-pandey/nifty50-trading-system/layer-4-analysis/internal/indicators"
+	"github.com/sonu831/Trading-System/layer-4-analysis/internal/analyzer"
+	"github.com/sonu831/Trading-System/layer-4-analysis/internal/indicators"
 )
 
 type Server struct {
@@ -30,11 +31,14 @@ func NewServer(engine *analyzer.Engine) *Server {
 }
 
 func (s *Server) routes() {
+	// Profiling endpoints per instruction §11
+	s.router.PathPrefix("/debug/pprof/").Handler(http.DefaultServeMux)
+
 	s.router.Handle("/metrics", promhttp.Handler())
 	s.router.HandleFunc("/health", s.handleHealth).Methods("GET")
 	s.router.HandleFunc("/analyze", s.handleAnalyze).Methods("GET")
 	s.router.HandleFunc("/analyze/market", s.handleMarketSentiment).Methods("GET")
-	
+
 	// AI Service Endpoints
 	s.router.HandleFunc("/analyze/features", s.handleAIFeatures).Methods("GET")
 	s.router.HandleFunc("/query/dynamic", s.handleDynamicQuery).Methods("POST")

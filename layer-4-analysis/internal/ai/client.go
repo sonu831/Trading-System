@@ -1,7 +1,9 @@
+// Package ai provides HTTP client for Layer 9 AI inference service
 package ai
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -9,11 +11,13 @@ import (
 	"time"
 )
 
+// Client wraps HTTP client for AI service communication
 type Client struct {
 	baseURL    string
 	httpClient *http.Client
 }
 
+// FeatureVector represents input features for AI prediction
 type FeatureVector struct {
 	RSI    float64 `json:"rsi"`
 	MACD   float64 `json:"macd"`
@@ -23,11 +27,13 @@ type FeatureVector struct {
 	Volume float64 `json:"volume"`
 }
 
+// PredictionRequest is the request body for /predict endpoint
 type PredictionRequest struct {
 	Symbol   string          `json:"symbol"`
 	Features []FeatureVector `json:"features"`
 }
 
+// PredictionResponse is the response from /predict endpoint
 type PredictionResponse struct {
 	Symbol       string  `json:"symbol"`
 	Prediction   float64 `json:"prediction"` // 0-1
@@ -36,6 +42,7 @@ type PredictionResponse struct {
 	Reasoning    string  `json:"reasoning"`
 }
 
+// NewClient creates a new AI service client
 func NewClient() *Client {
 	url := os.Getenv("AI_INFERENCE_URL")
 	if url == "" {
@@ -54,61 +61,89 @@ func NewClient() *Client {
 	}
 }
 
-func (c *Client) Predict(symbol string, features []FeatureVector) (*PredictionResponse, error) {
+// Predict sends features to AI service and returns prediction
+// Uses context with timeout per instruction §7b (200ms timeout for AI calls)
+func (c *Client) Predict(ctx context.Context, symbol string, features []FeatureVector) (*PredictionResponse, error) {
+	// Apply 200ms timeout for AI inference per instruction §3b Wave 4
+	ctx, cancel := context.WithTimeout(ctx, 200*time.Millisecond)
+	defer cancel()
+
 	reqBody := PredictionRequest{
 		Symbol:   symbol,
 		Features: features,
 	}
 
-	jsonValue, _ := json.Marshal(reqBody)
-	resp, err := c.httpClient.Post(c.baseURL+"/predict", "application/json", bytes.NewBuffer(jsonValue))
+	jsonValue, err := json.Marshal(reqBody)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("marshal prediction request for %s: %w", symbol, err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+"/predict", bytes.NewBuffer(jsonValue))
+	if err != nil {
+		return nil, fmt.Errorf("create prediction request for %s: %w", symbol, err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("AI inference for %s: %w", symbol, err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("AI Service Error: %d", resp.StatusCode)
+		return nil, fmt.Errorf("AI service error for %s: status %d", symbol, resp.StatusCode)
 	}
 
 	var result PredictionResponse
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("decode prediction response for %s: %w", symbol, err)
 	}
 
 	return &result, nil
-	return &result, nil
 }
 
+// MarketAnalysisRequest is the request body for /analyze_market endpoint
 type MarketAnalysisRequest struct {
 	Summaries []map[string]interface{} `json:"summaries"`
 }
 
+// MarketAnalysisResponse is the response from /analyze_market endpoint
 type MarketAnalysisResponse struct {
 	Sentiment  string  `json:"sentiment"`
 	Summary    string  `json:"summary"`
 	Confidence float64 `json:"confidence"`
 }
 
-func (c *Client) AnalyzeMarket(summaries []map[string]interface{}) (*MarketAnalysisResponse, error) {
+// AnalyzeMarket sends market summaries for AI analysis
+func (c *Client) AnalyzeMarket(ctx context.Context, summaries []map[string]interface{}) (*MarketAnalysisResponse, error) {
 	reqBody := MarketAnalysisRequest{
 		Summaries: summaries,
 	}
 
-	jsonValue, _ := json.Marshal(reqBody)
-	resp, err := c.httpClient.Post(c.baseURL+"/analyze_market", "application/json", bytes.NewBuffer(jsonValue))
+	jsonValue, err := json.Marshal(reqBody)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("marshal market analysis request: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+"/analyze_market", bytes.NewBuffer(jsonValue))
+	if err != nil {
+		return nil, fmt.Errorf("create market analysis request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("market analysis request: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("AI Service Error: %d", resp.StatusCode)
+		return nil, fmt.Errorf("AI service error: status %d", resp.StatusCode)
 	}
 
 	var result MarketAnalysisResponse
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("decode market analysis response: %w", err)
 	}
 
 	return &result, nil

@@ -8,10 +8,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/utkarsh-pandey/nifty50-trading-system/layer-5-aggregation/internal/breadth"
-	"github.com/utkarsh-pandey/nifty50-trading-system/layer-5-aggregation/internal/db"
-	redisClient "github.com/utkarsh-pandey/nifty50-trading-system/layer-5-aggregation/internal/redis"
-	"github.com/utkarsh-pandey/nifty50-trading-system/layer-5-aggregation/internal/sectors"
+	"github.com/sonu831/Trading-System/layer-5-aggregation/internal/breadth"
+	"github.com/sonu831/Trading-System/layer-5-aggregation/internal/db"
+	redisClient "github.com/sonu831/Trading-System/layer-5-aggregation/internal/redis"
+	"github.com/sonu831/Trading-System/layer-5-aggregation/internal/sectors"
 )
 
 // MarketView represents the aggregated market state

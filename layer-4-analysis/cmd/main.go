@@ -14,8 +14,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/utkarsh-pandey/nifty50-trading-system/layer-4-analysis/internal/analyzer"
-	"github.com/utkarsh-pandey/nifty50-trading-system/layer-4-analysis/internal/api"
+	"github.com/sonu831/Trading-System/layer-4-analysis/internal/analyzer"
+	"github.com/sonu831/Trading-System/layer-4-analysis/internal/api"
 )
 
 func main() {

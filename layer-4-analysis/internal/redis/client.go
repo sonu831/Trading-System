@@ -22,6 +22,11 @@ func NewClient() (*Client, error) {
 		redisURL = "localhost:6379"
 	}
 
+	// For local dev override (when running outside Docker)
+	if os.Getenv("GO_ENV") == "local" {
+		redisURL = "localhost:6379"
+	}
+
 	var opt *redis.Options
 	var err error
 
@@ -67,6 +72,35 @@ func (c *Client) PublishMetrics(ctx context.Context, key string, data interface{
 	}
 	// Store with 1 minute TTL
 	return c.rdb.Set(ctx, key, jsonData, 1*time.Minute).Err()
+}
+
+// PublishBatch publishes multiple results using Redis pipeline
+// Reduces 50 round-trips to 1 pipeline flush per instruction §12
+func (c *Client) PublishBatch(ctx context.Context, results interface{}) error {
+	// Type assert to slice of any type
+	pipe := c.rdb.Pipeline()
+
+	// Marshal and publish each result
+	switch v := results.(type) {
+	case []interface{}:
+		for _, result := range v {
+			jsonData, err := json.Marshal(result)
+			if err != nil {
+				continue // Skip malformed, don't fail batch
+			}
+			pipe.Publish(ctx, "analysis:updates", jsonData)
+		}
+	default:
+		// Single item
+		jsonData, err := json.Marshal(results)
+		if err != nil {
+			return err
+		}
+		pipe.Publish(ctx, "analysis:updates", jsonData)
+	}
+
+	_, err := pipe.Exec(ctx)
+	return err
 }
 
 // Close closes the Redis connection

@@ -3,7 +3,8 @@ import PropTypes from 'prop-types';
 
 /**
  * Input Component
- * A reusable form input component with label, error, and helper text support
+ * A reusable form input component with label, error, and helper text support.
+ * Styled with Tailwind CSS for dark mode (Slate-900).
  */
 export default function Input({
   type = 'text',
@@ -24,9 +25,9 @@ export default function Input({
   return (
     <div className={`flex flex-col gap-1.5 w-full ${className}`}>
       {label && (
-        <label htmlFor={inputId} className="text-sm font-medium text-text-tertiary">
+        <label htmlFor={inputId} className="text-xs font-semibold text-slate-400 uppercase tracking-wider ml-1">
           {label}
-          {required && <span className="text-error ml-1">*</span>}
+          {required && <span className="text-rose-500 ml-1">*</span>}
         </label>
       )}
 
@@ -38,12 +39,22 @@ export default function Input({
         placeholder={placeholder}
         disabled={disabled}
         required={required}
-        className={`px-3.5 py-2.5 border border-border rounded-lg bg-input text-text-primary text-sm font-inherit transition-all focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/10 disabled:opacity-50 disabled:cursor-not-allowed placeholder:text-text-tertiary/50 ${hasError ? 'border-error focus:border-error focus:ring-error/10' : ''} dark:[color-scheme:dark]`}
+        className={`
+          w-full px-4 py-2.5 rounded-lg text-sm transition-all duration-200
+          bg-slate-900/50 border border-white/10 text-slate-200 placeholder:text-slate-600
+          focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/50
+          disabled:opacity-50 disabled:cursor-not-allowed
+          ${hasError ? 'border-rose-500 focus:border-rose-500 focus:ring-rose-500/50 text-rose-300' : ''}
+        `}
         {...props}
       />
 
-      {error && <p className="text-xs text-error mt-0">{error}</p>}
-      {!error && helperText && <p className="text-xs text-text-tertiary mt-0">{helperText}</p>}
+      {error && (
+        <p className="text-xs text-rose-400 mt-1 flex items-center gap-1">
+          <span>⚠️</span> {error}
+        </p>
+      )}
+      {!error && helperText && <p className="text-xs text-slate-500 mt-1 ml-1">{helperText}</p>}
     </div>
   );
 }

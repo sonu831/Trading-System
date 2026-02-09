@@ -1,16 +1,10 @@
 import React from 'react';
 import PropTypes from 'prop-types';
+import { Badge, Table } from '@/components/ui';
 
 /**
  * EnhancedMultiTFSummary Component
  * Shows 6-timeframe analysis with indicators and 7-factor verdicts
- *
- * Accepts API response format:
- * {
- *   '5m': { verdict: {...}, rsi, macdHistogram, supertrend: 'Bullish'|'Bearish', trend },
- *   '15m': {...},
- *   ...
- * }
  */
 export default function EnhancedMultiTFSummary({ data }) {
   // Handle both formats: { timeframes: {...} } or direct { '5m': {...}, '15m': {...} }
@@ -49,18 +43,13 @@ export default function EnhancedMultiTFSummary({ data }) {
 
   const overallVerdict = data?.overallVerdict || calculateOverallVerdict();
 
-  const getVerdictColor = (signal) => {
+  const getVerdictVariant = (signal) => {
     switch (signal) {
-      case 'Strong Buy':
-        return 'bg-success text-white';
-      case 'Buy':
-        return 'bg-success/70 text-white';
-      case 'Strong Sell':
-        return 'bg-error text-white';
-      case 'Sell':
-        return 'bg-error/70 text-white';
-      default:
-        return 'bg-warning/70 text-white';
+      case 'Strong Buy': return 'success';
+      case 'Buy': return 'success';
+      case 'Strong Sell': return 'error';
+      case 'Sell': return 'error';
+      default: return 'warning';
     }
   };
 
@@ -70,31 +59,27 @@ export default function EnhancedMultiTFSummary({ data }) {
     return '●';
   };
 
-  const getTrendColor = (direction) => {
-    if (direction === 1 || direction === 'up' || direction === 'Bullish') return 'text-success';
-    if (direction === -1 || direction === 'down' || direction === 'Bearish') return 'text-error';
-    return 'text-warning';
+  const getTrendColorClass = (direction) => {
+    if (direction === 1 || direction === 'up' || direction === 'Bullish') return 'text-emerald-400';
+    if (direction === -1 || direction === 'down' || direction === 'Bearish') return 'text-rose-400';
+    return 'text-amber-400';
   };
 
-  // Helper to get MACD histogram value (handles both macdHist and macdHistogram)
+  // Helper to get MACD histogram value
   const getMacdHist = (tf) => tf?.macdHist ?? tf?.macdHistogram ?? null;
 
-  // Helper to get supertrend direction (handles both object and string formats)
+  // Helper to get supertrend direction
   const getSupertrendDirection = (tf) => {
     if (!tf?.supertrend) return null;
-    // If supertrend is a string like 'Bullish' or 'Bearish'
     if (typeof tf.supertrend === 'string') return tf.supertrend;
-    // If supertrend is an object with direction property
     return tf.supertrend.direction;
   };
 
   // Helper to get BB position
   const getBBPosition = (tf) => {
     if (tf?.bbPosition !== undefined) return tf.bbPosition;
-    // Try to get from verdict factors
     const bbFactor = tf?.verdict?.factors?.bb?.position;
     if (bbFactor) {
-      // Parse "42%" to 0.42
       const match = bbFactor.match(/(\d+)%/);
       if (match) return parseInt(match[1]) / 100;
     }
@@ -113,241 +98,85 @@ export default function EnhancedMultiTFSummary({ data }) {
   const intervals = ['5m', '15m', '1h', '4h', '1d', '1w'];
 
   return (
-    <>
-      <div className="enhanced-multi-tf">
-        <div className="header">
-          <h3>Multi-Timeframe Analysis</h3>
-          {overallVerdict && (
-            <span className={`overall-verdict ${getVerdictColor(overallVerdict.signal)}`}>
-              {overallVerdict.signal} ({overallVerdict.confidence}%)
-            </span>
-          )}
-        </div>
-
-        <div className="table-container">
-          <table>
-            <thead>
-              <tr>
-                <th>Timeframe</th>
-                <th>RSI</th>
-                <th>MACD</th>
-                <th>Supertrend</th>
-                <th>BB Position</th>
-                <th>Verdict</th>
-                <th>Confidence</th>
-              </tr>
-            </thead>
-            <tbody>
-              {intervals.map((interval) => {
-                const tf = timeframes[interval];
-                if (!tf) return null;
-
-                const macdHist = getMacdHist(tf);
-                const supertrendDir = getSupertrendDirection(tf);
-                const bbPos = getBBPosition(tf);
-
-                return (
-                  <tr key={interval}>
-                    <td className="interval">{intervalLabels[interval]}</td>
-                    <td className="numeric">
-                      <span className={tf.rsi > 70 ? 'text-error' : tf.rsi < 30 ? 'text-success' : ''}>
-                        {tf.rsi?.toFixed(1) || 'N/A'}
-                      </span>
-                    </td>
-                    <td className="numeric">
-                      <span className={macdHist > 0 ? 'text-success' : 'text-error'}>
-                        {macdHist?.toFixed(2) || 'N/A'}
-                      </span>
-                    </td>
-                    <td className="trend">
-                      <span className={getTrendColor(supertrendDir)}>
-                        {getTrendIcon(supertrendDir)}
-                      </span>
-                    </td>
-                    <td className="numeric">
-                      {bbPos !== null ? `${(bbPos * 100).toFixed(0)}%` : 'N/A'}
-                    </td>
-                    <td>
-                      <span className={`verdict-badge ${getVerdictColor(tf.verdict?.signal)}`}>
-                        {tf.verdict?.signal || 'N/A'}
-                      </span>
-                    </td>
-                    <td>
-                      <div className="confidence-bar">
-                        <div
-                          className="confidence-fill"
-                          style={{
-                            width: `${tf.verdict?.confidence || 0}%`,
-                            backgroundColor:
-                              tf.verdict?.signal?.includes('Buy')
-                                ? '#10b981'
-                                : tf.verdict?.signal?.includes('Sell')
-                                ? '#ef4444'
-                                : '#f59e0b',
-                          }}
-                        />
-                        <span className="confidence-text">{tf.verdict?.confidence || 0}%</span>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+    <div className="bg-slate-900/50 border border-white/10 rounded-xl overflow-hidden backdrop-blur-sm">
+      <div className="px-5 py-4 border-b border-white/5 flex justify-between items-center bg-white/5">
+        <h3 className="text-sm font-semibold text-slate-100 uppercase tracking-wide">Multi-Timeframe Analysis</h3>
+        {overallVerdict && (
+          <Badge variant={getVerdictVariant(overallVerdict.signal)} size="md">
+            {overallVerdict.signal} ({overallVerdict.confidence}%)
+          </Badge>
+        )}
       </div>
 
-      <style jsx>{`
-        .enhanced-multi-tf {
-          background: #1a1a2e;
-          border: 1px solid #2a2a3e;
-          border-radius: 12px;
-          overflow: hidden;
-        }
+      <div className="overflow-x-auto">
+        <table className="w-full text-left text-sm">
+          <thead>
+             <tr className="border-b border-white/5 bg-white/5 text-slate-400 uppercase text-xs tracking-wider font-semibold">
+              <th className="px-5 py-3">Timeframe</th>
+              <th className="px-5 py-3">RSI</th>
+              <th className="px-5 py-3">MACD</th>
+              <th className="px-5 py-3">Supertrend</th>
+              <th className="px-5 py-3">BB Position</th>
+              <th className="px-5 py-3">Verdict</th>
+              <th className="px-5 py-3">Confidence</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-white/5 text-slate-300">
+            {intervals.map((interval) => {
+              const tf = timeframes[interval];
+              if (!tf) return null;
 
-        .header {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          padding: 16px 20px;
-          border-bottom: 1px solid #2a2a3e;
-          background: #1a1a2e;
-        }
+              const macdHist = getMacdHist(tf);
+              const supertrendDir = getSupertrendDirection(tf);
+              const bbPos = getBBPosition(tf);
 
-        .header h3 {
-          font-size: 14px;
-          font-weight: 600;
-          color: #fff;
-          margin: 0;
-        }
-
-        .overall-verdict {
-          padding: 4px 12px;
-          border-radius: 8px;
-          font-size: 12px;
-          font-weight: 600;
-        }
-
-        .table-container {
-          overflow-x: auto;
-        }
-
-        table {
-          width: 100%;
-          border-collapse: collapse;
-          font-size: 13px;
-        }
-
-        th {
-          text-align: left;
-          padding: 12px 16px;
-          background: #15152a;
-          color: #888;
-          font-weight: 500;
-          font-size: 11px;
-          text-transform: uppercase;
-          letter-spacing: 0.5px;
-          white-space: nowrap;
-        }
-
-        td {
-          padding: 12px 16px;
-          border-bottom: 1px solid #2a2a3e;
-          color: #ddd;
-        }
-
-        tr:last-child td {
-          border-bottom: none;
-        }
-
-        tr:hover {
-          background: rgba(255, 255, 255, 0.02);
-        }
-
-        .interval {
-          font-weight: 500;
-          color: #fff;
-        }
-
-        .numeric {
-          font-family: monospace;
-        }
-
-        .trend {
-          font-size: 16px;
-        }
-
-        .text-success {
-          color: #10b981;
-        }
-
-        .text-error {
-          color: #ef4444;
-        }
-
-        .text-warning {
-          color: #f59e0b;
-        }
-
-        .verdict-badge {
-          display: inline-block;
-          padding: 4px 8px;
-          border-radius: 6px;
-          font-size: 11px;
-          font-weight: 600;
-          white-space: nowrap;
-        }
-
-        .confidence-bar {
-          position: relative;
-          width: 80px;
-          height: 20px;
-          background: #2a2a3e;
-          border-radius: 4px;
-          overflow: hidden;
-        }
-
-        .confidence-fill {
-          position: absolute;
-          left: 0;
-          top: 0;
-          height: 100%;
-          border-radius: 4px;
-          transition: width 0.3s ease;
-        }
-
-        .confidence-text {
-          position: absolute;
-          left: 50%;
-          top: 50%;
-          transform: translate(-50%, -50%);
-          font-size: 10px;
-          font-weight: 600;
-          color: #fff;
-          text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
-        }
-
-        .bg-success {
-          background: #10b981;
-        }
-
-        .bg-success\\/70 {
-          background: rgba(16, 185, 129, 0.7);
-        }
-
-        .bg-error {
-          background: #ef4444;
-        }
-
-        .bg-error\\/70 {
-          background: rgba(239, 68, 68, 0.7);
-        }
-
-        .bg-warning\\/70 {
-          background: rgba(245, 158, 11, 0.7);
-        }
-      `}</style>
-    </>
+              return (
+                <tr key={interval} className="hover:bg-white/5 transition-colors">
+                  <td className="px-5 py-3 font-medium text-slate-200">{intervalLabels[interval]}</td>
+                  <td className="px-5 py-3 font-mono">
+                    <span className={tf.rsi > 70 ? 'text-rose-400' : tf.rsi < 30 ? 'text-emerald-400' : ''}>
+                      {tf.rsi?.toFixed(1) || 'N/A'}
+                    </span>
+                  </td>
+                  <td className="px-5 py-3 font-mono">
+                    <span className={macdHist > 0 ? 'text-emerald-400' : 'text-rose-400'}>
+                      {macdHist?.toFixed(2) || 'N/A'}
+                    </span>
+                  </td>
+                  <td className="px-5 py-3 font-bold text-base">
+                    <span className={getTrendColorClass(supertrendDir)}>
+                      {getTrendIcon(supertrendDir)}
+                    </span>
+                  </td>
+                  <td className="px-5 py-3 font-mono">
+                    {bbPos !== null ? `${(bbPos * 100).toFixed(0)}%` : 'N/A'}
+                  </td>
+                  <td className="px-5 py-3">
+                    <Badge variant={getVerdictVariant(tf.verdict?.signal)} size="sm">
+                      {tf.verdict?.signal || 'N/A'}
+                    </Badge>
+                  </td>
+                  <td className="px-5 py-3">
+                    <div className="w-24 h-2 bg-slate-700/50 rounded-full overflow-hidden relative">
+                      <div
+                        className={`absolute top-0 left-0 h-full rounded-full transition-all duration-500 ${
+                          tf.verdict?.signal?.includes('Buy') ? 'bg-emerald-500' :
+                          tf.verdict?.signal?.includes('Sell') ? 'bg-rose-500' : 'bg-amber-500'
+                        }`}
+                        style={{ width: `${tf.verdict?.confidence || 0}%` }}
+                      />
+                    </div>
+                    <span className="text-[10px] text-slate-500 mt-1 block text-center font-mono">
+                      {tf.verdict?.confidence || 0}%
+                    </span>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
   );
 }
 

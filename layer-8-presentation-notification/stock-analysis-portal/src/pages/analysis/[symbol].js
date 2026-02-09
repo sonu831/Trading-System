@@ -15,7 +15,8 @@ import {
   BacktestPanel,
   IndicatorOverlayToggle,
 } from '@/components/features/Analysis';
-import { Card, Badge } from '@/components/ui';
+import { Card, Badge, Button } from '@/components/ui';
+import { PageHeader, EmptyState, ErrorBoundary } from '@/components/common';
 
 /**
  * Stock Detail & Technical Analysis Page
@@ -85,39 +86,55 @@ export default function AnalysisPage() {
     }
   };
 
+  if (error) {
+    return (
+      <div className="min-h-screen bg-slate-900 text-slate-100 font-sans p-8 flex items-center justify-center">
+        <EmptyState
+          icon="❌"
+          title="Analysis Failed"
+          description={error || "Could not load analysis data."}
+          actionLabel="Try Again"
+          onAction={refresh}
+        />
+      </div>
+    );
+  }
+
   return (
-    <>
+    <ErrorBoundary>
       <Head>
         <title>{symbol ? `${symbol} Analysis` : 'Stock Analysis'} | Trading System</title>
         <meta name="description" content={`Technical analysis and charts for ${symbol}`} />
       </Head>
 
-      <main className="min-h-screen bg-background text-text-primary">
+      <main className="min-h-screen bg-slate-900 text-slate-100 font-sans selection:bg-indigo-500/30">
         {/* Navigation Header */}
-        <header className="sticky top-0 z-40 bg-surface/95 backdrop-blur border-b border-border">
+        <header className="sticky top-0 z-40 bg-slate-900/80 backdrop-blur-md border-b border-white/10">
           <div className="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center">
             <nav className="flex items-center gap-4">
               <Link
                 href="/"
-                className="text-text-secondary hover:text-text-primary transition-colors"
+                className="text-slate-400 hover:text-slate-100 transition-colors font-medium flex items-center gap-2"
               >
                 ← Dashboard
               </Link>
-              <span className="text-border">|</span>
+              <span className="text-slate-700">|</span>
               <Link
                 href="/system"
-                className="text-text-secondary hover:text-text-primary transition-colors"
+                className="text-slate-400 hover:text-slate-100 transition-colors font-medium"
               >
                 System
               </Link>
             </nav>
             <div className="flex items-center gap-4">
-              <button
+              <Button
+                variant="ghost"
+                size="sm"
                 onClick={refreshAll}
-                className="text-sm text-text-tertiary hover:text-primary transition-colors"
+                className="text-slate-400 hover:text-indigo-400"
               >
                 🔄 Refresh All
-              </button>
+              </Button>
             </div>
           </div>
         </header>
@@ -125,17 +142,17 @@ export default function AnalysisPage() {
         {/* Main Content */}
         <div className="max-w-7xl mx-auto px-4 py-6 space-y-6">
           {/* Stock Header Card */}
-          <Card className="border-border bg-surface p-6">
+          <Card variant="glass" className="p-6">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div className="flex items-center gap-4">
-                <h1 className="text-3xl font-bold text-primary">{symbol || 'Loading...'}</h1>
+                <h1 className="text-3xl font-bold text-white tracking-tight">{symbol || 'Loading...'}</h1>
                 {overview && (
                   <>
-                    <span className="text-2xl font-mono text-text-primary">
+                    <span className="text-2xl font-mono text-slate-200">
                       ₹{overview.price?.toFixed(2)}
                     </span>
                     <span
-                      className={`text-lg font-bold ${overview.changePct >= 0 ? 'text-success' : 'text-error'}`}
+                      className={`text-lg font-bold ${overview.changePct >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}
                     >
                       {overview.changePct >= 0 ? '+' : ''}
                       {overview.changePct?.toFixed(2)}%
@@ -150,9 +167,9 @@ export default function AnalysisPage() {
                   </Badge>
                 )}
                 {summary?.trendState && (
-                  <span className="text-sm text-text-tertiary">
-                    RSI: <span className="font-mono">{summary.latestRSI?.toFixed(1)}</span>
-                    <span className="ml-1 text-text-secondary">({summary.trendState})</span>
+                  <span className="text-sm text-slate-400">
+                    RSI: <span className="font-mono text-slate-200">{summary.latestRSI?.toFixed(1)}</span>
+                    <span className="ml-1 text-slate-500">({summary.trendState})</span>
                   </span>
                 )}
               </div>
@@ -168,38 +185,29 @@ export default function AnalysisPage() {
             />
             <IndicatorOverlayToggle overlays={overlays} onToggle={handleOverlayToggle} />
             {loading && (
-              <span className="text-sm text-text-tertiary flex items-center gap-2">
-                <span className="w-3 h-3 border-2 border-primary border-t-transparent rounded-full animate-spin"></span>
-                Loading...
+              <span className="text-sm text-indigo-400 flex items-center gap-2 animate-pulse">
+                <span className="w-2 h-2 bg-indigo-500 rounded-full"></span>
+                Updating Analysis...
               </span>
             )}
           </div>
 
-          {/* Error State */}
-          {error && (
-            <Card className="border-error bg-error/10 p-6 text-center">
-              <p className="text-error">❌ {error}</p>
-              <button
-                onClick={refresh}
-                className="mt-4 text-sm text-primary hover:underline"
-              >
-                Try Again
-              </button>
-            </Card>
-          )}
-
           {/* Main Chart */}
-          {!error && (
-            <Card className="border-border bg-surface overflow-hidden">
-              <div className="p-4 border-b border-border flex items-center justify-between">
-                <h2 className="text-sm font-bold text-text-secondary">
-                  {symbol} - {interval.toUpperCase()} Chart
-                </h2>
-                <span className="text-xs text-text-tertiary">
-                  {candleData.length} candles
-                </span>
-              </div>
-              <div className="p-2">
+          <Card variant="glass" padding="none" className="overflow-hidden min-h-[500px]">
+            <div className="p-4 border-b border-white/5 flex items-center justify-between">
+              <h2 className="text-sm font-bold text-slate-400 uppercase tracking-wider">
+                {symbol} - {interval.toUpperCase()} Chart
+              </h2>
+              <span className="text-xs text-slate-600 font-mono">
+                {candleData?.length || 0} candles
+              </span>
+            </div>
+            <div className="p-2 bg-slate-900/50">
+               {loading && !candleData.length ? (
+                 <div className="h-[450px] flex items-center justify-center text-slate-500">
+                   Loading Chart Data...
+                 </div>
+               ) : (
                 <StockChart
                   candles={candleData}
                   indicators={indicators}
@@ -210,15 +218,15 @@ export default function AnalysisPage() {
                   showVolume={overlays.volume}
                   showSupportResistance={overlays.support}
                 />
-              </div>
-            </Card>
-          )}
+               )}
+            </div>
+          </Card>
 
           {/* Candle Pattern Badges */}
-          {!error && <CandlePatternBadges patterns={patterns} maxDisplay={5} />}
+          <CandlePatternBadges patterns={patterns} maxDisplay={5} />
 
           {/* Indicator Panels (RSI, MACD, Volume) */}
-          {!error && indicators && (
+          {indicators && (
             <IndicatorPanel candles={candleData} indicators={indicators} height={120} />
           )}
 
@@ -231,31 +239,31 @@ export default function AnalysisPage() {
 
             {/* Signal Breakdown */}
             {summary && (
-              <Card className="border-border bg-surface p-4">
-                <h3 className="text-sm font-bold text-text-primary mb-4">Signal Breakdown</h3>
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center">
-                    <span className="text-text-secondary">RSI (14)</span>
+              <Card variant="glass" className="p-4">
+                <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4">Signal Breakdown</h3>
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center border-b border-white/5 pb-2">
+                    <span className="text-slate-400 text-sm">RSI (14)</span>
                     <span
-                      className={`font-mono ${
+                      className={`font-mono font-bold ${
                         summary.latestRSI > 70
-                          ? 'text-error'
+                          ? 'text-rose-400'
                           : summary.latestRSI < 30
-                            ? 'text-success'
-                            : 'text-text-primary'
+                            ? 'text-emerald-400'
+                            : 'text-slate-200'
                       }`}
                     >
-                      {summary.latestRSI?.toFixed(1)} ({summary.trendState})
+                      {summary.latestRSI?.toFixed(1)} <span className="text-xs text-slate-500 font-sans ml-1">({summary.trendState})</span>
                     </span>
                   </div>
                   {indicators?.macd && (
-                    <div className="flex justify-between items-center">
-                      <span className="text-text-secondary">MACD Histogram</span>
+                    <div className="flex justify-between items-center border-b border-white/5 pb-2">
+                      <span className="text-slate-400 text-sm">MACD Histogram</span>
                       <span
-                        className={`font-mono ${
+                        className={`font-mono font-bold ${
                           indicators.macd.histogram?.[indicators.macd.histogram.length - 1] > 0
-                            ? 'text-success'
-                            : 'text-error'
+                            ? 'text-emerald-400'
+                            : 'text-rose-400'
                         }`}
                       >
                         {indicators.macd.histogram?.[indicators.macd.histogram.length - 1]?.toFixed(2)}
@@ -263,13 +271,13 @@ export default function AnalysisPage() {
                     </div>
                   )}
                   {indicators?.supertrend && (
-                    <div className="flex justify-between items-center">
-                      <span className="text-text-secondary">Supertrend</span>
+                    <div className="flex justify-between items-center border-b border-white/5 pb-2">
+                      <span className="text-slate-400 text-sm">Supertrend</span>
                       <span
-                        className={`font-mono ${
+                        className={`font-mono font-bold ${
                           indicators.supertrend.direction?.[indicators.supertrend.direction.length - 1] === 1
-                            ? 'text-success'
-                            : 'text-error'
+                            ? 'text-emerald-400'
+                            : 'text-rose-400'
                         }`}
                       >
                         {indicators.supertrend.direction?.[indicators.supertrend.direction.length - 1] === 1
@@ -278,8 +286,8 @@ export default function AnalysisPage() {
                       </span>
                     </div>
                   )}
-                  <div className="flex justify-between items-center">
-                    <span className="text-text-secondary">Signal</span>
+                  <div className="flex justify-between items-center pt-2">
+                    <span className="text-slate-400 text-sm">Overall Signal</span>
                     <Badge variant={getSignalBadgeColor(summary.signalBadge?.color)}>
                       {summary.signalBadge?.signal}
                     </Badge>
@@ -312,22 +320,15 @@ export default function AnalysisPage() {
             onClear={clearBacktest}
             symbol={symbol}
           />
-
-          {/* Legacy Multi-TF for backward compatibility (hidden by default) */}
-          {multiTF && !enhancedMultiTF && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <MultiTimeframeSummary data={multiTF} />
-            </div>
-          )}
         </div>
 
         {/* Footer */}
-        <footer className="border-t border-border py-4 mt-8">
-          <div className="max-w-7xl mx-auto px-4 text-center text-text-tertiary text-xs">
+        <footer className="border-t border-white/10 py-6 mt-12 bg-slate-900">
+          <div className="max-w-7xl mx-auto px-4 text-center text-slate-500 text-xs">
             Trading System • Technical Analysis Dashboard • AI-Powered Insights
           </div>
         </footer>
       </main>
-    </>
+    </ErrorBoundary>
   );
 }

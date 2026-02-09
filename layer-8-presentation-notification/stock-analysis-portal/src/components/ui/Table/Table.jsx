@@ -3,7 +3,8 @@ import PropTypes from 'prop-types';
 
 /**
  * Table Component
- * A reusable data table with header and body sections
+ * A reusable data table with header and body sections.
+ * Styled with Tailwind CSS for high density and readability.
  */
 export default function Table({
   striped = false,
@@ -12,67 +13,17 @@ export default function Table({
   className = '',
   ...props
 }) {
-  const classes = ['table', striped && 'table-striped', hoverable && 'table-hoverable', className]
-    .filter(Boolean)
-    .join(' ');
+  const classes = [
+    'w-full border-collapse text-left',
+    className
+  ].filter(Boolean).join(' ');
 
   return (
-    <>
-      <div className="table-wrapper">
-        <table className={classes} {...props}>
-          {children}
-        </table>
-      </div>
-
-      <style jsx>{`
-        .table-wrapper {
-          overflow-x: auto;
-          border-radius: 8px;
-        }
-
-        .table {
-          width: 100%;
-          border-collapse: collapse;
-        }
-
-        .table :global(th),
-        .table :global(td) {
-          padding: 12px 16px;
-          text-align: left;
-          border-bottom: 1px solid #2a2a3e;
-        }
-
-        .table :global(th) {
-          background: #16213e;
-          color: #888;
-          font-weight: 600;
-          font-size: 14px;
-          text-transform: uppercase;
-          letter-spacing: 0.5px;
-        }
-
-        .table :global(td) {
-          color: #ddd;
-          font-size: 14px;
-        }
-
-        .table :global(tbody) :global(tr):last-child :global(td) {
-          border-bottom: none;
-        }
-
-        .table-striped :global(tbody) :global(tr):nth-child(even) {
-          background: rgba(255, 255, 255, 0.02);
-        }
-
-        .table-hoverable :global(tbody) :global(tr) {
-          transition: background 0.2s;
-        }
-
-        .table-hoverable :global(tbody) :global(tr):hover {
-          background: rgba(102, 126, 234, 0.1);
-        }
-      `}</style>
-    </>
+    <div className="overflow-x-auto rounded-lg">
+      <table className={classes} {...props}>
+        {children}
+      </table>
+    </div>
   );
 }
 
@@ -81,7 +32,7 @@ export default function Table({
  */
 export function TableHeader({ children, className = '', ...props }) {
   return (
-    <thead className={className} {...props}>
+    <thead className={`bg-slate-900/50 border-b border-white/5 ${className}`} {...props}>
       {children}
     </thead>
   );
@@ -92,7 +43,7 @@ export function TableHeader({ children, className = '', ...props }) {
  */
 export function TableBody({ children, className = '', ...props }) {
   return (
-    <tbody className={className} {...props}>
+    <tbody className={`divide-y divide-white/5 ${className}`} {...props}>
       {children}
     </tbody>
   );
@@ -103,7 +54,7 @@ export function TableBody({ children, className = '', ...props }) {
  */
 export function TableRow({ children, className = '', ...props }) {
   return (
-    <tr className={className} {...props}>
+    <tr className={`group transition-colors ${className}`} {...props}>
       {children}
     </tr>
   );
@@ -114,7 +65,7 @@ export function TableRow({ children, className = '', ...props }) {
  */
 export function TableCell({ children, className = '', ...props }) {
   return (
-    <td className={className} {...props}>
+    <td className={`p-4 text-sm text-slate-300 ${className}`} {...props}>
       {children}
     </td>
   );
@@ -125,7 +76,7 @@ export function TableCell({ children, className = '', ...props }) {
  */
 export function TableHeaderCell({ children, className = '', ...props }) {
   return (
-    <th className={className} {...props}>
+    <th className={`p-4 text-xs font-bold text-slate-400 uppercase tracking-wider ${className}`} {...props}>
       {children}
     </th>
   );

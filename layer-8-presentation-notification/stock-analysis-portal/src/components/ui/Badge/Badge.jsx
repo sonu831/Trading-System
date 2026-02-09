@@ -3,7 +3,8 @@ import PropTypes from 'prop-types';
 
 /**
  * Badge Component
- * A small status indicator or label
+ * A small status indicator or label.
+ * Uses background opacity pattern for a modern look.
  */
 export default function Badge({
   variant = 'default',
@@ -12,81 +13,35 @@ export default function Badge({
   className = '',
   ...props
 }) {
-  const baseClasses = 'badge';
+  const baseClasses = 'inline-flex items-center justify-center font-bold whitespace-nowrap rounded-full transition-colors';
+  
   const variantClasses = {
-    default: 'badge-default',
-    success: 'badge-success',
-    error: 'badge-error',
-    warning: 'badge-warning',
-    info: 'badge-info',
-  };
-  const sizeClasses = {
-    sm: 'badge-sm',
-    md: 'badge-md',
-    lg: 'badge-lg',
+    default: 'bg-slate-700/50 text-slate-300 border border-slate-600',
+    success: 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20',
+    error: 'bg-rose-500/10 text-rose-400 border border-rose-500/20',
+    warning: 'bg-amber-500/10 text-amber-400 border border-amber-500/20',
+    info: 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20',
   };
 
-  const classes = [baseClasses, variantClasses[variant], sizeClasses[size], className]
+  const sizeClasses = {
+    sm: 'px-2 py-0.5 text-[10px]',
+    md: 'px-2.5 py-0.5 text-xs',
+    lg: 'px-3 py-1 text-sm',
+  };
+
+  const classes = [
+    baseClasses, 
+    variantClasses[variant], 
+    sizeClasses[size], 
+    className
+  ]
     .filter(Boolean)
     .join(' ');
 
   return (
-    <>
-      <span className={classes} {...props}>
-        {children}
-      </span>
-
-      <style jsx>{`
-        .badge {
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          border-radius: 12px;
-          font-weight: 600;
-          white-space: nowrap;
-        }
-
-        /* Sizes */
-        .badge-sm {
-          padding: 2px 8px;
-          font-size: 11px;
-        }
-        .badge-md {
-          padding: 4px 12px;
-          font-size: 12px;
-        }
-        .badge-lg {
-          padding: 6px 16px;
-          font-size: 14px;
-        }
-
-        /* Variants */
-        .badge-default {
-          background: #2a2a3e;
-          color: #aaa;
-        }
-
-        .badge-success {
-          background: #10b981;
-          color: white;
-        }
-
-        .badge-error {
-          background: #ef4444;
-          color: white;
-        }
-
-        .badge-warning {
-          background: #f59e0b;
-          color: white;
-        }
-
-        .badge-info {
-          background: #3b82f6;
-          color: white;
-        }
-      `}</style>
-    </>
+    <span className={classes} {...props}>
+      {children}
+    </span>
   );
 }
 

@@ -12,11 +12,11 @@ const NiftyGrid = React.memo(({ marketView }) => {
         label: 'Symbol',
         sortable: true,
         filterable: true,
-        className: 'font-bold',
+        className: 'font-bold pl-6',
         render: (val) => (
           <a
             href={`/analysis/${val}`}
-            className="text-primary hover:text-accent hover:underline transition-colors"
+            className="text-slate-100 hover:text-indigo-400 hover:underline transition-colors font-bold"
           >
             {val}
           </a>
@@ -35,7 +35,7 @@ const NiftyGrid = React.memo(({ marketView }) => {
         sortable: true,
         className: 'text-right',
         render: (val) => (
-          <span className={`font-bold ${val >= 0 ? 'text-success' : 'text-error'}`}>
+          <span className={`font-bold ${val >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
             {val > 0 ? '+' : ''}
             {val.toFixed(2)}%
           </span>
@@ -50,10 +50,10 @@ const NiftyGrid = React.memo(({ marketView }) => {
           <span
             className={`inline-block px-2 py-0.5 rounded text-xs font-bold ${
               val > 70
-                ? 'bg-error/20 text-error'
+                ? 'bg-rose-500/10 text-rose-400'
                 : val < 30
-                  ? 'bg-success/20 text-success'
-                  : 'bg-surface text-text-tertiary'
+                  ? 'bg-emerald-500/10 text-emerald-400'
+                  : 'bg-white/5 text-slate-400'
             }`}
           >
             {val.toFixed(1)}
@@ -64,18 +64,18 @@ const NiftyGrid = React.memo(({ marketView }) => {
         key: 'volume',
         label: 'Volume',
         sortable: true,
-        className: 'text-right font-mono text-text-tertiary',
+        className: 'text-right font-mono text-slate-500',
         render: (val) => `${(val / 1000).toFixed(1)}k`,
       },
       {
         key: 'trend',
         label: 'Trend',
-        sortable: false, // Calculated field, might be tricky to sort unless mapped
+        sortable: false,
         className: 'text-center',
         render: (_, row) => {
-          if (row.change_pct > 0.5) return <span className="text-success text-xs">▲ Bullish</span>;
-          if (row.change_pct < -0.5) return <span className="text-error text-xs">▼ Bearish</span>;
-          return <span className="text-text-tertiary text-xs">─ Neutral</span>;
+          if (row.change_pct > 0.5) return <span className="text-emerald-400 text-xs">▲ Bullish</span>;
+          if (row.change_pct < -0.5) return <span className="text-rose-400 text-xs">▼ Bearish</span>;
+          return <span className="text-slate-500 text-xs">─ Neutral</span>;
         },
       },
     ],
@@ -83,9 +83,9 @@ const NiftyGrid = React.memo(({ marketView }) => {
   );
 
   return (
-    <Card className="p-4 border-border bg-surface">
-      <div className="flex justify-between items-center mb-4">
-        <h2 className="text-lg font-bold text-text-primary">Nifty 50 Live Watch</h2>
+    <Card variant="glass" padding="none">
+      <div className="p-4 border-b border-white/5">
+        <h2 className="text-lg font-bold text-slate-100">Nifty 50 Live Watch</h2>
       </div>
 
       <DataTable

@@ -5,11 +5,15 @@
   "main": "src/index.js",
   "scripts": {
     "start": "node src/index.js",
-    "dev": "nodemon src/index.js"
+    "dev": "nodemon src/index.js",
+    "dev:local": "cross-env REDIS_URL=redis://localhost:6379 PORT=7002 nodemon src/index.js",
+    "test:preview": "node scripts/generate-previews.js",
+    "test:trigger": "cross-env REDIS_URL=redis://localhost:6379 node scripts/trigger-notifications.js"
   },
   "dependencies": {
+    "cross-env": "^7.0.3",
+    "dotenv": "^16.4.5",
     "express": "^4.18.2",
-    "kafkajs": "^2.2.4",
     "nodemailer": "^6.9.7",
     "pino": "^9.6.0",
     "pino-pretty": "^13.0.0",

@@ -1,108 +1,54 @@
 import React from 'react';
 import PropTypes from 'prop-types';
-import { Card } from '@/components/ui';
 import { useMounted } from '@/hooks';
+import { SentimentCard } from './SentimentCard';
+import { AdvanceDeclineCard } from './AdvanceDeclineCard';
+import { Card } from '@/components/ui';
 
 const MarketOverview = ({ marketView }) => {
   const isMounted = useMounted();
   const sentiment = marketView?.marketSentiment || 'Neutral';
   const advances = marketView?.advanceDecline?.advances || 0;
   const declines = marketView?.advanceDecline?.declines || 0;
-  const total = advances + declines || 1;
-  const adRatio = (advances / declines || 0).toFixed(2);
+  const total = advances + declines || 0; 
 
-  const getSentimentIcon = (s) => {
-    switch (s) {
-      case 'BULLISH':
-        return '🐂';
-      case 'BEARISH':
-        return '🐻';
-      default:
-        return '⚖️';
-    }
-  };
-
-  const getSentimentColor = (s) => {
-    switch (s) {
-      case 'BULLISH':
-        return 'text-success';
-      case 'BEARISH':
-        return 'text-error';
-      default:
-        return 'text-warning';
-    }
-  };
+  if (!isMounted) return null;
 
   return (
-    <section className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6 mb-6">
-      {/* Market Sentiment Card */}
-      <Card className="relative overflow-hidden group border-border hover:border-primary/50 transition duration-300">
-        <div className="absolute -right-6 -top-6 text-9xl opacity-5 grayscale group-hover:grayscale-0 group-hover:opacity-10 transition duration-500 select-none">
-          {getSentimentIcon(sentiment)}
-        </div>
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+      {/* 1. Market Sentiment */}
+      <SentimentCard sentiment={sentiment} />
 
-        <h3 className="text-text-tertiary text-xs font-bold uppercase tracking-wider mb-2">
-          Market Sentiment
-        </h3>
-        <div
-          className={`text-2xl md:text-3xl lg:text-4xl font-extrabold flex items-center gap-2 md:gap-3 ${getSentimentColor(sentiment)}`}
-        >
-          <span className="animate-bounce-slow text-3xl md:text-4xl shrink-0">
-            {getSentimentIcon(sentiment)}
-          </span>
-          <span className="truncate">{sentiment || 'NEUTRAL'}</span>
-        </div>
-        <div className="text-xs text-text-tertiary mt-2 font-mono">
-          Updated: {isMounted ? new Date().toLocaleTimeString() : ''}
+      {/* 2. Advance / Decline */}
+      <AdvanceDeclineCard advances={advances} declines={declines} total={total} />
+
+      {/* 3. Nifty 50 Status */}
+       <Card variant="glass" className="flex flex-col justify-center">
+         <h3 className="text-slate-400 text-sm font-medium uppercase tracking-wider mb-1">Nifty 50</h3>
+         <div className="flex items-baseline gap-2">
+           <span className="text-2xl font-bold text-slate-100">23,540.25</span>
+           <span className="text-sm text-emerald-400">+120.50 (0.65%)</span>
+         </div>
+       </Card>
+
+      {/* 4. VIX / Volatility */}
+      <Card variant="glass" className="flex flex-col justify-center">
+        <h3 className="text-slate-400 text-sm font-medium uppercase tracking-wider mb-1">India VIX</h3>
+        <div className="flex items-baseline gap-2">
+          <span className="text-2xl font-bold text-slate-100">11.20</span>
+          <span className="text-sm text-rose-400">-0.45 (3.2%)</span>
         </div>
       </Card>
-
-      {/* Advance / Decline Meter */}
-      <Card className="border-border hover:border-accent/50 transition duration-300">
-        <h3 className="text-text-tertiary text-xs font-bold uppercase tracking-wider mb-2">
-          Advance / Decline
-        </h3>
-        <div className="flex items-end justify-between gap-4 mb-2">
-          <div className="shrink-0">
-            <div className="text-2xl md:text-3xl font-extrabold text-text-primary">{adRatio}</div>
-            <div className="text-[10px] uppercase tracking-tighter text-text-tertiary">
-              A/D Ratio
-            </div>
-          </div>
-          <div className="text-right text-xs font-bold">
-            <div className="text-success">{advances} Advances 🟢</div>
-            <div className="text-error">{declines} Declines 🔴</div>
-          </div>
-        </div>
-
-        {/* Improved Meter */}
-        <div className="relative h-4 bg-background rounded-full overflow-hidden shadow-inner border border-border">
-          {/* Center Marker */}
-          <div className="absolute left-1/2 top-0 bottom-0 w-0.5 bg-text-primary/30 z-10"></div>
-
-          <div className="flex h-full w-full">
-            <div
-              className="bg-gradient-to-r from-success/40 to-success h-full transition-all duration-700 ease-out"
-              style={{ width: `${(advances / total) * 100}%` }}
-            ></div>
-            <div
-              className="bg-gradient-to-l from-error/40 to-error h-full transition-all duration-700 ease-out"
-              style={{ width: `${(declines / total) * 100}%` }}
-            ></div>
-          </div>
-        </div>
-      </Card>
-    </section>
+    </div>
   );
 };
 
 MarketOverview.propTypes = {
   marketView: PropTypes.shape({
-    breadth: PropTypes.shape({
-      market_sentiment: PropTypes.string,
+    marketSentiment: PropTypes.string,
+    advanceDecline: PropTypes.shape({
       advances: PropTypes.number,
       declines: PropTypes.number,
-      advance_decline_ratio: PropTypes.number,
     }),
   }),
 };

@@ -18,7 +18,7 @@ const INTERVALS = [
  */
 export default function TimeframeSelector({ selected, onChange, disabled = false }) {
   return (
-    <div className="flex gap-1 bg-background border border-border rounded-lg p-1">
+    <div className="flex gap-1 bg-slate-900/50 border border-white/10 rounded-lg p-1 backdrop-blur-sm">
       {INTERVALS.map(({ key, label }) => (
         <button
           key={key}
@@ -26,8 +26,8 @@ export default function TimeframeSelector({ selected, onChange, disabled = false
           disabled={disabled}
           className={`px-3 py-1.5 text-xs font-bold rounded transition-all ${
             selected === key
-              ? 'bg-primary text-white shadow'
-              : 'text-text-tertiary hover:text-text-primary hover:bg-surface'
+              ? 'bg-indigo-600 text-white shadow shadow-indigo-500/20'
+              : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
           } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
         >
           {label}

@@ -39,7 +39,7 @@ const TopPicksWidget = ({ marketView }) => {
             const trend = pick.trend || 'N/A';
 
             return (
-              <Link href={`/${symbol}`} key={`${symbol}-${i}`} className="block group">
+              <Link href={`/analysis/${symbol}`} key={`${symbol}-${i}`} className="block group">
                 <div className="bg-gray-800 border border-gray-700 rounded-xl p-4 hover:border-blue-500 transition-all cursor-pointer">
                   <div className="flex justify-between items-start mb-2">
                     <span className="font-bold text-lg text-white group-hover:text-blue-400">

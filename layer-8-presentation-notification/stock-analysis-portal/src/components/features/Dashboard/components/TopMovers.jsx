@@ -1,6 +1,7 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 import { Carousel } from '@/components/ui';
+import Link from 'next/link';
 
 const StockCard = ({ title, symbol, value, subValue, type }) => {
   const getValueColor = () => {
@@ -15,12 +16,12 @@ const StockCard = ({ title, symbol, value, subValue, type }) => {
   };
 
   return (
-    <div className="min-w-[160px] bg-background p-3 rounded-lg border border-border flex flex-col snap-center hover:bg-surface-hover transition cursor-pointer group">
+    <Link href={`/analysis/${symbol}`} className="min-w-[160px] bg-background p-3 rounded-lg border border-border flex flex-col snap-center hover:bg-surface-hover transition cursor-pointer group">
       <div className="text-xs text-text-tertiary mb-1 group-hover:text-text-secondary">{title}</div>
       <div className="font-bold text-text-primary text-lg">{symbol}</div>
       <div className={`font-mono text-sm font-bold ${getValueColor()}`}>{value}</div>
       <div className="text-xs text-text-tertiary mt-1">{subValue}</div>
-    </div>
+    </Link>
   );
 };
 

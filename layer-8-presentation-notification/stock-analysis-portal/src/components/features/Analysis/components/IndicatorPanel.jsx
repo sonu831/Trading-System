@@ -38,19 +38,19 @@ export default function IndicatorPanel({ candles, indicators, height = 120 }) {
       width: rsiContainerRef.current.clientWidth,
       height,
       layout: {
-        background: { type: ColorType.Solid, color: '#0a0a0f' },
-        textColor: '#9ca3af',
+        background: { type: ColorType.Solid, color: 'transparent' },
+        textColor: '#94a3b8', // slate-400
       },
       grid: {
-        vertLines: { color: '#1f2937' },
-        horzLines: { color: '#1f2937' },
+        vertLines: { color: 'rgba(255, 255, 255, 0.05)' },
+        horzLines: { color: 'rgba(255, 255, 255, 0.05)' },
       },
       rightPriceScale: {
-        borderColor: '#1f2937',
+        borderColor: 'rgba(255, 255, 255, 0.1)',
         scaleMargins: { top: 0.1, bottom: 0.1 },
       },
       timeScale: {
-        borderColor: '#1f2937',
+        borderColor: 'rgba(255, 255, 255, 0.1)',
         visible: false,
       },
     });
@@ -59,7 +59,7 @@ export default function IndicatorPanel({ candles, indicators, height = 120 }) {
 
     // RSI Line (v5 API)
     const rsiSeries = chart.addSeries(LineSeries, {
-      color: '#8b5cf6',
+      color: '#8b5cf6', // violet-500
       lineWidth: 2,
       priceLineVisible: false,
       lastValueVisible: true,
@@ -78,7 +78,7 @@ export default function IndicatorPanel({ candles, indicators, height = 120 }) {
 
     // Overbought/Oversold lines
     const overboughtLine = chart.addSeries(LineSeries, {
-      color: '#ef4444',
+      color: '#f43f5e', // rose-500
       lineWidth: 1,
       lineStyle: 2,
       priceLineVisible: false,
@@ -86,7 +86,7 @@ export default function IndicatorPanel({ candles, indicators, height = 120 }) {
     });
 
     const oversoldLine = chart.addSeries(LineSeries, {
-      color: '#10b981',
+      color: '#10b981', // emerald-500
       lineWidth: 1,
       lineStyle: 2,
       priceLineVisible: false,
@@ -146,19 +146,19 @@ export default function IndicatorPanel({ candles, indicators, height = 120 }) {
       width: macdContainerRef.current.clientWidth,
       height,
       layout: {
-        background: { type: ColorType.Solid, color: '#0a0a0f' },
-        textColor: '#9ca3af',
+        background: { type: ColorType.Solid, color: 'transparent' },
+        textColor: '#94a3b8', // slate-400
       },
       grid: {
-        vertLines: { color: '#1f2937' },
-        horzLines: { color: '#1f2937' },
+        vertLines: { color: 'rgba(255, 255, 255, 0.05)' },
+        horzLines: { color: 'rgba(255, 255, 255, 0.05)' },
       },
       rightPriceScale: {
-        borderColor: '#1f2937',
+        borderColor: 'rgba(255, 255, 255, 0.1)',
         scaleMargins: { top: 0.1, bottom: 0.1 },
       },
       timeScale: {
-        borderColor: '#1f2937',
+        borderColor: 'rgba(255, 255, 255, 0.1)',
         visible: false,
       },
     });
@@ -175,7 +175,7 @@ export default function IndicatorPanel({ candles, indicators, height = 120 }) {
       .map((v, i) => ({
         time: Math.floor(new Date(candles[i]?.time).getTime() / 1000),
         value: v,
-        color: v >= 0 ? '#10b981' : '#ef4444',
+        color: v >= 0 ? '#10b981' : '#f43f5e',
       }))
       .filter((d) => d.value !== null && !isNaN(d.time));
 
@@ -185,7 +185,7 @@ export default function IndicatorPanel({ candles, indicators, height = 120 }) {
 
     // MACD Line (v5 API)
     const macdLine = chart.addSeries(LineSeries, {
-      color: '#3b82f6',
+      color: '#3b82f6', // blue-500
       lineWidth: 1,
       priceLineVisible: false,
       lastValueVisible: false,
@@ -204,7 +204,7 @@ export default function IndicatorPanel({ candles, indicators, height = 120 }) {
 
     // Signal Line (v5 API)
     const signalLine = chart.addSeries(LineSeries, {
-      color: '#f59e0b',
+      color: '#f59e0b', // amber-500
       lineWidth: 1,
       priceLineVisible: false,
       lastValueVisible: false,
@@ -249,19 +249,19 @@ export default function IndicatorPanel({ candles, indicators, height = 120 }) {
   }
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-4">
       {/* RSI Panel */}
-      <div className="border border-border rounded-lg overflow-hidden">
-        <div className="bg-surface px-3 py-1 flex items-center justify-between">
-          <span className="text-xs font-bold text-text-secondary">RSI (14)</span>
+      <div className="border border-white/10 rounded-lg overflow-hidden bg-slate-900/50 backdrop-blur-sm">
+        <div className="px-3 py-2 border-b border-white/5 flex items-center justify-between">
+          <span className="text-xs font-bold text-slate-400">RSI (14)</span>
           {indicators.rsi && (
             <span
-              className={`text-xs font-mono ${
+              className={`text-xs font-mono font-bold ${
                 indicators.rsi[indicators.rsi.length - 1] > 70
-                  ? 'text-error'
+                  ? 'text-rose-400'
                   : indicators.rsi[indicators.rsi.length - 1] < 30
-                    ? 'text-success'
-                    : 'text-text-tertiary'
+                    ? 'text-emerald-400'
+                    : 'text-slate-500'
               }`}
             >
               {indicators.rsi[indicators.rsi.length - 1]?.toFixed(1) || 'N/A'}
@@ -272,14 +272,14 @@ export default function IndicatorPanel({ candles, indicators, height = 120 }) {
       </div>
 
       {/* MACD Panel */}
-      <div className="border border-border rounded-lg overflow-hidden">
-        <div className="bg-surface px-3 py-1 flex items-center justify-between">
-          <span className="text-xs font-bold text-text-secondary">MACD (12, 26, 9)</span>
+      <div className="border border-white/10 rounded-lg overflow-hidden bg-slate-900/50 backdrop-blur-sm">
+        <div className="px-3 py-2 border-b border-white/5 flex items-center justify-between">
+          <span className="text-xs font-bold text-slate-400">MACD (12, 26, 9)</span>
           <div className="flex gap-3 text-xs">
-            <span className="flex items-center gap-1">
+            <span className="flex items-center gap-1 text-slate-500">
               <span className="w-2 h-0.5 bg-blue-500"></span> MACD
             </span>
-            <span className="flex items-center gap-1">
+            <span className="flex items-center gap-1 text-slate-500">
               <span className="w-2 h-0.5 bg-amber-500"></span> Signal
             </span>
           </div>

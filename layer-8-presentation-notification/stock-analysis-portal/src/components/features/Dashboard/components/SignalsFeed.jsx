@@ -16,7 +16,7 @@ const SignalsFeed = ({ signals = [] }) => {
         key: 'timestamp',
         label: 'Time',
         sortable: true,
-        className: 'text-sm text-text-secondary w-32',
+        className: 'text-sm text-slate-500 w-32 font-mono',
         render: (val) => formatTime(val),
       },
       {
@@ -24,7 +24,7 @@ const SignalsFeed = ({ signals = [] }) => {
         label: 'Symbol',
         sortable: true,
         filterable: true,
-        className: 'font-bold text-text-primary',
+        className: 'font-bold text-slate-100',
       },
       {
         key: 'action',
@@ -41,14 +41,14 @@ const SignalsFeed = ({ signals = [] }) => {
         key: 'price',
         label: 'Price',
         sortable: true,
-        className: 'text-sm font-mono',
+        className: 'text-sm font-mono text-slate-300',
         render: (val) => `₹${val}`,
       },
       {
         key: 'strategy',
         label: 'Strategy',
         sortable: true,
-        className: 'text-xs text-text-tertiary',
+        className: 'text-xs text-slate-400',
       },
       {
         key: 'confidence',
@@ -56,8 +56,11 @@ const SignalsFeed = ({ signals = [] }) => {
         sortable: true,
         className: 'w-32',
         render: (val) => (
-          <div className="w-full bg-background rounded-full h-2.5">
-            <div className="bg-info h-2.5 rounded-full" style={{ width: `${val * 100}%` }} />
+          <div className="w-full bg-slate-800 rounded-full h-1.5">
+            <div 
+              className="bg-indigo-500 h-1.5 rounded-full" 
+              style={{ width: `${val * 100}%` }} 
+            />
           </div>
         ),
       },
@@ -66,11 +69,16 @@ const SignalsFeed = ({ signals = [] }) => {
   );
 
   return (
-    <Card className="border-border p-0 overflow-hidden">
-      <div className="p-4 border-b border-border bg-surface">
-        <h2 className="text-lg font-bold text-text-primary">Live Signals</h2>
+    <Card variant="glass" padding="none">
+      <div className="p-4 border-b border-white/5">
+        <h2 className="text-lg font-bold text-slate-100">Live Signals</h2>
       </div>
-      <DataTable columns={columns} data={signals} pagination={{ pageSize: 5 }} className="w-full" />
+      <DataTable 
+        columns={columns} 
+        data={signals} 
+        pagination={{ pageSize: 5 }} 
+        className="w-full" 
+      />
     </Card>
   );
 };

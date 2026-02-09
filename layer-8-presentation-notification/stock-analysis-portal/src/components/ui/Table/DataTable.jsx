@@ -3,6 +3,11 @@ import PropTypes from 'prop-types';
 import Table from './Table';
 import { Input, Button } from '@/components/ui';
 
+/**
+ * DataTable Component
+ * A wrapper around Table that provides Sorting, Filtering, and Pagination.
+ * Adapts to Client-side or Server-side modes based on props.
+ */
 const DataTable = ({
   columns,
   data,
@@ -46,7 +51,6 @@ const DataTable = ({
 
   // Process Data (Client-side Fallback)
   const processedData = useMemo(() => {
-    // Only skip client-side processing if handlers are provided (Server-Side Mode)
     const isServerSide = !!(
       pagination?.onPageChange ||
       sorting?.onSort ||
@@ -89,22 +93,20 @@ const DataTable = ({
 
   return (
     <div className={`space-y-4 ${className}`}>
-      {/* Filters (Optional: Render above table) */}
-
       <Table className="w-full">
         <Table.Header>
-          <Table.Row className="bg-surface text-text-tertiary">
+          <Table.Row className="bg-white/5 text-slate-400">
             {columns.map((col) => (
               <Table.HeaderCell
                 key={col.key}
-                className={`px-4 py-3 font-semibold ${col.sortable ? 'cursor-pointer hover:text-text-primary select-none' : ''} ${col.className || ''}`}
+                className={`px-4 py-3 font-semibold ${col.sortable ? 'cursor-pointer hover:text-slate-200 select-none' : ''} ${col.className || ''}`}
                 onClick={() => col.sortable && handleSort(col.key)}
               >
                 <div className="flex items-center gap-2">
                   {col.label}
                   {col.sortable && (
                     <span
-                      className={`text-[10px] ${currentSort.column === col.key ? 'text-primary' : 'text-text-tertiary/30'}`}
+                      className={`text-[10px] ${currentSort.column === col.key ? 'text-indigo-400' : 'text-slate-600'}`}
                     >
                       {currentSort.column === col.key
                         ? currentSort.direction === 'asc'
@@ -119,7 +121,7 @@ const DataTable = ({
                   <div className="mt-2" onClick={(e) => e.stopPropagation()}>
                     <input
                       type="text"
-                      className="w-full bg-background border border-border rounded px-2 py-1 text-xs text-text-primary focus:border-primary focus:outline-none"
+                      className="w-full bg-slate-900/50 border border-white/10 rounded px-2 py-1 text-xs text-slate-200 focus:border-indigo-500 focus:outline-none"
                       placeholder={`Filter...`}
                       value={currentFilters[col.key] || ''}
                       onChange={(e) => handleFilter(col.key, e.target.value)}
@@ -130,12 +132,12 @@ const DataTable = ({
             ))}
           </Table.Row>
         </Table.Header>
-        <Table.Body className="divide-y divide-border">
+        <Table.Body className="divide-y divide-white/5">
           {loading ? (
             <Table.Row>
               <Table.Cell
                 colSpan={columns.length}
-                className="px-6 py-8 text-center text-text-tertiary animate-pulse"
+                className="px-6 py-8 text-center text-slate-500 animate-pulse"
               >
                 Loading data...
               </Table.Cell>
@@ -144,7 +146,7 @@ const DataTable = ({
             <Table.Row>
               <Table.Cell
                 colSpan={columns.length}
-                className="px-6 py-8 text-center text-text-tertiary"
+                className="px-6 py-8 text-center text-slate-500"
               >
                 No results found.
               </Table.Cell>
@@ -153,7 +155,7 @@ const DataTable = ({
             displayData.map((row, idx) => (
               <Table.Row
                 key={row.id || idx}
-                className="hover:bg-surface-hover/50 transition-colors"
+                className="hover:bg-white/5 transition-colors"
               >
                 {columns.map((col) => (
                   <Table.Cell
@@ -171,8 +173,8 @@ const DataTable = ({
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="flex items-center justify-between px-2">
-          <div className="text-sm text-text-tertiary">
+        <div className="flex items-center justify-between px-2 pt-2 border-t border-white/5">
+          <div className="text-sm text-slate-500">
             Showing {(currentPage - 1) * pageSize + 1} to{' '}
             {Math.min(currentPage * pageSize, totalItems)} of {totalItems}
           </div>
@@ -189,7 +191,7 @@ const DataTable = ({
             >
               Previous
             </Button>
-            <span className="flex items-center px-2 text-sm font-mono text-text-secondary">
+            <span className="flex items-center px-4 text-sm font-mono text-slate-400">
               Page {currentPage} of {totalPages}
             </span>
             <Button

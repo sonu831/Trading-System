@@ -1,5 +1,6 @@
 import React from 'react';
 import PropTypes from 'prop-types';
+import { Card, Badge } from '@/components/ui';
 
 /**
  * PCRPanel Component
@@ -13,16 +14,10 @@ export default function PCRPanel({ data }) {
 
   const { pcr, pcrVolume, putOI, callOI, putVolume, callVolume, maxPain, sentiment } = data;
 
-  const getSentimentColor = (s) => {
-    if (s === 'Bullish' || s === 'bullish') return '#10b981';
-    if (s === 'Bearish' || s === 'bearish') return '#ef4444';
-    return '#f59e0b';
-  };
-
-  const getSentimentIcon = (s) => {
-    if (s === 'Bullish' || s === 'bullish') return '▲';
-    if (s === 'Bearish' || s === 'bearish') return '▼';
-    return '●';
+  const getSentimentVariant = (s) => {
+    if (s === 'Bullish' || s === 'bullish') return 'success';
+    if (s === 'Bearish' || s === 'bearish') return 'error';
+    return 'warning';
   };
 
   const formatNumber = (num) => {
@@ -33,249 +28,104 @@ export default function PCRPanel({ data }) {
     return num.toFixed(0);
   };
 
-  const pcrColor = pcr > 1 ? '#10b981' : pcr < 0.7 ? '#ef4444' : '#f59e0b';
+  const getPCRColorClass = (val) => {
+    if (val > 1) return 'text-emerald-400';
+    if (val < 0.7) return 'text-rose-400';
+    return 'text-amber-400';
+  };
 
   return (
-    <>
-      <div className="pcr-panel">
-        <div className="header">
-          <h3>Options Analysis</h3>
-          {sentiment && (
-            <span className="sentiment" style={{ color: getSentimentColor(sentiment) }}>
-              {getSentimentIcon(sentiment)} {sentiment}
-            </span>
-          )}
+    <Card className="h-full">
+      <div className="flex justify-between items-center mb-5">
+        <h3 className="text-sm font-bold text-slate-100 uppercase tracking-wide">Options Analysis</h3>
+        {sentiment && (
+          <Badge variant={getSentimentVariant(sentiment)} size="md">
+            {sentiment}
+          </Badge>
+        )}
+      </div>
+
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-6">
+        <div className="bg-slate-900/50 border border-indigo-500/30 rounded-lg p-3 text-center backdrop-blur-sm relative overflow-hidden group">
+          <div className="absolute top-0 left-0 w-1 h-full bg-indigo-500/50"></div>
+          <span className="block text-[10px] text-slate-500 uppercase font-bold mb-1">PCR (OI)</span>
+          <span className={`block text-xl font-mono font-bold ${getPCRColorClass(pcr)}`}>
+            {pcr?.toFixed(2) || 'N/A'}
+          </span>
+          <span className="block text-[10px] text-slate-500 mt-1">
+            {pcr > 1 ? 'Bullish' : pcr < 0.7 ? 'Bearish' : 'Neutral'}
+          </span>
         </div>
 
-        <div className="metrics-grid">
-          <div className="metric-card highlight">
-            <span className="label">PCR (OI)</span>
-            <span className="value" style={{ color: pcrColor }}>
-              {pcr?.toFixed(2) || 'N/A'}
-            </span>
-            <span className="hint">{pcr > 1 ? 'Bullish' : pcr < 0.7 ? 'Bearish' : 'Neutral'}</span>
-          </div>
-
-          <div className="metric-card">
-            <span className="label">PCR (Volume)</span>
-            <span className="value">{pcrVolume?.toFixed(2) || 'N/A'}</span>
-          </div>
-
-          {maxPain && (
-            <div className="metric-card highlight">
-              <span className="label">Max Pain</span>
-              <span className="value">{maxPain.toLocaleString()}</span>
-              <span className="hint">Strike price</span>
-            </div>
-          )}
+        <div className="bg-slate-900/50 border border-white/10 rounded-lg p-3 text-center backdrop-blur-sm">
+          <span className="block text-[10px] text-slate-500 uppercase font-bold mb-1">PCR (Vol)</span>
+          <span className="block text-xl font-mono font-bold text-slate-200">
+            {pcrVolume?.toFixed(2) || 'N/A'}
+          </span>
         </div>
 
-        <div className="oi-breakdown">
-          <div className="breakdown-header">Open Interest Breakdown</div>
-          <div className="bars">
-            <div className="bar-container">
-              <span className="bar-label">Put OI</span>
-              <div className="bar">
+        {maxPain && (
+          <div className="bg-slate-900/50 border border-indigo-500/30 rounded-lg p-3 text-center backdrop-blur-sm relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-1 h-full bg-indigo-500/50"></div>
+            <span className="block text-[10px] text-slate-500 uppercase font-bold mb-1">Max Pain</span>
+            <span className="block text-xl font-mono font-bold text-slate-200">
+              {maxPain.toLocaleString()}
+            </span>
+            <span className="block text-[10px] text-slate-500 mt-1">Strike</span>
+          </div>
+        )}
+      </div>
+
+      <div className="space-y-5">
+        {/* OI Breakdown */}
+        <div>
+          <div className="text-xs text-slate-500 font-bold uppercase mb-2">Open Interest Breakdown</div>
+          <div className="space-y-3">
+            <div className="flex items-center gap-3">
+              <span className="w-12 text-xs text-slate-400 font-medium">Put OI</span>
+              <div className="flex-1 h-2 bg-slate-800 rounded-full overflow-hidden">
                 <div
-                  className="bar-fill put"
+                  className="h-full bg-emerald-500 rounded-full"
                   style={{
                     width: `${putOI && callOI ? (putOI / (putOI + callOI)) * 100 : 50}%`,
                   }}
                 />
               </div>
-              <span className="bar-value">{formatNumber(putOI)}</span>
+              <span className="w-16 text-right text-xs font-mono text-slate-300">{formatNumber(putOI)}</span>
             </div>
-            <div className="bar-container">
-              <span className="bar-label">Call OI</span>
-              <div className="bar">
+            <div className="flex items-center gap-3">
+              <span className="w-12 text-xs text-slate-400 font-medium">Call OI</span>
+              <div className="flex-1 h-2 bg-slate-800 rounded-full overflow-hidden">
                 <div
-                  className="bar-fill call"
+                  className="h-full bg-rose-500 rounded-full"
                   style={{
                     width: `${putOI && callOI ? (callOI / (putOI + callOI)) * 100 : 50}%`,
                   }}
                 />
               </div>
-              <span className="bar-value">{formatNumber(callOI)}</span>
+              <span className="w-16 text-right text-xs font-mono text-slate-300">{formatNumber(callOI)}</span>
             </div>
           </div>
         </div>
 
+        {/* Volume Breakdown */}
         {(putVolume || callVolume) && (
-          <div className="volume-breakdown">
-            <div className="breakdown-header">Volume Breakdown</div>
-            <div className="volume-stats">
-              <div className="vol-stat">
-                <span className="vol-label">Put Vol</span>
-                <span className="vol-value put">{formatNumber(putVolume)}</span>
+          <div>
+            <div className="text-xs text-slate-500 font-bold uppercase mb-2">Volume Breakdown</div>
+            <div className="flex gap-6">
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-slate-400">Put Vol:</span>
+                <span className="text-sm font-mono font-bold text-emerald-400">{formatNumber(putVolume)}</span>
               </div>
-              <div className="vol-stat">
-                <span className="vol-label">Call Vol</span>
-                <span className="vol-value call">{formatNumber(callVolume)}</span>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-slate-400">Call Vol:</span>
+                <span className="text-sm font-mono font-bold text-rose-400">{formatNumber(callVolume)}</span>
               </div>
             </div>
           </div>
         )}
       </div>
-
-      <style jsx>{`
-        .pcr-panel {
-          background: #1a1a2e;
-          border: 1px solid #2a2a3e;
-          border-radius: 12px;
-          padding: 20px;
-        }
-
-        .header {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          margin-bottom: 20px;
-        }
-
-        .header h3 {
-          font-size: 14px;
-          font-weight: 600;
-          color: #fff;
-          margin: 0;
-        }
-
-        .sentiment {
-          font-size: 13px;
-          font-weight: 600;
-        }
-
-        .metrics-grid {
-          display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
-          gap: 12px;
-          margin-bottom: 20px;
-        }
-
-        .metric-card {
-          background: #15152a;
-          border-radius: 8px;
-          padding: 12px;
-          text-align: center;
-        }
-
-        .metric-card.highlight {
-          border: 1px solid #3b82f6;
-        }
-
-        .label {
-          display: block;
-          font-size: 11px;
-          color: #888;
-          margin-bottom: 4px;
-          text-transform: uppercase;
-        }
-
-        .value {
-          display: block;
-          font-size: 20px;
-          font-weight: 700;
-          color: #fff;
-          font-family: monospace;
-        }
-
-        .hint {
-          display: block;
-          font-size: 10px;
-          color: #666;
-          margin-top: 2px;
-        }
-
-        .oi-breakdown,
-        .volume-breakdown {
-          margin-top: 16px;
-        }
-
-        .breakdown-header {
-          font-size: 11px;
-          color: #888;
-          text-transform: uppercase;
-          margin-bottom: 12px;
-        }
-
-        .bars {
-          display: flex;
-          flex-direction: column;
-          gap: 8px;
-        }
-
-        .bar-container {
-          display: flex;
-          align-items: center;
-          gap: 12px;
-        }
-
-        .bar-label {
-          width: 60px;
-          font-size: 12px;
-          color: #aaa;
-        }
-
-        .bar {
-          flex: 1;
-          height: 8px;
-          background: #2a2a3e;
-          border-radius: 4px;
-          overflow: hidden;
-        }
-
-        .bar-fill {
-          height: 100%;
-          border-radius: 4px;
-          transition: width 0.3s ease;
-        }
-
-        .bar-fill.put {
-          background: #ef4444;
-        }
-
-        .bar-fill.call {
-          background: #10b981;
-        }
-
-        .bar-value {
-          width: 70px;
-          text-align: right;
-          font-size: 12px;
-          font-family: monospace;
-          color: #ddd;
-        }
-
-        .volume-stats {
-          display: flex;
-          gap: 24px;
-        }
-
-        .vol-stat {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-        }
-
-        .vol-label {
-          font-size: 12px;
-          color: #888;
-        }
-
-        .vol-value {
-          font-size: 14px;
-          font-weight: 600;
-          font-family: monospace;
-        }
-
-        .vol-value.put {
-          color: #ef4444;
-        }
-
-        .vol-value.call {
-          color: #10b981;
-        }
-      `}</style>
-    </>
+    </Card>
   );
 }
 

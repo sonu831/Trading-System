@@ -17,17 +17,10 @@ src/
 ├── components/
 │   ├── features/               # Domain-Specific Modules (Smart Components)
 │   │   ├── Backfill/           # Feature: Backfill Management
-│   │   │   ├── components/     # Sub-components ONLY for this feature (Granular)
-│   │   │   │   ├── BackfillCard.jsx
-│   │   │   │   ├── BackfillStatusBadge.jsx
-│   │   │   │   ├── BackfillProgressBar.jsx
-│   │   │   │   └── index.js    # Barrier Export
-│   │   │   ├── hooks/          # Hooks ONLY for this feature (Logic Extraction)
-│   │   │   │   ├── useBackfillStatus.js
-│   │   │   │   └── useBackfillActions.js
-│   │   │   ├── utils/          # Helpers ONLY for this feature
-│   │   │   │   └── formatDuration.js
-│   │   │   └── index.js        # Public API (Only export the Main Container)
+│   │   │   ├── BackfillCard.jsx
+│   │   │   ├── BackfillStatusBadge.jsx
+│   │   │   ├── BackfillProgressBar.jsx
+│   │   │   └── index.js        # Barrier Export (Exports Container + Sub-components)
 │   │   └── Dashboard/          # Feature: Main Dashboard
 │   ├── ui/                     # GENERIC Design System (Dumb Atoms)
 │   │   ├── Card/               # Reusable Card Container
@@ -35,7 +28,12 @@ src/
 │   │   ├── Badge/              # Status Indicators
 │   │   └── Loader.jsx          # Spinners
 │   └── layout/                 # Global Layouts (Sidebar, Navbar)
-├── hooks/                      # Global / Cross-Feature Hooks
+├── hooks/                      # Global & Feature Hooks
+│   ├── features/               # Feature-Specific Hooks
+│   │   ├── backfill/           # Backfill Hooks
+│   │   │   └── useBackfillLogic.js
+│   │   └── dashboard/          # Dashboard Hooks
+│   │       └── useDashboardLogic.js
 │   ├── useSocket.js
 │   └── useTheme.js
 ├── store/                      # Redux Toolkit Slices
@@ -68,7 +66,7 @@ import { Card, Button, Badge } from '@/components/ui';
 import { BackfillStats } from './components/BackfillStats';
 
 // 4. Custom Hooks (Logic Extraction)
-import { useBackfillLogic } from '../hooks/useBackfillLogic';
+import { useBackfillLogic } from '@/hooks/features/backfill/useBackfillLogic';
 
 // 5. Constants / Config (Outside component)
 const REFRESH_RATE = 5000;
@@ -122,7 +120,7 @@ BackfillManager.propTypes = {
 * **Rule:** If a block of JSX (like a table row, a specific chart legend, or a status bar) takes up more than 20 lines, **extract it**.
 * **Where to put it?**
 * If it's generic (used in Dashboard AND Backfill) → Move to `components/ui/`.
-* If it's specific (only used in Backfill) → Move to `components/features/Backfill/components/`.
+* If it's specific (only used in Backfill) → Move to `components/features/Backfill/`.
 
 
 
@@ -130,7 +128,7 @@ BackfillManager.propTypes = {
 
 * **Rule:** View components should handle **Presentation** only.
 * **Rule:** Logic components (Hooks) should handle **State & Side Effects**.
-* **Trigger:** If you have more than 3 `useState` or 1 complex `useEffect` in a component, create a hook file (e.g., `features/Backfill/hooks/useBackfillMonitor.js`).
+* **Trigger:** If you have more than 3 `useState` or 1 complex `useEffect` in a component, create a hook file (e.g., `hooks/features/backfill/useBackfillMonitor.js`).
 
 ---
 
@@ -194,4 +192,43 @@ When asked to implement a feature (e.g., "Create a Backfill Manager"):
 1. First, outline the file structure (Component vs Hook vs Sub-components).
 2. Check if any Generic UI components can be reused.
 3. Write the Hook first (Logic), then the Component (View).
-4. Apply the "Glassmorphism" Tailwind classes by default.
+
+---
+
+
+---
+
+## 7. 🔔 Notification Services Standards (Layer 8)
+
+**Goal:** Treat Email and Telegram as "Presentation Layers". They must deliver the same "Institutional-Grade" info-density and aesthetic as the Dashboard.
+
+### ✅ Architecture for Notification Services
+
+Services like `email-service` and `telegram-bot` should be structured to separate **Presentation (Templates)** from **Transport (Sending)**.
+
+```
+src/
+├── config/                 # Centralized Env Vars
+├── core/                   # Infrastructure (Logger, Metrics)
+├── services/               # Transport Logic (Nodemailer, Telegraf)
+├── presentation/           # THE PRESENTATION LAYER
+│   ├── templates/          # React-like components or HTML generators
+│   │   ├── colors.js       # Shared color tokens (match Dashboard)
+│   │   ├── BaseLayout.js   # Glassmorphism HTML wrapper
+│   │   └── NotificationEmail.js   # Dynamic Template (Alerts, Reports)
+│   └── formatters/         # Data -> Text/Markdown converters
+├── index.js                # Orchestrator
+```
+
+### 🎨 Presentation-First Rules
+
+1.  **Rich Content:** Never send plain text if HTML/Markdown is possible.
+2.  **Consistent Branding:** Use the same Color Palette (Emerald for success, Rose for danger, Slate for background) as the Dashboard.
+3.  **Inline CSS:** For emails, use inline styles that mimic Glassmorphism (e.g., specific HEX codes for dark mode backgrounds).
+4.  **Interactive-Feel:** Emails should look like "Mini Dashboards". Use tables, standardized headers, and clear calls to action.
+
+### 🔑 Key Principles
+
+1.  **Componentize:** Even in Node.js, think in components. `renderHeader()`, `renderStatusBadge()`.
+2.  **Shared Aesthetics:** If the dashboard changes to "Blue", update the notification `colors.js` to match.
+3.  **Observability:** Monitor "Sent", "Failed", and "Open Rates" (if possible).

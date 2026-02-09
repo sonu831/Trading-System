@@ -3,7 +3,8 @@ import PropTypes from 'prop-types';
 
 /**
  * Button Component
- * A reusable button component with multiple variants and sizes
+ * A reusable button component with multiple variants and sizes.
+ * Uses strict Tailwind classes for semantic coloring.
  */
 export default function Button({
   variant = 'primary',
@@ -16,158 +17,58 @@ export default function Button({
   type = 'button',
   ...props
 }) {
-  const baseClasses = 'btn';
+  const baseClasses = 'inline-flex items-center justify-center gap-2 rounded-lg font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900 disabled:opacity-50 disabled:cursor-not-allowed';
+  
   const variantClasses = {
-    primary: 'btn-primary',
-    secondary: 'btn-secondary',
-    outline: 'btn-outline',
-    danger: 'btn-danger',
-    ghost: 'btn-ghost',
+    primary: 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-500/20 focus:ring-indigo-500',
+    secondary: 'bg-slate-700 hover:bg-slate-600 text-slate-200 border border-slate-600 focus:ring-slate-500',
+    outline: 'bg-transparent border-2 border-indigo-500 text-indigo-400 hover:bg-indigo-500/10 focus:ring-indigo-500',
+    danger: 'bg-rose-600 hover:bg-rose-500 text-white shadow-lg shadow-rose-900/20 focus:ring-rose-500',
+    ghost: 'bg-transparent hover:bg-white/5 text-slate-400 hover:text-white focus:ring-slate-500',
+    success: 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-900/20 focus:ring-emerald-500',
   };
+
   const sizeClasses = {
-    sm: 'btn-sm',
-    md: 'btn-md',
-    lg: 'btn-lg',
+    sm: 'px-3 py-1.5 text-xs',
+    md: 'px-5 py-2.5 text-sm',
+    lg: 'px-7 py-3.5 text-base',
   };
 
   const classes = [
     baseClasses,
     variantClasses[variant],
     sizeClasses[size],
-    disabled && 'btn-disabled',
-    loading && 'btn-loading',
+    loading && 'cursor-wait',
     className,
   ]
     .filter(Boolean)
     .join(' ');
 
   return (
-    <>
-      <button
-        type={type}
-        className={classes}
-        disabled={disabled || loading}
-        onClick={onClick}
-        {...props}
-      >
-        {loading ? (
-          <>
-            <span className="btn-spinner" />
-            {children}
-          </>
-        ) : (
-          children
-        )}
-      </button>
-
-      <style jsx>{`
-        .btn {
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          gap: 8px;
-          border: none;
-          border-radius: 8px;
-          cursor: pointer;
-          font-weight: 500;
-          transition: all 0.2s;
-          font-family: inherit;
-        }
-
-        /* Sizes */
-        .btn-sm {
-          padding: 6px 12px;
-          font-size: 14px;
-        }
-        .btn-md {
-          padding: 10px 20px;
-          font-size: 16px;
-        }
-        .btn-lg {
-          padding: 14px 28px;
-          font-size: 18px;
-        }
-
-        /* Variants */
-        .btn-primary {
-          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-          color: white;
-        }
-        .btn-primary:hover:not(:disabled) {
-          transform: translateY(-2px);
-          box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
-        }
-
-        .btn-secondary {
-          background: #16213e;
-          color: #ddd;
-          border: 1px solid #333;
-        }
-        .btn-secondary:hover:not(:disabled) {
-          background: #1e2a47;
-          border-color: #444;
-        }
-
-        .btn-outline {
-          background: transparent;
-          color: #667eea;
-          border: 2px solid #667eea;
-        }
-        .btn-outline:hover:not(:disabled) {
-          background: rgba(102, 126, 234, 0.1);
-        }
-
-        .btn-danger {
-          background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
-          color: white;
-        }
-        .btn-danger:hover:not(:disabled) {
-          transform: translateY(-2px);
-          box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
-        }
-
-        .btn-ghost {
-          background: transparent;
-          color: #aaa;
-        }
-        .btn-ghost:hover:not(:disabled) {
-          background: rgba(255, 255, 255, 0.05);
-          color: #ddd;
-        }
-
-        /* States */
-        .btn-disabled {
-          opacity: 0.5;
-          cursor: not-allowed;
-        }
-
-        .btn-loading {
-          position: relative;
-          color: transparent;
-        }
-
-        .btn-spinner {
-          position: absolute;
-          width: 16px;
-          height: 16px;
-          border: 2px solid transparent;
-          border-top-color: currentColor;
-          border-radius: 50%;
-          animation: spin 0.6s linear infinite;
-        }
-
-        @keyframes spin {
-          to {
-            transform: rotate(360deg);
-          }
-        }
-      `}</style>
-    </>
+    <button
+      type={type}
+      className={classes}
+      disabled={disabled || loading}
+      onClick={onClick}
+      {...props}
+    >
+      {loading ? (
+        <>
+          <svg className="animate-spin h-4 w-4 text-current" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+          {children}
+        </>
+      ) : (
+        children
+      )}
+    </button>
   );
 }
 
 Button.propTypes = {
-  variant: PropTypes.oneOf(['primary', 'secondary', 'outline', 'danger', 'ghost']),
+  variant: PropTypes.oneOf(['primary', 'secondary', 'outline', 'danger', 'ghost', 'success']),
   size: PropTypes.oneOf(['sm', 'md', 'lg']),
   disabled: PropTypes.bool,
   loading: PropTypes.bool,

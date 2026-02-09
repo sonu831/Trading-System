@@ -20,13 +20,15 @@ export default function ThemeToggle({ className = '', ...props }) {
       variant="ghost"
       size="sm"
       onClick={toggleTheme}
-      className={`theme-toggle ${className}`}
+      className={`relative w-8 h-8 p-0 flex items-center justify-center overflow-hidden ${className}`}
       aria-label="Toggle Theme"
       {...props}
     >
       {/* Sun Icon for Light Mode (shown when dark) */}
       <svg
-        className={`icon sun-icon ${isDark ? 'visible' : 'hidden'}`}
+        className={`w-5 h-5 absolute transition-all duration-500 ease-[cubic-bezier(0.23,1,0.32,1)] ${
+          isDark ? 'opacity-100 rotate-0 scale-100' : 'opacity-0 rotate-90 scale-0'
+        }`}
         xmlns="http://www.w3.org/2000/svg"
         viewBox="0 0 24 24"
         fill="none"
@@ -48,7 +50,9 @@ export default function ThemeToggle({ className = '', ...props }) {
 
       {/* Moon Icon for Dark Mode (shown when light) */}
       <svg
-        className={`icon moon-icon ${!isDark ? 'visible' : 'hidden'}`}
+        className={`w-5 h-5 absolute transition-all duration-500 ease-[cubic-bezier(0.23,1,0.32,1)] ${
+          !isDark ? 'opacity-100 rotate-0 scale-100' : 'opacity-0 rotate-90 scale-0'
+        }`}
         xmlns="http://www.w3.org/2000/svg"
         viewBox="0 0 24 24"
         fill="none"
@@ -59,24 +63,6 @@ export default function ThemeToggle({ className = '', ...props }) {
       >
         <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
       </svg>
-
-      <style jsx>{`
-        .icon {
-          width: 20px;
-          height: 20px;
-          transition: transform 0.5s cubic-bezier(0.23, 1, 0.32, 1);
-        }
-        .visible {
-          display: block;
-          opacity: 1;
-          transform: rotate(0deg);
-        }
-        .hidden {
-          display: none;
-          opacity: 0;
-          transform: rotate(90deg);
-        }
-      `}</style>
     </Button>
   );
 }

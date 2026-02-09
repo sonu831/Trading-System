@@ -43,8 +43,8 @@ func NewClient(ctx context.Context) (*Client, error) {
 		return nil, fmt.Errorf("parse db config: %w", err)
 	}
 
-	// Pool configuration per instruction §5a
-	config.MaxConns = 60                          // 50 analysis + 10 headroom for API/metrics
+	// Pool configuration per instruction §5a (Pool Budget: L4=40, L5=20, L7=30)
+	config.MaxConns = 40                          // Reduced from 60 to fit multi-service pool budget
 	config.MinConns = 10                          // Keep warm connections for low-latency first query
 	config.MaxConnLifetime = 30 * time.Minute     // Recycle connections periodically
 	config.MaxConnIdleTime = 5 * time.Minute      // Release idle connections

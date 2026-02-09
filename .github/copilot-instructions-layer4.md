@@ -271,11 +271,15 @@ func publishResult(ctx context.Context, rdb *redis.Client, result *StockAnalysis
 
 ### 5a. Connection pool sizing
 
-50 concurrent queries need a properly sized pool:
+Pool budget across services (total `max_connections=200`):
+- Layer 4: 40 connections
+- Layer 5: 20 connections  
+- Layer 7 (Prisma): 30 connections
+- Reserved: headroom for monitoring/admin
 
 ```go
 config, _ := pgxpool.ParseConfig(connURL)
-config.MaxConns = 60          // 50 analysis + 10 headroom for API/metrics
+config.MaxConns = 40          // Pool budget: L4=40, L5=20, L7=30
 config.MinConns = 10          // keep warm connections for low-latency first query
 config.MaxConnLifetime = 30 * time.Minute
 config.MaxConnIdleTime = 5 * time.Minute
@@ -284,7 +288,31 @@ config.HealthCheckPeriod = 30 * time.Second
 pool, err := pgxpool.NewWithConfig(ctx, config)
 ```
 
-### 5b. Query patterns
+### 5b. Hybrid data access pattern
+
+Layer 4 uses a **hybrid data access** approach:
+
+| Data Type | Source | Reason |
+|-----------|--------|--------|
+| Stock symbols, sectors | Layer 7 API | Static, cached, centralized source of truth |
+| Candle OHLCV data | Direct TimescaleDB | High-frequency, performance-critical |
+
+**Symbol loading priority:**
+1. Layer 7 API `/api/v1/stocks/symbols` (preferred)
+2. Shared JSON file `/app/shared/stocks/nifty50_shared.json` (fallback)
+
+```go
+// loadSymbolsFromAPI fetches from Layer 7 API first
+if symbols := loadSymbolsFromAPI(); len(symbols) > 0 {
+    return symbols
+}
+// Fall back to JSON file
+if symbols := loadSymbolsFromJSON(); len(symbols) > 0 {
+    return symbols
+}
+```
+
+### 5c. Query patterns
 
 - **Parameterized queries only** — never concatenate user input into SQL.
 - **Validate dynamic fields** against allowlists:

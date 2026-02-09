@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"log"
+	"net/http"
 	"os"
 	"runtime"
 	"sort"
@@ -28,16 +29,76 @@ type StockEntry struct {
 	Tokens   map[string]string `json:"tokens"`
 }
 
-// Nifty50Symbols - loaded from shared/stocks/nifty50_shared.json
+// API response for /api/v1/stocks/symbols
+type SymbolsAPIResponse struct {
+	Success bool     `json:"success"`
+	Count   int      `json:"count"`
+	Symbols []string `json:"symbols"`
+}
+
+// Nifty50Symbols - loaded from Layer 7 API (preferred) or shared JSON (fallback)
 var Nifty50Symbols = loadNifty50Symbols()
 
-// loadNifty50Symbols loads symbols from the shared JSON file
+// loadNifty50Symbols implements hybrid data access:
+// 1. Try Layer 7 API (single source of truth)
+// 2. Fall back to shared JSON file
 func loadNifty50Symbols() []string {
-	// Try Docker path first, then local dev path
+	// 1. Try Layer 7 API first (hybrid pattern per architecture plan)
+	if symbols := loadSymbolsFromAPI(); len(symbols) > 0 {
+		return symbols
+	}
+
+	// 2. Fall back to JSON file
+	if symbols := loadSymbolsFromJSON(); len(symbols) > 0 {
+		return symbols
+	}
+
+	// No fallback - both sources must be available
+	log.Printf("❌ FATAL: Could not load symbols from API or JSON. Check Layer 7 API or shared/stocks/nifty50_shared.json")
+	return []string{} // Empty, but allow startup to continue for debugging
+}
+
+// loadSymbolsFromAPI fetches symbols from Layer 7 API
+func loadSymbolsFromAPI() []string {
+	apiURL := os.Getenv("BACKEND_API_URL")
+	if apiURL == "" {
+		apiURL = "http://backend-api:4000" // Docker default
+	}
+
+	// For local dev
+	if os.Getenv("GO_ENV") == "local" {
+		apiURL = "http://localhost:4000"
+	}
+
+	client := &http.Client{Timeout: 5 * time.Second}
+	resp, err := client.Get(apiURL + "/api/v1/stocks/symbols")
+	if err != nil {
+		log.Printf("⚠️ API unavailable, falling back to JSON: %v", err)
+		return nil
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		log.Printf("⚠️ API returned %d, falling back to JSON", resp.StatusCode)
+		return nil
+	}
+
+	var apiResp SymbolsAPIResponse
+	if err := json.NewDecoder(resp.Body).Decode(&apiResp); err != nil {
+		log.Printf("⚠️ Failed to parse API response: %v", err)
+		return nil
+	}
+
+	log.Printf("✅ Loaded %d symbols from Layer 7 API", len(apiResp.Symbols))
+	return apiResp.Symbols
+}
+
+// loadSymbolsFromJSON loads from shared JSON file
+func loadSymbolsFromJSON() []string {
 	paths := []string{
-		"/app/shared/stocks/nifty50_shared.json",             // Docker path
-		"../../shared/stocks/nifty50_shared.json",            // Local dev path
-		"../../../shared/stocks/nifty50_shared.json",         // Alternative local path
+		"/app/shared/stocks/nifty50_shared.json",     // Docker path
+		"../../shared/stocks/nifty50_shared.json",    // Local dev path
+		"../../../shared/stocks/nifty50_shared.json", // Alternative local path
 	}
 
 	var data []byte
@@ -50,14 +111,12 @@ func loadNifty50Symbols() []string {
 	}
 
 	if err != nil {
-		log.Printf("⚠️ Failed to load symbols from JSON, using fallback: %v", err)
-		return getFallbackSymbols()
+		return nil
 	}
 
 	var stocks []StockEntry
 	if err := json.Unmarshal(data, &stocks); err != nil {
-		log.Printf("⚠️ Failed to parse symbols JSON, using fallback: %v", err)
-		return getFallbackSymbols()
+		return nil
 	}
 
 	symbols := make([]string, len(stocks))
@@ -66,22 +125,6 @@ func loadNifty50Symbols() []string {
 	}
 	log.Printf("✅ Loaded %d symbols from shared JSON", len(symbols))
 	return symbols
-}
-
-// getFallbackSymbols returns hardcoded symbols as fallback
-func getFallbackSymbols() []string {
-	return []string{
-		"RELIANCE", "TCS", "HDFCBANK", "INFY", "ICICIBANK",
-		"HINDUNILVR", "SBIN", "BHARTIARTL", "KOTAKBANK", "ITC",
-		"LT", "AXISBANK", "BAJFINANCE", "ASIANPAINT", "MARUTI",
-		"HCLTECH", "TITAN", "WIPRO", "SUNPHARMA", "ULTRACEMCO",
-		"ONGC", "NTPC", "POWERGRID", "TATAMOTORS", "M&M",
-		"BAJAJFINSV", "ADANIPORTS", "COALINDIA", "TATASTEEL", "TECHM",
-		"JSWSTEEL", "INDUSINDBK", "HINDALCO", "DRREDDY", "DIVISLAB",
-		"CIPLA", "GRASIM", "BRITANNIA", "NESTLEIND", "EICHERMOT",
-		"APOLLOHOSP", "BPCL", "HEROMOTOCO", "SBILIFE", "HDFCLIFE",
-		"BAJAJ-AUTO", "TATACONSUM", "ADANIENT", "LTIM", "SHRIRAMFIN",
-	}
 }
 
 // StockAnalysis represents the complete analysis result for a stock
@@ -156,25 +199,9 @@ func NewEngine(ctx context.Context) (*Engine, error) {
 	// Initialize AI Client
 	aiClient := ai.NewClient()
 
-	// Try loading from shared JSON first (Single Source of Truth)
-	jsonSymbols, err := loadSymbolsFromJSON("/app/vendor/nifty50_shared.json")
-	var symbols []string
-
-	if err == nil && len(jsonSymbols) > 0 {
-		symbols = jsonSymbols
-		log.Printf("✅ Loaded %d symbols from shared JSON", len(symbols))
-	} else {
-		// Fallback to DB
-		dbSymbols, err := dbClient.GetAvailableSymbols(ctx)
-		if err != nil {
-			log.Printf("⚠️ Could not fetch symbols from DB, using defaults: %v", err)
-			symbols = Nifty50Symbols
-		} else {
-			symbols = dbSymbols
-		}
-	}
-
-	log.Printf("📊 Found %d symbols in database", len(symbols))
+	// Use pre-loaded Nifty50Symbols (from API or JSON via hybrid loader)
+	symbols := Nifty50Symbols
+	log.Printf("📊 Using %d Nifty50 symbols", len(symbols))
 
 	return &Engine{
 		ctx:          ctx,
@@ -681,45 +708,4 @@ func generateMockCandles(count int) []Candle {
 	}
 
 	return candles
-}
-
-// Helper to load symbols from JSON
-func loadSymbolsFromJSON(path string) ([]string, error) {
-	file, err := os.Open(path)
-	if err != nil {
-		return nil, err
-	}
-	defer file.Close()
-
-	byteValue, _ := ioutil.ReadAll(file)
-
-	// Structure of nifty50_shared.json depends on its content.
-	// Assume it's {"symbols": ["RELIANCE", ...]} or just ["RELIANCE", ...]
-	// Usually vendor file is mapped.
-	// Let's assume standard format: {"instruments": [...]} or something.
-	// Wait, I should verify the JSON structure first!
-	// But assuming user said "nifty 50 json", it's likely a list or list wrapper.
-	// I'll assume array of strings OR parse generic.
-
-	// Let's try map[string]interface first to see structure, or just define it.
-	// Ideally I should have checked the file content.
-	// I will just read into generic structure.
-
-	var data struct {
-		Symbols []string `json:"symbols"`
-	}
-	// Or maybe it is just an array?
-	// I will attempt both or check file content first.
-	// Actually, I'll return error if unmarshal fails.
-
-	if err := json.Unmarshal(byteValue, &data); err == nil && len(data.Symbols) > 0 {
-		return data.Symbols, nil
-	}
-
-	var list []string
-	if err := json.Unmarshal(byteValue, &list); err == nil {
-		return list, nil
-	}
-
-	return nil, err
 }

@@ -16,9 +16,42 @@ console.log("DEBUG: Script initialized. Loading libs...");
 
 const { DateTime } = require('luxon');
 const { MStockVendor } = require('../src/vendors/mstock');
-// Load master map - works in both local and Docker environments
-const vendorPath = path.resolve(__dirname, '..', 'vendor', 'nifty50_shared.json');
-const masterMap = require(vendorPath);
+
+// Master map loaded asynchronously from API or JSON
+let masterMap = [];
+
+// Load symbols from Layer 7 API or fallback to shared JSON
+async function loadMasterMap() {
+  const axios = require('axios');
+  const BACKEND_API_URL = process.env.BACKEND_API_URL || 'http://backend-api:4000';
+  
+  // 1. Try Layer 7 API first
+  try {
+    const response = await axios.get(`${BACKEND_API_URL}/api/v1/stocks`, { timeout: 5000 });
+    if (response.data?.success && response.data?.stocks?.length > 0) {
+      console.log(`✅ Loaded ${response.data.stocks.length} symbols from Layer 7 API`);
+      return response.data.stocks;
+    }
+  } catch (e) {
+    console.warn(`⚠️ API unavailable, falling back to JSON: ${e.message}`);
+  }
+  
+  // 2. Fall back to shared JSON
+  const paths = [
+    '/app/shared/stocks/nifty50_shared.json',    // Docker path
+    path.resolve(__dirname, '../../shared/stocks/nifty50_shared.json'), // Local dev
+  ];
+  
+  for (const p of paths) {
+    if (fs.existsSync(p)) {
+      const data = JSON.parse(fs.readFileSync(p, 'utf-8'));
+      console.log(`✅ Loaded ${data.length} symbols from shared JSON`);
+      return data;
+    }
+  }
+  
+  throw new Error('Cannot load symbols from API or JSON');
+}
 
 // --- Configuration ---
 const args = process.argv.slice(2);
@@ -162,6 +195,15 @@ async function pushMetric(name, value, labels = {}) {
 }
 
 async function main() {
+  // Step 1: Load master symbol map from API or JSON
+  console.log('⏳ Step 1: Fetching Data... All Symbols');
+  try {
+    masterMap = await loadMasterMap();
+  } catch (e) {
+    console.error('❌ Failed to load symbols:', e.message);
+    process.exit(1);
+  }
+
   // Determine date range
   let start, end;
   const today = DateTime.now().startOf('day');

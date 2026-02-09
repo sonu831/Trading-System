@@ -26,14 +26,30 @@ type Client struct {
 	pool *pgxpool.Pool
 }
 
-// NewClient creates a new TimescaleDB client
+// NewClient creates a new TimescaleDB client with pool configuration
 func NewClient(ctx context.Context) (*Client, error) {
 	connURL := os.Getenv("TIMESCALE_URL")
 	if connURL == "" {
 		connURL = "postgresql://trading:trading123@localhost:5432/nifty50"
 	}
 
-	pool, err := pgxpool.New(ctx, connURL)
+	// For local dev override (when running outside Docker)
+	if os.Getenv("GO_ENV") == "local" {
+		connURL = "postgresql://trading:trading123@localhost:5432/nifty50"
+	}
+
+	config, err := pgxpool.ParseConfig(connURL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse config: %w", err)
+	}
+
+	// Pool configuration (Pool Budget: L4=40, L5=20, L7=30)
+	config.MaxConns = 20                        // Layer 5 pool budget
+	config.MinConns = 5                         // Keep warm connections
+	config.MaxConnLifetime = 30 * time.Minute   // Recycle periodically
+	config.MaxConnIdleTime = 5 * time.Minute    // Release idle connections
+
+	pool, err := pgxpool.NewWithConfig(ctx, config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to TimescaleDB: %w", err)
 	}

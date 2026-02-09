@@ -67,3 +67,12 @@ project.tar.gz
 
 # Backups
 backups/
+
+# --- Go Binaries ---
+# Ignore the specific binary name 'main' in root or any subfolder
+main
+**/main
+
+# Ignore Windows versions just in case
+main.exe
+**/main.exe

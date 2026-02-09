@@ -30,17 +30,23 @@ CREATE TABLE IF NOT EXISTS candles_1m (
     UNIQUE (time, symbol)
 );
 
-SELECT create_hypertable('candles_1m', 'time', 
-    chunk_time_interval => INTERVAL '1 day',
+SELECT create_hypertable('candles_1m', 'time',
+    chunk_time_interval => INTERVAL '1 week',
     if_not_exists => TRUE
 );
 
 CREATE INDEX IF NOT EXISTS idx_candles_1m_symbol_time ON candles_1m (symbol, time DESC);
 
--- Compression Policy
-ALTER TABLE candles_1m SET (timescaledb.compress, timescaledb.compress_segmentby = 'symbol');
-SELECT add_compression_policy('candles_1m', INTERVAL '7 days', if_not_exists => TRUE);
-SELECT add_retention_policy('candles_1m', INTERVAL '30 days', if_not_exists => TRUE);
+-- Compression Policy (segment by symbol, order by time for optimal query performance)
+ALTER TABLE candles_1m SET (
+    timescaledb.compress,
+    timescaledb.compress_segmentby = 'symbol',
+    timescaledb.compress_orderby = 'time DESC'
+);
+SELECT add_compression_policy('candles_1m', INTERVAL '30  days', if_not_exists => TRUE);
+-- NO retention policy: raw candle data is kept indefinitely.
+-- Compression handles storage efficiency (10-20x reduction).
+-- 10 years of data = ~5 GB compressed on disk.
 
 -- OPTIONS CHAIN
 CREATE TABLE IF NOT EXISTS options_chain (
@@ -155,11 +161,37 @@ SELECT time_bucket('1 day', time) AS time, symbol, exchange, first(open, time) A
 FROM candles_1m GROUP BY time_bucket('1 day', time), symbol, exchange WITH NO DATA;
 SELECT add_continuous_aggregate_policy('candles_1d', start_offset => INTERVAL '3 days', end_offset => INTERVAL '1 day', schedule_interval => INTERVAL '1 day', if_not_exists => TRUE);
 
+-- 4h
+CREATE MATERIALIZED VIEW IF NOT EXISTS candles_4h WITH (timescaledb.continuous) AS
+SELECT time_bucket('4 hours', time) AS time, symbol, exchange, first(open, time) AS open, max(high) AS high, min(low) AS low, last(close, time) AS close, sum(volume) AS volume, sum(volume * vwap) / NULLIF(sum(volume), 0) AS vwap, sum(trades) AS trades
+FROM candles_1m GROUP BY time_bucket('4 hours', time), symbol, exchange WITH NO DATA;
+SELECT add_continuous_aggregate_policy('candles_4h', start_offset => INTERVAL '1 day', end_offset => INTERVAL '4 hours', schedule_interval => INTERVAL '4 hours', if_not_exists => TRUE);
+
 -- Weekly
 CREATE MATERIALIZED VIEW IF NOT EXISTS candles_weekly WITH (timescaledb.continuous) AS
 SELECT time_bucket('1 week', time) AS time, symbol, exchange, first(open, time) AS open, max(high) AS high, min(low) AS low, last(close, time) AS close, sum(volume) AS volume, sum(trades) AS trades
 FROM candles_1m GROUP BY time_bucket('1 week', time), symbol, exchange WITH NO DATA;
 SELECT add_continuous_aggregate_policy('candles_weekly', start_offset => INTERVAL '1 month', end_offset => INTERVAL '1 week', schedule_interval => INTERVAL '1 day', if_not_exists => TRUE);
+
+-- ============================================
+-- 3b. COMPRESSION ON CONTINUOUS AGGREGATES
+-- ============================================
+ALTER MATERIALIZED VIEW candles_5m SET (timescaledb.compress);
+SELECT add_compression_policy('candles_5m', INTERVAL '30 days', if_not_exists => TRUE);
+ALTER MATERIALIZED VIEW candles_10m SET (timescaledb.compress);
+SELECT add_compression_policy('candles_10m', INTERVAL '30 days', if_not_exists => TRUE);
+ALTER MATERIALIZED VIEW candles_15m SET (timescaledb.compress);
+SELECT add_compression_policy('candles_15m', INTERVAL '30 days', if_not_exists => TRUE);
+ALTER MATERIALIZED VIEW candles_30m SET (timescaledb.compress);
+SELECT add_compression_policy('candles_30m', INTERVAL '30 days', if_not_exists => TRUE);
+ALTER MATERIALIZED VIEW candles_1h SET (timescaledb.compress);
+SELECT add_compression_policy('candles_1h', INTERVAL '60 days', if_not_exists => TRUE);
+ALTER MATERIALIZED VIEW candles_4h SET (timescaledb.compress);
+SELECT add_compression_policy('candles_4h', INTERVAL '60 days', if_not_exists => TRUE);
+ALTER MATERIALIZED VIEW candles_1d SET (timescaledb.compress);
+SELECT add_compression_policy('candles_1d', INTERVAL '90 days', if_not_exists => TRUE);
+ALTER MATERIALIZED VIEW candles_weekly SET (timescaledb.compress);
+SELECT add_compression_policy('candles_weekly', INTERVAL '90 days', if_not_exists => TRUE);
 
 -- ============================================
 -- 4. MASTER DATA & METADATA
@@ -214,7 +246,7 @@ CREATE TABLE IF NOT EXISTS trading_calendar (
 CREATE TABLE IF NOT EXISTS users (
     id              SERIAL PRIMARY KEY,
     telegram_id     BIGINT UNIQUE,
-    email           TEXT,
+    email           TEXT UNIQUE,
     phone           TEXT,
     name            TEXT,
     is_premium      BOOLEAN DEFAULT FALSE,
@@ -236,9 +268,12 @@ CREATE TABLE IF NOT EXISTS user_alerts (
     threshold       DECIMAL(12,2),
     is_active       BOOLEAN DEFAULT TRUE,
     triggered_at    TIMESTAMPTZ,
-    created_at      TIMESTAMPTZ DEFAULT NOW()
+    created_at      TIMESTAMPTZ DEFAULT NOW(),
+
+    UNIQUE(user_id, symbol, alert_type, condition, threshold)
 );
 CREATE INDEX IF NOT EXISTS idx_user_alerts_user ON user_alerts(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_alerts_symbol ON user_alerts(symbol);
 
 -- User Watchlists
 CREATE TABLE IF NOT EXISTS user_watchlists (
@@ -247,7 +282,9 @@ CREATE TABLE IF NOT EXISTS user_watchlists (
     name            TEXT NOT NULL,
     symbols         TEXT[] NOT NULL,
     is_default      BOOLEAN DEFAULT FALSE,
-    created_at      TIMESTAMPTZ DEFAULT NOW()
+    created_at      TIMESTAMPTZ DEFAULT NOW(),
+
+    UNIQUE(user_id, name)
 );
 
 -- DATA AVAILABILITY (Watermark System)
@@ -270,7 +307,7 @@ CREATE INDEX IF NOT EXISTS idx_data_availability_symbol ON data_availability(sym
 -- Backfill Jobs
 CREATE TABLE IF NOT EXISTS backfill_jobs (
     id              SERIAL PRIMARY KEY,
-    job_id          UUID DEFAULT gen_random_uuid(),
+    job_id          UUID DEFAULT gen_random_uuid() UNIQUE,
     status          TEXT DEFAULT 'PENDING',
     symbols         TEXT[],
     timeframe       TEXT,
@@ -394,7 +431,7 @@ CREATE TABLE IF NOT EXISTS payments (
     status          TEXT DEFAULT 'PENDING',
     payment_method  TEXT,
     gateway_order_id TEXT,
-    gateway_payment_id TEXT,
+    gateway_payment_id TEXT UNIQUE,
     metadata        JSONB DEFAULT '{}',
     created_at      TIMESTAMPTZ DEFAULT NOW(),
     completed_at    TIMESTAMPTZ
@@ -434,7 +471,44 @@ CREATE TABLE IF NOT EXISTS user_subscribers (
 );
 
 -- ============================================
--- 6. PERMISSIONS & VIEWS
+-- 6. API KEYS, NOTIFICATIONS & SUGGESTIONS
+-- ============================================
+
+-- API Keys
+CREATE TABLE IF NOT EXISTS api_keys (
+    id              SERIAL PRIMARY KEY,
+    key             TEXT NOT NULL UNIQUE,
+    user_id         INTEGER REFERENCES users(id),
+    vendor_name     TEXT,
+    is_active       BOOLEAN DEFAULT TRUE,
+    rate_limit      INTEGER DEFAULT 10,
+    created_at      TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_api_keys_key ON api_keys(key);
+
+-- System Notifications
+CREATE TABLE IF NOT EXISTS system_notifications (
+    id              SERIAL PRIMARY KEY,
+    type            TEXT NOT NULL,
+    message         TEXT NOT NULL,
+    metadata        JSONB DEFAULT '{}',
+    is_read         BOOLEAN DEFAULT FALSE,
+    created_at      TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_system_notifications_created ON system_notifications(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_system_notifications_is_read ON system_notifications(is_read);
+
+-- User Suggestions
+CREATE TABLE IF NOT EXISTS user_suggestions (
+    id              SERIAL PRIMARY KEY,
+    username        TEXT,
+    message         TEXT NOT NULL,
+    source          TEXT,
+    created_at      TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- ============================================
+-- 7. PERMISSIONS & VIEWS
 -- ============================================
 
 CREATE OR REPLACE VIEW latest_prices AS

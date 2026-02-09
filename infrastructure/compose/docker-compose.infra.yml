@@ -139,13 +139,13 @@ services:
       - -c
       - max_connections=200 # Increased from default 100 for multiple services + backups
       - -c
-      - shared_buffers=6GB # ULTRA: 35-40% of 16GB RAM
+      - shared_buffers=8GB # 67% of 12GB container — optimal for TimescaleDB
       - -c
-      - effective_cache_size=14GB # ULTRA: Assume full system cache usage
+      - effective_cache_size=10GB # shared_buffers + OS cache estimate
       - -c
-      - work_mem=256MB # ULTRA: High memory for complex sorts
+      - work_mem=128MB # Safe: 200 connections × 128MB = 25GB theoretical peak
       - -c
-      - maintenance_work_mem=4GB # ULTRA: Super fast vacuums/indexes
+      - maintenance_work_mem=2GB # Fast vacuums/indexes without OOM risk
       - -c
       - max_wal_size=8GB # ULTRA: Reduce checkpoint frequency
       - -c
@@ -167,24 +167,20 @@ services:
       - -c
       - max_parallel_maintenance_workers=4 # ULTRA: Parallel index builds
       - -c
-      - synchronous_commit=off # EXTREME: Sacrifice safety for raw SPEED (50L/sec target)
+      - synchronous_commit=on # SAFE: Ensures data durability (10-year persistence requirement)
       - -c
       - wal_writer_delay=200ms # EXTREME: Reduce disk IO pressure
       - -c
       - wal_compression=on # EXTREME: Trade CPU for Disk Bandwidth
       - -c
-      - commit_delay=100000 # EXTREME: Group commits aggressively
+      - commit_delay=10000 # Group commits (10ms) — safe balance of throughput vs latency
       - -c
       - checkpoint_timeout=30min # EXTREME: Reduce checkpoint IO spikes
       - -c
       - autovacuum_naptime=10min # EXTREME: Defer vacuuming during heavy loads
       - -c
-      - work_mem=512MB # EXTREME READ: Massive sort/hash memory (8 workers * 512MB = 4GB peak per query)
-      - -c
-      - jit=on # EXTREME READ: JIT Compilation for complex aggregations
-      - -c
-      - default_statistics_target=500 # EXTREME READ: Better planner stats for large tables
-    shm_size: 10gb # Prevent "could not resize shared memory segment" errors
+      - jit=on # JIT Compilation for complex aggregations on large tables
+    shm_size: 12gb # Must be >= shared_buffers (8GB) + overhead
     volumes:
       - ../../data/timescaledb:/var/lib/postgresql/data
       - ../../layer-3-storage/timescaledb/migrations:/docker-entrypoint-initdb.d

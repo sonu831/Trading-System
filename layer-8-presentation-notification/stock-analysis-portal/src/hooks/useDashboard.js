@@ -113,7 +113,9 @@ export const useDashboard = () => {
 
   useEffect(() => {
     fetchData();
-    const interval = setInterval(fetchData, 3000); // 3s polling
+    // Default to 30s if not set
+    const intervalMs = Number(process.env.NEXT_PUBLIC_DASHBOARD_POLL_INTERVAL) || 30000;
+    const interval = setInterval(fetchData, intervalMs); 
     return () => clearInterval(interval);
   }, [fetchData]);
 

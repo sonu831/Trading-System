@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Card, Badge, Button } from '../../ui';
 
-const POLL_INTERVAL = 2000; // 2 seconds
+const POLL_INTERVAL = Number(process.env.NEXT_PUBLIC_BACKFILL_POLL_INTERVAL) || 30000;
+
 
 /**
  * SwarmMonitor Component
@@ -85,7 +86,7 @@ export default function SwarmMonitor({ onRefresh, showEmpty = false }) {
     intervalId = setInterval(fetchStatus, POLL_INTERVAL);
 
     return () => clearInterval(intervalId);
-  }, []); // Empty dependency array = mount only
+  }, [POLL_INTERVAL]);
 
   // Helper Component for DB Sync Card
   const DbSyncCard = () => {

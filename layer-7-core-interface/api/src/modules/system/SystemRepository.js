@@ -5,10 +5,20 @@ class SystemRepository extends BaseRepository {
     super({ redis, prisma, logger });
   }
 
+  /**
+   * Get recent system logs from Redis
+   * @param {number} limit - Number of logs to retrieve
+   * @returns {Promise<Array<string>>} List of log strings
+   */
   async getLogs(limit = 50) {
     return this.redis.getList('system:layer1:logs', 0, limit - 1);
   }
 
+  /**
+   * Get a specific metric from Redis
+   * @param {string} key - Redis key for the metric
+   * @returns {Promise<string|null>} Metric value or null
+   */
   async getMetric(key) {
     try {
       const data = await this.redis.get(key);
@@ -18,6 +28,10 @@ class SystemRepository extends BaseRepository {
     }
   }
 
+  /**
+   * Get the count of signals generated
+   * @returns {Promise<number>} Signal count
+   */
   async getSignalCount() {
     try {
       return await this.redis.publisher.lLen('signals:history');
@@ -26,14 +40,27 @@ class SystemRepository extends BaseRepository {
     }
   }
 
+  /**
+   * Get the total count of 1-minute candles in the database
+   * Cached for 30 seconds to reduce DB load
+   * @returns {Promise<number>} Candle count
+   */
   async getCandleCount() {
-    try {
-      return await this.prisma.candles_1m.count();
-    } catch {
-      return 0;
-    }
+    const ttl = Number(process.env.SYSTEM_CACHE_TTL_CANDLE_COUNT) || 30;
+    return this.getCached('system:metrics:candle_count', async () => {
+      try {
+        return await this.prisma.candles_1m.count();
+      } catch {
+        return 0;
+      }
+    }, ttl);
   }
 
+  /**
+   * Trigger a backfill command via Redis Pub/Sub
+   * @param {Object} params - Backfill parameters
+   * @returns {Promise<void>}
+   */
   async triggerBackfill(params) {
     await this.redis.publisher.publish(
       'system:commands',
@@ -41,6 +68,10 @@ class SystemRepository extends BaseRepository {
     );
   }
 
+  /**
+   * Get the current status of the Swarm (Ingestion Layer)
+   * @returns {Promise<Object|null>} Swarm status object or null
+   */
   async getSwarmStatus() {
     try {
       // RedisClient.get() already parses JSON
@@ -60,12 +91,19 @@ class SystemRepository extends BaseRepository {
    * @param {string} key - Redis key
    * @param {Function} fetchFn - Function to fetch data if cache miss
    * @param {number} ttl - Time to live in seconds (default 300s = 5m)
+   * @returns {Promise<any>} The data (cached or fresh)
    */
-  async getCached(key, fetchFn, ttl = 300) {
+  async getCached(key, fetchFn, ttl = Number(process.env.SYSTEM_DEFAULT_CACHE_TTL) || 300) {
     try {
       // 1. Try Cache
       const cached = await this.redis.get(key);
-      if (cached) return cached;
+      if (cached) {
+        try {
+          return JSON.parse(cached); // Fix: Parse the string back to object
+        } catch (e) {
+          this.logger.warn({ key, err: e }, 'Failed to parse cached value, fetching fresh');
+        }
+      }
       
       // 2. Fetch Fresh
       const data = await fetchFn();
@@ -86,7 +124,8 @@ class SystemRepository extends BaseRepository {
 
   /**
    * Clear specific cache keys or patterns
-   * @param {string} pattern - Key pattern to delete (e.g. 'system:*')
+   * @param {Array<string>} keys - List of keys to delete
+   * @returns {Promise<void>}
    */
   async clearCache(keys = []) {
     if (!keys || keys.length === 0) return;
@@ -103,6 +142,7 @@ class SystemRepository extends BaseRepository {
   /**
    * Clear keys matching a pattern
    * @param {string} pattern - Redis key pattern (e.g. 'system:*')
+   * @returns {Promise<void>}
    */
   async clearCachePattern(pattern) {
     if (!pattern) return;
@@ -198,19 +238,9 @@ class SystemRepository extends BaseRepository {
   // ═══════════════════════════════════════════════════════════════
 
   /**
-   * Update or create data availability record (Upsert Logic)
-   * Called by Ingestion Service (Layer 1) after processing a batch.
-   * 
-   * Logic:
-   * - If record exists: Expand date range (min/max) and ADD to total_records count.
-   * - If new: Create fresh record.
-   * 
-   * @param {Object} params - { symbol, timeframe, firstDate, lastDate, recordCount }
-   * @returns {Promise<Object>} The updated record
-   */
-  /**
    * Refresh data availability from source of truth (candles_1m)
    * @param {string} symbol - Symbol to refresh
+   * @returns {Promise<Object|void>} Updated stats or void
    */
   async refreshDataAvailability(symbol) {
     if (!symbol) return;
@@ -254,6 +284,7 @@ class SystemRepository extends BaseRepository {
   /**
    * Sync all symbols from source of truth (candles_1m)
    * This is used by the periodic cron job.
+   * @returns {Promise<number>} Number of symbols updated
    */
   async syncAllDataAvailability() {
     try {
@@ -299,7 +330,9 @@ class SystemRepository extends BaseRepository {
 
   /**
    * Update or create data availability record (Legacy: Manual Input)
+   * @param {Object} params - Update parameters
    * @deprecated Use refreshDataAvailability for source-of-truth updates
+   * @returns {Promise<Object>} Updated record
    */
   async updateDataAvailability(params) {
     let { symbol, timeframe = '1m', firstDate, lastDate } = params;

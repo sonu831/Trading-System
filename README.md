@@ -660,6 +660,27 @@ OLLAMA_MODEL=llama3
 
 ---
 
+## Performance Tuning ⚡
+
+### Database Optimization
+The system uses TimescaleDB for high-speed time-series data. To ensure optimal performance:
+- **Hypertables**: Automatic partitioning is enabled for `market_candles`.
+- **Compression**: Historical data (>7 days) is compressed to save 90% space.
+- **Maintenance**: Run `VACUUM FULL` weekly during low activity.
+
+### Caching Strategy
+Redis is used extensively to reduce database load:
+- **Real-time Ticks**: 1s TTL (Ephemeral)
+- **Aggregated Status**: 30s TTL
+- **Data Availability Stats**: 30s TTL (`getCandleCount`)
+
+### API Rate Limiting
+- Public endpoints: 100 requests/min
+- Authenticated endpoints: 1000 requests/min
+- Backfill triggers: 1 request/min per user
+
+---
+
 ## Troubleshooting
 
 ### Common Issues

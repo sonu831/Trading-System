@@ -252,4 +252,30 @@ Strictly adhere to these casing standards to ensure consistency across the polyg
 - **Integration**: Use `docker-compose.infra.yml` to spin up dependencies for tests.
 - **Mocking**: Mock external vendor APIs (MStock, Kite) to avoid rate limits.
 
+## Performance & Optimization
+
+### General Principles
+1.  **Performance First**: This is a production-grade trading system. Latency matters.
+    -   Avoid blocking the Event Loop in Node.js.
+    -   Offload heavy computations to Worker Threads or Go microservices (Layer 4).
+    -   Always use `Promise.all` for parallel async operations.
+    -   **Externalize Configuration**:
+        -   ALL magic numbers (timeouts, intervals, limits) must be in `.env`.
+        -   Frontend: Use `NEXT_PUBLIC_` prefix.
+        -   Backend: Use `process.env` with sensible defaults.
+
+### Caching Strategy
+-   **Layer 2 (Processing)**: Cache aggregated candles in Redis (latest only).
+-   **Layer 7 (API)**:
+    -   Cache all expensive DB queries (Counts, Aggregations).
+    -   Use `SystemRepository.getCached()` wrapper for consistent behavior.
+    -   Default TTL: 30-300s depending on criticality.
+
+### Frontend Optimization
+-   **Polling**:
+    -   Avoid aggressive polling (< 5s) unless absolutely necessary for real-time ticks.
+    -   Use `30s` for status checks (dashboard, system health).
+    -   Implement "stale-while-revalidate" strategies.
+
+
 ---

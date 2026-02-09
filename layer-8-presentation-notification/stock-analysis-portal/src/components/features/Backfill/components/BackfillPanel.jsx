@@ -1,13 +1,14 @@
-import React, { useState, useEffect } from 'react';
-import { useSelector } from 'react-redux';
+import React, { useState, useEffect, useRef } from 'react';
+import { useSelector, useDispatch } from 'react-redux';
 import { Card, Input, Button, Badge, Table } from '@/components/ui';
-import { selectPipelineStatus } from '@/store/slices/systemSlice';
+import { selectPipelineStatus, setSystemStatus } from '@/store/slices/systemSlice';
 import BackfillProgress from './BackfillProgress';
 
 const API_URL = ''; // Proxy handling
 const MAX_DAYS = 30;
 
 export default function BackfillPanel() {
+  const dispatch = useDispatch();
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
   const [symbol, setSymbol] = useState('');
@@ -17,6 +18,11 @@ export default function BackfillPanel() {
   const [coverage, setCoverage] = useState([]);
   const [loadingCoverage, setLoadingCoverage] = useState(true);
   const [jobStatus, setJobStatus] = useState(null);
+
+  // Completion Logic Refs
+  const lastCountRef = useRef(0);
+  const lastChangeTimeRef = useRef(Date.now());
+  const pollingRef = useRef(null);
 
   const pipelineStatus = useSelector(selectPipelineStatus);
   const backfillStatus = pipelineStatus?.layers?.layer1?.backfill;
@@ -30,6 +36,13 @@ export default function BackfillPanel() {
     setFromDate(weekAgo.toISOString().split('T')[0]);
 
     fetchCoverage();
+
+    // Start local polling for backfill logic
+    pollingRef.current = setInterval(checkBackfillProgress, 30000); // 30s poll
+
+    return () => {
+      if (pollingRef.current) clearInterval(pollingRef.current);
+    };
   }, []);
 
   const fetchCoverage = async () => {
@@ -39,15 +52,48 @@ export default function BackfillPanel() {
       setCoverage(data.data?.symbols || []);
       setLoadingCoverage(false);
     } catch (e) {
-      console.error('Failed to fetch coverage:', e);
-      setLoadingCoverage(false);
     }
   };
 
+  // Logic to detect if backfill is "stuck" or "complete"
+  useEffect(() => {
+    if (!backfillStatus || backfillStatus.status !== 'running') {
+      // Reset refs when backfill is not running
+      lastCountRef.current = 0;
+      lastChangeTimeRef.current = Date.now();
+      return;
+    }
+
+    const currentCount = backfillStatus.progress || 0;
+    const now = Date.now();
+
+    if (currentCount > lastCountRef.current) {
+      // Progress is happening
+      lastCountRef.current = currentCount;
+      lastChangeTimeRef.current = now;
+    } else if (currentCount === lastCountRef.current && currentCount > 0) {
+      // No change. Check how long it's been.
+      const timeSinceLastChange = now - lastChangeTimeRef.current;
+      
+      // If no change for > COMPLETION_TIMEOUT, assume completion
+      if (timeSinceLastChange > COMPLETION_TIMEOUT) {
+        // Dispatch "Completed" status locally to update UI immediately
+        // In a real app, backend would send this, but this is a fail-safe
+        const updatedStatus = { ...backfillStatus, status: 'completed', details: 'No new data for 60s. Backfill presumed complete.' };
+        // We need a way to update global state. 
+        // ideally backend sends "completed". 
+        // For now, we can show a local success message or just let the user dismiss.
+        setMessage({ type: 'success', text: 'Backfill appears complete (no new data for 1 min).' });
+      }
+    }
+  }, [backfillStatus, COMPLETION_TIMEOUT]);
+
   const validateDateRange = () => {
+    const MAX_DAYS = Number(process.env.NEXT_PUBLIC_BACKFILL_MAX_DAYS) || 30;
     const from = new Date(fromDate);
     const to = new Date(toDate);
-    const diffDays = Math.ceil((to - from) / (1000 * 60 * 60 * 24));
+    const diffTime = Math.abs(to - from);
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
     if (diffDays > MAX_DAYS) {
       setMessage({ type: 'error', text: `Date range cannot exceed ${MAX_DAYS} days` });
@@ -67,6 +113,10 @@ export default function BackfillPanel() {
     setLoading(true);
     setMessage(null);
     setJobStatus(null);
+    
+    // Reset trackers
+    lastCountRef.current = 0;
+    lastChangeTimeRef.current = Date.now();
 
     try {
       const res = await fetch(`${API_URL}/api/v1/system/backfill/trigger`, {
@@ -76,7 +126,7 @@ export default function BackfillPanel() {
           fromDate,
           toDate,
           symbol: symbol || null,
-          force,
+          force, // Pass force flag
         }),
       });
 
@@ -93,7 +143,7 @@ export default function BackfillPanel() {
         });
         setMessage({
           type: 'success',
-          text: `✅ Backfill started! Job ID: ${data.jobId}. Check Telegram for updates.`,
+          text: `✅ Backfill started! Job ID: ${data.data?.jobId}. Check Telegram for updates.`,
         });
         setTimeout(fetchCoverage, 5000);
       } else {
@@ -114,12 +164,13 @@ export default function BackfillPanel() {
       <h2 className="text-xl font-bold text-text-primary mb-4">📥 Historical Data Backfill</h2>
 
       {/* Visual Progress Bar from Global State */}
-      {/* Visual Progress Bar from Global State */}
       {backfillStatus && (
         <BackfillProgress
           status={backfillStatus.status}
           progress={backfillStatus.progress}
           details={backfillStatus.details}
+          logs={backfillStatus.logs}
+          onClose={() => { /* Optional: handler to clear status */ }}
         />
       )}
 

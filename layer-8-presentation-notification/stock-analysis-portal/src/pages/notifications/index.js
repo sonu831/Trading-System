@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import Head from 'next/head';
-import { AppLayout } from '../../components/layout';
-import NotificationFeed from '../../components/features/Notifications/NotificationFeed';
-import { Card } from '../../components/ui';
+import { AppLayout } from '@/components/layout';
+import { NotificationFeed } from '@/components/Notifications';
+import { Card } from '@/components/ui';
 
 export default function NotificationsPage() {
   const [notifications, setNotifications] = useState([]);

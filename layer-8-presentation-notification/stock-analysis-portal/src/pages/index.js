@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useSelector } from 'react-redux';
 import { AppLayout } from '@/components/layout';
-import DashboardView from '@/components/features/Dashboard';
-import HistoricalView from '@/components/features/Historical';
+import DashboardView from '@/components/Dashboard';
+import HistoricalView from '@/components/Historical';
+import { EmptyState, PageHeader, ErrorBoundary } from '@/components/common';
 import { useDashboard } from '@/hooks';
 import { selectPipelineStatus } from '@/store/slices/systemSlice';
-import { BackfillProgress } from '@/components/features/Backfill';
-import SwarmNotification from '@/components/features/Backfill/SwarmNotification';
+import { BackfillProgress, SwarmNotification } from '@/components/Backfill';
 
 export default function Home() {
   const { marketView, signals, systemStatus, loading, viewMode, setViewMode } = useDashboard();

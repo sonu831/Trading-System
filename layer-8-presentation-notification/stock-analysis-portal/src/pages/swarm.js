@@ -1,7 +1,7 @@
 import React from 'react';
 import Head from 'next/head';
 import { AppLayout } from '@/components/layout';
-import SwarmMonitor from '@/components/features/BackfillManager/SwarmMonitor';
+import SwarmMonitor from '@/components/BackfillManager/SwarmMonitor';
 import { useDashboard } from '@/hooks';
 
 /**

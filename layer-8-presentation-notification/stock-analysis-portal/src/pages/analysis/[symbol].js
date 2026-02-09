@@ -2,7 +2,7 @@ import React, { useState, useCallback } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import useAnalysis from '@/hooks/useAnalysis';
+import useAnalysis from '@/hooks/analysis/useAnalysis';
 import {
   StockChart,
   IndicatorPanel,
@@ -14,7 +14,7 @@ import {
   AIPredictionPanel,
   BacktestPanel,
   IndicatorOverlayToggle,
-} from '@/components/features/Analysis';
+} from '@/components/Analysis';
 import { Card, Badge, Button } from '@/components/ui';
 import { PageHeader, EmptyState, ErrorBoundary } from '@/components/common';
 

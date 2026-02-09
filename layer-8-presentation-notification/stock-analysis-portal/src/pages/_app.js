@@ -1,10 +1,10 @@
 import '@/styles/globals.css';
-import { ThemeProvider } from '../utils/theme-provider';
+import { ThemeProvider } from '@/utils/theme-provider';
 import { Provider } from 'react-redux';
 import { store } from '@/store';
 import { NotificationProvider } from '@/context/NotificationContext';
 
-import NotificationToast from '@/components/features/Notifications/NotificationToast';
+import { NotificationToast } from '@/components/Notifications';
 
 export default function App({ Component, pageProps }) {
   return (

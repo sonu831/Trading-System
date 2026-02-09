@@ -2,8 +2,8 @@ import React from 'react';
 import PropTypes from 'prop-types';
 import { useDispatch } from 'react-redux';
 import { setBackfillModalOpen } from '@/store/slices/systemSlice';
-import { ThemeToggle } from '../../ui';
-import NotificationBell from '../../features/Notifications/NotificationBell';
+import { ThemeToggle } from '@/components/ui';
+import { NotificationBell } from '@/components/Notifications';
 
 import Link from 'next/link';
 

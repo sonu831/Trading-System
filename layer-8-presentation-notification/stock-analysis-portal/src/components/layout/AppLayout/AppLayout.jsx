@@ -2,7 +2,7 @@ import React from 'react';
 import PropTypes from 'prop-types';
 import { useSelector, useDispatch } from 'react-redux';
 import { selectBackfillModalOpen, setBackfillModalOpen } from '@/store/slices/systemSlice';
-import { BackfillModal } from '@/components/features/Backfill';
+import { BackfillModal } from '@/components/Backfill';
 import Navbar from '../Navbar';
 import Footer from '../Footer';
 

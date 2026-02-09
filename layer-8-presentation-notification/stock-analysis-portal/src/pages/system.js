@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { BackfillModal, BackfillProgress } from '@/components/features/Backfill';
+import { BackfillModal, BackfillProgress } from '@/components/Backfill';
 import {
   Activity,
   Server,

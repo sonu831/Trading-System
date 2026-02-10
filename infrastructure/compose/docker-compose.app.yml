@@ -37,6 +37,7 @@ services:
     volumes:
       - ../../vendor:/app/vendor:ro
       - ../../shared:/app/shared:ro
+      - ../../layer-1-ingestion/data:/app/data
     networks:
       - trading-network
     restart: unless-stopped

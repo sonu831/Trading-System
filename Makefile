@@ -11,7 +11,7 @@
 #
 # ===========================================================
 
-.PHONY: help up down infra wait-kafka app ui observe logs clean backup restore layer-4-analysis
+.PHONY: help up down infra wait-kafka app ui observe logs clean backup restore layer-4-analysis backfill feed-kafka backfill-logs backfill-files db-candle-status
 
 COMPOSE_DIR := infrastructure/compose
 DC := docker-compose --env-file .env
@@ -36,6 +36,13 @@ help:
 	@echo "  make ui             Start Dashboard"
 	@echo "  make notify         Start Telegram Bot & Email"
 	@echo "  make observe        Start Monitoring (Grafana + Prom)"
+	@echo ""
+	@echo "📡 BACKFILL (MStock → JSON → Kafka → DB)"
+	@echo "  make backfill FROM=.. TO=..   Full pipeline: fetch from MStock + feed Kafka"
+	@echo "  make feed-kafka              Re-feed existing JSON to Kafka (skip fetch)"
+	@echo "  make backfill-files          List fetched JSON files + candle counts"
+	@echo "  make backfill-logs           Tail ingestion logs (live progress)"
+	@echo "  make db-candle-status        Show per-symbol candle count in DB"
 	@echo ""
 	@echo "📦 DATABASE & CACHE"
 	@echo "  make backup         Backup TimescaleDB to ./backups/"
@@ -510,38 +517,138 @@ version-check-manual:
 	fi
 
 # ===========================================================
-# 5. DATA & TESTING
+# 5. BACKFILL & DATA PIPELINE
+# ===========================================================
+#
+# Data flow:
+#   MStock API ──→ JSON files (/app/data/historical/) ──→ Kafka (raw-ticks) ──→ Layer 2 ──→ TimescaleDB
+#   ├── Step 1: batch_nifty50.js   (fetch from broker API, write JSON)
+#   └── Step 2: feed_kafka.js      (read JSON, publish to Kafka topic)
+#
+# The JSON files persist on host via volume mount (layer-1-ingestion/data:/app/data)
+# so if the container restarts between Step 1 and Step 2, you can re-feed without re-fetching.
+#
 # ===========================================================
 
-batch:
-	@echo "📊 Fetching historical data..."
-	cd layer-1-ingestion && node scripts/batch_nifty50.js
-
-batch-symbol:
-	cd layer-1-ingestion && node scripts/batch_nifty50.js --symbol $(SYMBOL)
-
-feed:
-	@echo "📡 Feeding data to Kafka..."
-	cd layer-1-ingestion && node scripts/feed_kafka.js
-
-# Trigger backfill via Backend API (service must be running)
-# Usage: make backfill [SYMBOL=RELIANCE] [FROM=2024-01-01] [TO=2024-12-31]
+# ─── BACKFILL (Full Pipeline: Fetch + Kafka Feed) ────────
+# Triggers Layer 1 to run both steps inside the Docker container.
+# Step 1: Fetches candles from MStock API → writes JSON to /app/data/historical/
+# Step 2: Reads JSON files → publishes each candle to Kafka 'raw-ticks' topic
+# Step 3: Layer 2 consumer picks up from Kafka → inserts to TimescaleDB (ON CONFLICT DO NOTHING)
+#
+# Usage:
+#   make backfill FROM=2025-01-01 TO=2025-12-31                  All 50 Nifty symbols
+#   make backfill FROM=2025-01-01 TO=2025-12-31 SYMBOL=RELIANCE  Single symbol
+#   make backfill FROM=2025-01-01 TO=2025-12-31 FORCE=true       Force re-fetch (ignore cache)
 backfill:
-	@echo "📡 Triggering Backfill via Backend API..."
-	@curl -s -X POST http://localhost:4000/api/v1/system/backfill/trigger \
-		-H "Content-Type: application/json" \
-		-d '{"symbol":"$(SYMBOL)","fromDate":"$(FROM)","toDate":"$(TO)"}' | jq .
-	@echo "✅ Backfill job queued. Check status with: make backfill-status"
+	@echo "📡 Triggering Backfill via Layer 1 (Ingestion)..."
+	@echo "   FROM=$(FROM) TO=$(TO) SYMBOL=$(SYMBOL) FORCE=$(FORCE)"
+	@echo "   Pipeline: MStock API → JSON → Kafka → Layer 2 → TimescaleDB"
+	@echo "   Files saved as: <SYMBOL>_ONE_MINUTE_<FROM>_<TO>.json (kept for re-feed)"
+	@echo ""
+	@docker exec ingestion node -e " \
+		const http = require('http'); \
+		const data = JSON.stringify({ \
+			symbol: '$(SYMBOL)' || undefined, \
+			fromDate: '$(FROM)' || undefined, \
+			toDate: '$(TO)' || undefined, \
+			force: $(if $(FORCE),$(FORCE),false) \
+		}); \
+		const req = http.request({ \
+			hostname: '0.0.0.0', port: 9101, path: '/api/backfill/historical', \
+			method: 'POST', \
+			headers: { 'Content-Type': 'application/json', 'Content-Length': data.length } \
+		}, res => { \
+			let d=''; res.on('data',c=>d+=c); res.on('end',()=>console.log(res.statusCode, d)); \
+		}); \
+		req.write(data); req.end();"
+	@echo ""
+	@echo "✅ Backfill triggered! Monitor with: make backfill-logs"
 
-# View data availability status via Backend API
+# ─── FEED KAFKA (Step 2 only: JSON → Kafka) ──────────────
+# Reads existing JSON files from /app/data/historical/ and publishes to Kafka.
+# Use this when Step 1 (fetch) already completed but Step 2 didn't run
+# (e.g., container restarted between fetch and kafka feed).
+#
+# Usage:
+#   make feed-kafka                  Feed all symbol JSON files to Kafka
+#   make feed-kafka SYMBOL=RELIANCE  Feed single symbol to Kafka
+feed-kafka:
+	@echo "📡 Re-feeding existing JSON data to Kafka (skipping MStock fetch)..."
+	@echo "   Source: /app/data/historical/*.json → Kafka 'raw-ticks' topic"
+	@echo ""
+	@FILE_COUNT=$$(docker exec ingestion node -e " \
+		const fs = require('fs'); \
+		const files = fs.readdirSync('/app/data/historical/').filter(f => f.endsWith('.json')); \
+		console.log(files.length);" 2>/dev/null); \
+	if [ "$$FILE_COUNT" = "0" ] || [ -z "$$FILE_COUNT" ]; then \
+		echo "❌ No JSON files found in /app/data/historical/"; \
+		echo "   Run 'make backfill FROM=... TO=...' first to fetch data from MStock."; \
+		exit 1; \
+	fi; \
+	echo "📁 Found $$FILE_COUNT data files. Starting Kafka feed..."
+	@docker exec ingestion node /app/scripts/feed_kafka.js $(if $(SYMBOL),--symbol $(SYMBOL),)
+	@echo ""
+	@echo "✅ Kafka feed complete! Layer 2 will consume and insert to TimescaleDB."
+
+# ─── BACKFILL CLEANUP ─────────────────────────────────────
+
+# Delete all JSON data files from /app/data/historical/
+backfill-clean:
+	@echo "🗑️  Clearing all JSON files from /app/data/historical/..."
+	@docker exec ingestion node -e " \
+		const fs = require('fs'); const dir = '/app/data/historical/'; \
+		try { const files = fs.readdirSync(dir).filter(f => f.endsWith('.json')); \
+		files.forEach(f => fs.unlinkSync(dir + f)); \
+		console.log('   Deleted ' + files.length + ' file(s)'); \
+		} catch(e) { console.log('   No files to clean'); }"
+
+# ─── BACKFILL MONITORING ─────────────────────────────────
+
+# Tail Layer 1 ingestion logs (live progress of fetch/feed)
+backfill-logs:
+	@docker logs ingestion --tail 30 -f
+
+# List all fetched JSON data files with candle counts per symbol
+backfill-files:
+	@echo "📁 Backfill data files (host: layer-1-ingestion/data/historical/):"
+	@echo ""
+	@docker exec ingestion node -e " \
+		const fs = require('fs'); \
+		const dir = '/app/data/historical/'; \
+		const files = fs.readdirSync(dir).filter(f => f.endsWith('.json')).sort(); \
+		let total = 0; \
+		for (const f of files) { \
+			try { \
+				const raw = fs.readFileSync(dir + f, 'utf-8'); \
+				const d = JSON.parse(raw); \
+				let c = Array.isArray(d) ? d.length : (d.candles ? d.candles.length : Object.keys(d).length); \
+				total += c; \
+				console.log('  ' + f.padEnd(35) + c.toLocaleString().padStart(10) + ' candles'); \
+			} catch(e) { console.log('  ' + f.padEnd(35) + '  (writing...)'); } \
+		} \
+		console.log(''); \
+		console.log('  Total: ' + files.length + ' files, ' + total.toLocaleString() + ' candles');"
+
+# ─── DATA STATUS (via Layer 7 Backend API) ───────────────
+
+# Show data availability summary (symbols, date ranges, gaps)
 data-status:
 	@echo "📊 Data Availability Status..."
 	@curl -s http://localhost:4000/api/v1/data/availability | jq '.data.summary'
 
-# View backfill job history
+# Show recent backfill job history from DB (created by Layer 7 API)
 backfill-status:
-	@echo "📋 Backfill Jobs..."
+	@echo "📋 Backfill Jobs (from DB)..."
 	@curl -s http://localhost:4000/api/v1/backfill | jq '.data.jobs[:5]'
+
+# Quick DB candle count check per symbol (direct TimescaleDB query)
+db-candle-status:
+	@echo "📊 Candle count per symbol in TimescaleDB:"
+	@docker exec timescaledb psql -U trading -d nifty50 -c " \
+		SELECT symbol, count(*) AS total_candles, \
+			min(time)::date AS start_date, max(time)::date AS end_date \
+		FROM candles_1m GROUP BY symbol ORDER BY symbol;"
 
 
 test:

@@ -434,6 +434,9 @@ async function main() {
           });
 
           allFormattedCandles.push(...formattedCandles);
+          if (formattedCandles.length > 0) {
+              console.log(`   🔎 [DEBUG] First Candle: ${formattedCandles[0][0]} | Last Candle: ${formattedCandles[formattedCandles.length-1][0]}`);
+          }
           console.log(`   📥 Fetched ${formattedCandles.length} candles for range ${range.from} to ${range.to}`);
         } else {
           // Fix for "Confusing Error Message" bug
@@ -447,7 +450,7 @@ async function main() {
 
       // Save combined data if we got any candles
       if (allFormattedCandles.length > 0) {
-        const filename = `${symbol}_${INTERVAL}.json`;
+        const filename = `${symbol}_${INTERVAL}_${params.fromdate}_${params.todate}.json`;
         const filePath = path.join(OUTPUT_DIR, filename);
 
         // Sort candles by timestamp

@@ -33,22 +33,72 @@ Memory footprint per cycle:
 
 ---
 
-## 2. Architecture
+## 2. System Role & Inter-Service Architecture
+
+Layer 4 is the **single computation engine** for all technical analysis. No other layer computes indicators.
+
+### Layer responsibilities
+
+| Layer | Role | Owns |
+|-------|------|------|
+| **Layer 4 (this)** | Computation engine | All indicator math, scoring, backtesting, feature vectors |
+| Layer 7 | API gateway | Auth, Swagger docs, CRUD (users/subscriptions), thin proxy to L4 |
+| Layer 9 | AI inference | ML models (PyTorch/Claude/Ollama), predictions from L4 features |
+
+### Inter-service communication
+
+```
+Layer 8 (Frontend)
+    │ HTTP/WebSocket
+    ▼
+Layer 7 (Fastify API Gateway) ──Prisma──→ TimescaleDB (metadata: users, alerts, watchlists)
+    │                                          ▲
+    │ HTTP proxy (analysis requests)           │ pgxpool (OHLCV: candles, aggregates)
+    ▼                                          │
+Layer 4 (Go Analysis Engine) ─────────────────┘
+    │                     ▲
+    │ POST /predict       │ GET /analyze/features
+    │ POST /analyze_market│ GET /analyze, POST /query/dynamic
+    ▼                     │
+Layer 9 (AI/ML FastAPI) ──┘
+```
+
+### Communication rules
+
+| From → To | Protocol | Data | Reason |
+|-----------|----------|------|--------|
+| L4 → TimescaleDB | pgxpool (direct) | OHLCV candles, aggregates | Hot path: 15K rows/cycle. HTTP overhead unacceptable |
+| L4 → Layer 7 API | HTTP GET | Stock symbols, sector metadata | Low-frequency, Layer 7 is source of truth |
+| L4 → Layer 9 | HTTP POST | Feature vectors → predictions | Direct: adding L7 hop adds latency + circular dep |
+| L9 → Layer 4 | HTTP GET/POST | Scorecards, features, dynamic queries | Layer 9 needs computed indicators. L4 already has them |
+| L7 → Layer 4 | HTTP proxy | All analysis requests from frontend | L7 is thin proxy, L4 does all computation |
+| L4 → Redis | Pub/Sub | Analysis results → `analysis:updates` | Layer 6 (signals) subscribes to this channel |
+
+**Anti-patterns:**
+- Never route OHLCV data through Layer 7 — adds Prisma + HTTP serialization overhead
+- Never duplicate indicator calculations in Layer 7 — Layer 4 is the single source of truth
+- Never call Layer 7 from Layer 9 for analysis — go direct to Layer 4
+- Never write user/subscription logic in Layer 4 — that belongs in Layer 7
+
+---
+
+## 2b. Project Structure
 
 ```
 cmd/main.go                          Entry point, signal handling, graceful shutdown
 internal/
   analyzer/engine.go                 Core engine: Fan-Out/Fan-In, 4-wave stock analysis
+  analyzer/interfaces.go             Interface definitions for DI and testability
   indicators/indicators.go           Pure math: RSI, EMA, MACD, ATR, VWAP, Supertrend, Bollinger
   indicators/scorecard.go            Techan-wrapped scorecard with recommendation
   indicators/features.go             Feature vector generation for Layer 9 AI
-  api/server.go                      HTTP API (Gorilla mux), 7 endpoints on :8081
+  api/server.go                      HTTP API (Gorilla mux), endpoints on :8081
   db/client.go                       TimescaleDB (pgxpool), multi-timeframe queries
   redis/client.go                    Redis pub/sub for analysis result distribution
   ai/client.go                       HTTP client for Layer 9 AI inference (soft-fail)
 ```
 
-**Data Flow:**
+**Data Flow (Autonomous Mode — every 60s):**
 ```
                     ┌─── DB Fetch Phase (I/O bound) ───┐
 TimescaleDB ──────→ │  50 concurrent pgx queries        │
@@ -647,21 +697,69 @@ Use `sync.RWMutex` — market sentiment API reads far more often than analysis w
 
 ## 13. API Endpoints
 
-| Method | Path | Purpose |
-|--------|------|---------|
-| GET | `/health` | Liveness check |
-| GET | `/metrics` | Prometheus metrics |
-| GET | `/analyze?symbol=X` | Single stock scorecard (300 candles, techan) |
-| GET | `/analyze/market` | Market sentiment (cached, all 50 stocks) |
-| GET | `/analyze/features?symbol=X&timeframes=5m,15m,1h,4h,1d` | Multi-TF feature vectors for AI |
-| POST | `/query/dynamic` | Dynamic aggregation (AI fallback, allowlist-validated) |
-| GET | `/symbols` | Available symbols from DB |
+Layer 4 operates in two modes:
+1. **Autonomous mode**: 60s ticker loop analyzing all 50 stocks → Redis pub/sub
+2. **On-demand mode**: REST API endpoints called by Layer 7 (proxy) and Layer 9 (direct)
+
+### Existing endpoints
+
+| Method | Path | Consumer | Purpose |
+|--------|------|----------|---------|
+| GET | `/health` | Infra | Liveness check |
+| GET | `/metrics` | Prometheus | Prometheus metrics |
+| GET | `/analyze?symbol=X` | L7, L9 | Single stock scorecard (300 candles, techan) |
+| GET | `/analyze/market` | L7 | Market sentiment (cached, all 50 stocks) |
+| GET | `/analyze/features?symbol=X&timeframes=5m,15m,1h,4h,1d` | L9 | Multi-TF feature vectors for AI |
+| POST | `/query/dynamic` | L9 | Dynamic aggregation (AI fallback, allowlist-validated) |
+| GET | `/symbols` | L7, L9 | Available symbols from DB |
+| GET | `/debug/pprof/*` | Dev | pprof profiling endpoints |
+
+### Planned endpoints (to replace Layer 7 duplicate computation)
+
+These endpoints make Layer 4 the **single source of truth** for all analysis. Layer 7 becomes a thin proxy.
+
+| Method | Path | Consumer | Purpose |
+|--------|------|----------|---------|
+| GET | `/analyze/full/:symbol?interval=15m&limit=500` | L7 proxy | Full indicator arrays (RSI[], MACD[], BB[], etc.) for charting |
+| GET | `/analyze/multi-tf/:symbol` | L7 proxy | 6-timeframe verdicts (5m,15m,1h,4h,1d,1w) with 7-factor scoring |
+| GET | `/analyze/backtest/:symbol?indicator=rsi&operator=lt&threshold=30` | L7 proxy | Historical backtesting on 2500 daily candles |
+| GET | `/analyze/patterns/:symbol?interval=15m&limit=500` | L7 proxy | Candlestick pattern detection (hammer, engulfing, etc.) |
+| GET | `/analyze/options/:symbol` | L7 proxy | PCR analysis (put-call ratio, max pain) |
+| GET | `/analyze/overview/:symbol` | L7 proxy | Stock overview (price, change, RSI, signal badge) |
+
+**Key difference from existing endpoints:**
+- Existing `/analyze` returns **latest values** (single RSI number, single MACD).
+- New `/analyze/full` returns **full arrays** (500 RSI values for charting) — this is what the frontend needs.
+
+### Response format for `/analyze/full/:symbol`
+
+```json
+{
+  "symbol": "RELIANCE",
+  "candles": [...],
+  "indicators": {
+    "rsi": [null, null, ..., 45.2, 47.1, ...],
+    "macd": { "macd": [...], "signal": [...], "histogram": [...] },
+    "ema": { "ema20": [...], "ema50": [...], "ema200": [...] },
+    "bb": { "upper": [...], "middle": [...], "lower": [...] },
+    "atr": [...],
+    "supertrend": { "value": [...], "direction": [...] },
+    "stochastic": { "k": [...], "d": [...] },
+    "adx": { "adx": [...], "pdi": [...], "ndi": [...] },
+    "volume": { "values": [...], "sma20": [...] }
+  },
+  "patterns": [{ "index": 142, "time": "...", "patterns": [{"name": "Hammer", "type": "bullish"}] }],
+  "verdict": { "signal": "Buy", "confidence": 64, "score": 5, "maxScore": 14, "factors": {...} },
+  "summary": { "latestRSI": 47.1, "trendState": "Neutral", "signalBadge": {"signal": "Buy", "color": "success"} }
+}
+```
 
 **Rules:**
 - 15s read/write timeout on the HTTP server — never block longer.
 - `/analyze/market` reads from in-memory cache, not live computation.
 - `/query/dynamic` validates aggregation + field against allowlists before SQL execution.
 - All responses are JSON with `Content-Type: application/json`.
+- Indicator arrays are padded to match candle length (null-fill for warmup period).
 
 ---
 
@@ -691,13 +789,19 @@ All configuration via environment variables. No config files.
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
-| `TIMESCALE_URL` | `postgresql://trading:trading123@localhost:5432/nifty50` | DB connection |
-| `REDIS_URL` | `localhost:6379` | Redis (supports `redis://` URI) |
-| `AI_INFERENCE_URL` | `http://ai-inference:8000` | Layer 9 AI |
-| `GO_ENV` | (none) | `local` → localhost overrides |
-| `ANALYSIS_INTERVAL` | `60s` | Cycle frequency |
+| **Infrastructure** | | |
+| `TIMESCALE_URL` | `postgresql://trading:trading123@timescaledb:5432/nifty50` | DB connection (Docker) |
+| `REDIS_URL` | `redis:6379` | Redis (supports `redis://` URI) |
+| `GO_ENV` | (none) | `local` → localhost overrides for all URLs |
+| **Inter-Service** | | |
+| `AI_INFERENCE_URL` | `http://ai-service:8000` | Layer 9 AI inference |
+| `BACKEND_API_URL` | `http://backend-api:4000` | Layer 7 API (for symbol loading) |
+| **Tuning** | | |
+| `ANALYSIS_INTERVAL` | `60s` | Autonomous cycle frequency |
 | `ANALYSIS_WORKERS` | `50` | Max concurrent stock analyses |
-| `DB_MAX_CONNS` | `60` | pgx pool max connections |
+| `DB_MAX_CONNS` | `40` | pgx pool max (budget: L4=40, L5=20, L7=30 of 200 total) |
+| `DB_MIN_CONNS` | `10` | pgx pool min warm connections |
+| `API_PORT` | `8081` | HTTP API listen port |
 
 ---
 
@@ -740,7 +844,38 @@ type StockAnalysis struct {
 
 ---
 
-## 18. Coding Standards Checklist
+## 18. Architectural Boundaries (Do / Don't)
+
+### Layer 4 DOES own:
+- All technical indicator computation (RSI, MACD, EMA, BB, ATR, Supertrend, Stochastic, ADX, OBV, VWAP)
+- Candlestick pattern detection (hammer, engulfing, morning star, etc.)
+- Composite scoring and verdict generation (7-factor scoring)
+- Multi-timeframe analysis across all continuous aggregates
+- Historical backtesting (indicator condition → forward returns)
+- Feature vector generation for AI consumption
+- Market sentiment aggregation (bullish/bearish/neutral across all stocks)
+- Direct TimescaleDB access for OHLCV data
+- Redis pub/sub for real-time result distribution
+
+### Layer 4 does NOT own:
+- User authentication or authorization (Layer 7)
+- User CRUD, subscriptions, billing, watchlists, alerts (Layer 7 via Prisma)
+- Swagger/OpenAPI documentation (Layer 7)
+- AI/ML model training or inference (Layer 9)
+- Data ingestion or vendor API calls (Layer 1)
+- WebSocket connections to the frontend (Layer 7)
+- Options chain data ingestion (Layer 1) — but Layer 4 CAN compute PCR from options data in DB
+
+### When adding new analysis features:
+1. Implement the indicator/algorithm in `internal/indicators/`
+2. Wire it into the analysis engine in `internal/analyzer/engine.go`
+3. Expose via REST endpoint in `internal/api/server.go`
+4. Layer 7 adds a thin proxy route — NO computation logic in Layer 7
+5. Frontend calls Layer 7 route → Layer 7 proxies to Layer 4 → returns result
+
+---
+
+## 19. Coding Standards Checklist
 
 - [ ] `go fmt ./...`
 - [ ] `go vet ./...`
@@ -756,3 +891,5 @@ type StockAnalysis struct {
 - [ ] Semaphore-bounded goroutine spawning
 - [ ] sync.RWMutex for shared caches, atomic.Bool for flags
 - [ ] Benchmarks for all indicator functions
+- [ ] New analysis logic goes in Layer 4, not Layer 7
+- [ ] Inter-service calls have timeouts and soft-fail handling

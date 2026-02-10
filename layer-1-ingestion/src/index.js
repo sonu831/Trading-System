@@ -536,7 +536,7 @@ const runBackfill = async (startParams = {}) => {
     // Step 1: Fetch
     logger.info(`⏳ Step 1: Fetching Data... ${symbolMsg}`);
     await updateBackfillStatus(1, 10, 'Fetching Data...');
-    
+
     // Scripts path relative to __dirname (which is src/)
     const batchScript = path.resolve(__dirname, '../scripts/batch_nifty50.js');
     const scriptArgs = [];

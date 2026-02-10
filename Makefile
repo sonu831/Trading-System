@@ -180,7 +180,7 @@ up-ingestion:
 	@echo "🚀 Starting High-Performance Ingestion Mode..."
 	
 	@echo "1️⃣  Starting Core Infra (Redis, Zookeeper)..."
-	$(DC) -f $(COMPOSE_DIR)/docker-compose.infra.yml up -d redis zookeeper
+	$(DC) -f $(COMPOSE_DIR)/docker-compose.infra.yml up -d redis zookeeper pgadmin redis-commander
 
 	@echo "2️⃣  Starting TimescaleDB (OPTIMIZED)..."
 	$(DC_INGESTION) up -d timescaledb
@@ -793,9 +793,9 @@ fix-kafka:
 	@echo "🗑️ Removing containers..."
 	@docker rm -f kafka zookeeper kafka-ui || true
 	@echo "🗑️ Wiping Kafka data..."
-	@rm -rf data/kafka/* || true
+	@docker volume rm compose_kafka_data || true
 	@echo "🗑️ Wiping Zookeeper data..."
-	@rm -rf data/zookeeper/* || true
+	@docker volume rm compose_zookeeper_data || true
 	@echo "🚀 Restarting Kafka Stack..."
 	@$(DC) -f $(COMPOSE_DIR)/docker-compose.infra.yml up -d zookeeper kafka kafka-ui
 	@echo "✅ Kafka Stack Reset."

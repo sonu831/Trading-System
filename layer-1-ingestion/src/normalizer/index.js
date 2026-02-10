@@ -3,7 +3,8 @@
  */
 
 const symbolConfig = require('../../config/symbols.json');
-const { logger } = require('../utils/logger');
+const { createChildLogger } = require('../utils/logger');
+const log = createChildLogger({ vendor: 'NORMALIZER' });
 
 class Normalizer {
   constructor() {
@@ -28,7 +29,7 @@ class Normalizer {
       const symbolInfo = this.tokenSymbolMap[rawTick.token];
 
       if (!symbolInfo) {
-        logger.warn(`Unknown token: ${rawTick.token}`);
+        log.warn(`Unknown token: ${rawTick.token}`);
         return null;
       }
 
@@ -57,7 +58,7 @@ class Normalizer {
 
       return this.validate(normalizedTick) ? normalizedTick : null;
     } catch (error) {
-      logger.error('Normalization error:', error);
+      log.error('Normalization error:', error);
       return null;
     }
   }

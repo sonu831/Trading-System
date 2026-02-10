@@ -17,7 +17,7 @@ Every data source (MStock, Kite, Yahoo) follows the same pipeline:
 ### Standard Data Structure
 
 ```javascript
-// src/normalization/tick-normalizer.js
+// src/normalizer/index.js
 
 const StandardTick = {
   token: "26000",       // String
@@ -38,8 +38,8 @@ We use **Swarm Mode** to fetch millions of historical candles in parallel.
 
 ### Key Components
 
-1.  **TimeSlicer**: Splits a large date range (e.g., 1 Year) into small chunks (e.g., 30 Days).
-2.  **Concurrency**: Use `p-limit` to process chunks in parallel.
+1.  **TimeSlicer** (`src/utils/time-slicer.js`): Splits a large date range into small chunks.
+2.  **Concurrency**: Use `p-limit` to process chunks in parallel (configurable via `SWARM_CONCURRENCY` env).
 3.  **Rate Limiting**: Respect vendor limits (e.g., 3 requests/sec).
 
 ```javascript
@@ -66,43 +66,49 @@ await Promise.all(chunks.map(chunk => limit(async () => {
 
 ## 3. Resilience Patterns
 
-### Exponential Backoff
+### Exponential Backoff (`src/utils/retry.js`)
 
 When a vendor API fails (429, 500, 503), do not retry immediately. Use exponential backoff.
 
 ```javascript
-// src/utils/retry.js
+const { fetchWithRetry } = require('./utils/retry');
 
-async function fetchWithRetry(url, attempts = 3) {
-  for (let i = 0; i < attempts; i++) {
-    try {
-      return await axios.get(url);
-    } catch (err) {
-      if (i === attempts - 1) throw err;
-      const waitTime = Math.pow(2, i) * 1000; // 1s, 2s, 4s...
-      await sleep(waitTime);
-    }
-  }
-}
+// Retries 3 times with 1s, 2s, 4s delays
+const data = await fetchWithRetry(
+  () => axios.get(url),
+  { attempts: 3, baseDelay: 1000, label: '[MSTOCK] [RELIANCE] [FETCH]' }
+);
 ```
 
-### Circuit Breaker
+### Circuit Breaker (`src/utils/retry.js`)
 
-If a vendor fails continuously (e.g., 10 failures in 1 minute), trip the circuit breaker and stop requests for 5 minutes. Alert the team via Slack/Telegram.
+If a vendor fails continuously (e.g., 10 failures in 1 minute), trip the circuit breaker and stop requests for 5 minutes. Alert the team via Telegram.
+
+```javascript
+const { CircuitBreaker } = require('./utils/retry');
+
+const breaker = new CircuitBreaker({ name: 'MSTOCK', failureThreshold: 10 });
+
+// Wraps any async call with circuit breaker protection
+const result = await breaker.execute(() => vendor.getHistory(params));
+```
+
+The `BaseVendor` class (`src/vendors/base.js`) comes with a built-in `this.circuitBreaker` instance.
 
 ---
 
 ## 4. Kafka Production Rules
 
 -   **Topic**: `market_ticks` (Real-time), `historical_candles` (Backfill).
--   **Partitioning**: Key messages by `token` or `symbol` to ensure ordering.
--   **Compression**: Use `gzip` for high-throughput topics.
+-   **Partitioning**: Key messages by `symbol` to ensure ordering per stock.
+-   **Compression**: `CompressionTypes.GZIP` is enabled on all producer sends.
 
 ```javascript
 await producer.send({
   topic: 'market_ticks',
+  compression: CompressionTypes.GZIP,
   messages: [{
-    key: tick.token, // Ensures all ticks for "INFY" go to same partition
+    key: tick.symbol, // Ensures all ticks for "INFY" go to same partition
     value: JSON.stringify(tick) 
   }]
 });
@@ -112,10 +118,39 @@ await producer.send({
 
 ## 5. Coding Standards Checklist
 
-1.  [ ] **Timezones**: Is `Asia/Kolkata` explicitly used for all date logic?
-2.  [ ] **Normalization**: Is data normalized *before* leaving the process?
-3.  [ ] **Error Handling**: Are WebSocket errors caught and do they trigger reconnection?
-4.  [ ] **Logging**: Do logs include `[VENDOR]`, `[SYMBOL]`, and `[ACTION]` tags?
-5.  [ ] **Secrets**: Are `API_KEY` and `USER_ID` loaded from `process.env`?
+1.  [x] **Timezones**: `Asia/Kolkata` explicitly used via `luxon` for all date logic.
+2.  [x] **Normalization**: Data normalized *before* leaving the process (`src/normalizer/index.js`).
+3.  [x] **Error Handling**: WebSocket errors caught with reconnection + exponential backoff (`src/utils/retry.js`).
+4.  [x] **Logging**: Use `createChildLogger({ vendor, symbol, action })` for structured `[VENDOR] [SYMBOL] [ACTION]` tags.
+5.  [x] **Secrets**: `API_KEY` and `USER_ID` loaded from `process.env` only.
+
+### Logging Example
+
+```javascript
+const { createChildLogger } = require('./utils/logger');
+
+// Per-vendor logger
+const log = createChildLogger({ vendor: 'MSTOCK', action: 'CONNECT' });
+log.info('WebSocket connected');  // Output: [MSTOCK] [CONNECT] WebSocket connected
+
+// Per-symbol logger
+const symLog = createChildLogger({ vendor: 'MSTOCK', symbol: 'RELIANCE', action: 'FETCH' });
+symLog.info('Fetched 1000 candles');  // Output: [MSTOCK] [RELIANCE] [FETCH] Fetched 1000 candles
+```
 
 ---
+
+## 6. Deployment & Storage
+
+### Persistent Storage
+-   **Volume**: `ingestion_data` (Docker Named Volume).
+-   **Mount Path**: `/app/data` inside container.
+-   **Purpose**: Prevents data loss during container restarts and avoids macOS bind mount issues.
+
+### Automated Cleanup
+-   **Pre-Backfill**: JSON files in `/app/data/historical/` are **automatically deleted** at the start of every backfill job.
+-   **Reason**: Ensures a clean state for every run, preventing duplicate ingestion.
+
+### Database Integrity
+-   **Primary Key**: `candles_1m` uses `PRIMARY KEY (time, symbol)` to enforce uniqueness.
+-   **Duplicate Handling**: Application uses `ON CONFLICT DO NOTHING` to gracefully handle re-ingestion attempts.

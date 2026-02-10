@@ -5,7 +5,8 @@ const { HistoricalChunker } = require('../utils/historical-chunker');
 const { ResponseBuilder } = require('../utils/response-builder');
 const { RequestUtils } = require('../utils/request-utils');
 const { DateTime } = require('luxon');
-const { logger } = require('../utils/logger');
+const { logger, createChildLogger } = require('../utils/logger');
+const { fetchWithRetry, CircuitBreaker } = require('../utils/retry');
 
 class BaseVendor {
   constructor(options) {
@@ -16,7 +17,14 @@ class BaseVendor {
     this.redisClient = options.redisClient || null; // For Swarm Visibility
     const swarmSize = parseInt(process.env.SWARM_CONCURRENCY, 10) || 12;
     this.concurrencyLimit = pLimit(swarmSize);
-    logger.info(`BaseVendor: Swarm Concurrency set to ${swarmSize}`);
+
+    // Standard #5: Structured logging with [VENDOR] tags
+    this.log = createChildLogger({ vendor: this.name });
+
+    // Standard #3: Circuit breaker per vendor
+    this.circuitBreaker = new CircuitBreaker({ name: this.name });
+
+    this.log.info(`Swarm Concurrency set to ${swarmSize}`);
   }
 
   // Abstract Methods

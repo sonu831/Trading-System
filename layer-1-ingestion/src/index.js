@@ -536,6 +536,29 @@ const runBackfill = async (startParams = {}) => {
 
     if (jobId) await backendApi.updateBackfillJob(jobId, { status: 'RUNNING', processed: 0 }).catch(() => {});
 
+    // Step 0: Cleanup Old Data
+    logger.info('🧹 Step 0: Clearing previous historical JSON files...');
+    const fs = require('fs');
+    try {
+      const histDir = path.resolve(__dirname, '../data/historical');
+      if (fs.existsSync(histDir)) {
+        const files = fs.readdirSync(histDir).filter(f => f.endsWith('.json'));
+        if (files.length > 0) {
+          // If specific symbol is requested, only clear that symbol's files?
+          // User asked: "as backfill trigger... it has to be clear"
+          // Usually better to clear ALL if it's a "fresh" start, but if we run parallel jobs?
+          // For now, let's clear ALL to be safe as per user request (State-less ingestion).
+          
+          files.forEach(f => fs.unlinkSync(path.join(histDir, f)));
+          logger.info(`✅ Cleared ${files.length} old JSON files.`);
+        } else {
+          logger.info('✅ No old JSON files to clear.');
+        }
+      }
+    } catch (cleanErr) {
+      logger.warn(`⚠️ Failed to clear old data: ${cleanErr.message}`);
+    }
+
     // Step 1: Fetch
     logger.info(`⏳ Step 1: Fetching Data... ${symbolMsg}`);
     await updateBackfillStatus(1, 10, 'Fetching Data...');

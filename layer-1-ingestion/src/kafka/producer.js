@@ -7,7 +7,7 @@
  * - Exactly-once semantics support
  */
 
-const { Kafka, Partitioners } = require('kafkajs');
+const { Kafka, CompressionTypes } = require('kafkajs');
 const { logger } = require('../utils/logger');
 const { metrics } = require('../utils/metrics');
 const symbolConfig = require('../../config/symbols.json');
@@ -36,8 +36,8 @@ class KafkaProducer {
 
     this.producer = this.kafka.producer({
       allowAutoTopicCreation: true,
-      // Removed idempotent and transactionalId - causes hangs in single-broker setup
-      // acks: 1 means leader acknowledgment only (faster, suitable for market data)
+      // Standard #4: Use gzip compression for high-throughput topics
+      // Reduces network bandwidth and improves throughput
     });
   }
 
@@ -70,6 +70,7 @@ class KafkaProducer {
 
       await this.producer.send({
         topic: this.topic,
+        compression: CompressionTypes.GZIP,
         messages: [
           {
             key: tick.symbol,
@@ -110,6 +111,7 @@ class KafkaProducer {
 
     await this.producer.send({
       topic: this.topic,
+      compression: CompressionTypes.GZIP,
       messages: messages,
     });
 

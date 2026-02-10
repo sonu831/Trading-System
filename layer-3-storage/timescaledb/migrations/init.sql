@@ -27,7 +27,8 @@ CREATE TABLE IF NOT EXISTS candles_1m (
     created_at  TIMESTAMPTZ DEFAULT NOW(),
     
     -- Constraint added forduplicate prevention
-    UNIQUE (time, symbol)
+    -- Primary Key (Composite) for TimescaleDB
+    PRIMARY KEY (time, symbol)
 );
 
 SELECT create_hypertable('candles_1m', 'time',

@@ -37,7 +37,7 @@ services:
     volumes:
       - ../../vendor:/app/vendor:ro
       - ../../shared:/app/shared:ro
-      - ../../layer-1-ingestion/data:/app/data
+      - ingestion_data:/app/data
     networks:
       - trading-network
     restart: unless-stopped
@@ -214,3 +214,8 @@ networks:
   trading-network:
     external: true
     name: local-trading-network
+
+volumes:
+  ingestion_data:
+    external: true
+    name: compose_ingestion_data

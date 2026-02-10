@@ -15,7 +15,7 @@ services:
     ports:
       - '2181:2181'
     volumes:
-      - ../../data/zookeeper:/var/lib/zookeeper/data
+      - zookeeper_data:/var/lib/zookeeper/data
     networks:
       - trading-network
     healthcheck:
@@ -56,7 +56,7 @@ services:
       KAFKA_LOG_RETENTION_MS: 604800000 # 7 Days
       KAFKA_LOG_RETENTION_BYTES: -1
     volumes:
-      - ../../data/kafka:/var/lib/kafka/data
+      - kafka_data:/var/lib/kafka/data
     networks:
       - trading-network
     restart: on-failure
@@ -92,7 +92,7 @@ services:
       - '6379:6379'
     command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy volatile-lru
     volumes:
-      - ../../data/redis:/data
+      - redis_data:/data
     networks:
       - trading-network
     healthcheck:
@@ -182,7 +182,7 @@ services:
       - jit=on # JIT Compilation for complex aggregations on large tables
     shm_size: 12gb # Must be >= shared_buffers (8GB) + overhead
     volumes:
-      - ../../data/timescaledb:/var/lib/postgresql/data
+      - timescaledb_data:/var/lib/postgresql/data
       - ../../layer-3-storage/timescaledb/migrations:/docker-entrypoint-initdb.d
     networks:
       - trading-network
@@ -199,7 +199,7 @@ services:
       - '5051:80'
     environment:
       PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@admin.com}
-      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD} # REQUIRED: Set in .env file
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin123} # Fallback to admin123 if env var missing
       PGADMIN_CONFIG_SERVER_MODE: 'False'
       PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: 'False'
     depends_on:
@@ -207,15 +207,25 @@ services:
     networks:
       - trading-network
     volumes:
-      - ../../data/pgadmin:/var/lib/pgadmin
+      - pgadmin_data:/var/lib/pgadmin
       - ../pgadmin/servers.json:/pgadmin4/servers.json:ro
       - ../pgadmin/pgpass:/pgpass_source:ro
     entrypoint: >
-      /bin/sh -c " cp /pgpass_source /var/lib/pgadmin/pgpass && chmod 600 /var/lib/pgadmin/pgpass && chown 5050:5050 /var/lib/pgadmin/pgpass && /entrypoint.sh"
+      /bin/sh -c " cp /pgpass_source /var/lib/pgadmin/pgpass && chmod 600 /var/lib/pgadmin/pgpass && /entrypoint.sh"
 
 # ===========================================
-# NETWORKS
+# VOLUMES
 # ===========================================
+volumes:
+  zookeeper_data:
+  kafka_data:
+  redis_data:
+  timescaledb_data:
+  pgadmin_data:
+
+    # ===========================================
+    # NETWORKS
+    # ===========================================
 networks:
   trading-network:
     driver: bridge

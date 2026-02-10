@@ -15,10 +15,13 @@
 
 COMPOSE_DIR := infrastructure/compose
 DC := docker-compose --env-file .env
+DC_INGESTION := $(DC) -f $(COMPOSE_DIR)/docker-compose.infra.yml -f $(COMPOSE_DIR)/docker-compose.app.yml -f $(COMPOSE_DIR)/docker-compose.ingestion.yml
 
 # ===========================================================
 # 1. HELP
 # ===========================================================
+
+.PHONY: help up down infra wait-kafka app ui observe logs clean backup restore layer-4-analysis backfill feed-kafka backfill-logs backfill-files db-candle-status up-ingestion up-dev-standard
 
 help:
 	@echo "🚀 Nifty 50 Trading System"
@@ -161,8 +164,48 @@ up: infra-core restore-check infra-kafka app-backend app-processing app-rest ui-
 	@echo ""
 	@echo "📧 Notifications: Enabled (Email + Telegram)"
 
-# Development: All Services Except Notifications
-up-dev: infra-core restore-check infra-kafka app-backend app-processing app-rest ui-and-observe ai gateway
+# Development: Interactive Mode (Standard or High-Performance Ingestion)
+up-dev:
+	@echo "🚀 Starting Development Environment..."
+	@echo ""
+	@read -p "⚡ Enable HIGH-PERFORMANCE INGESTION MODE? (Max resources for DB/Ingestion, No UI/AI) (y/N): " mode; \
+	if [ "$$mode" = "y" ] || [ "$$mode" = "Y" ]; then \
+		make up-ingestion; \
+	else \
+		make up-dev-standard; \
+	fi
+
+# Ingestion Mode: Essential Services with BOOSTED Resources
+up-ingestion:
+	@echo "🚀 Starting High-Performance Ingestion Mode..."
+	
+	@echo "1️⃣  Starting Core Infra (Redis, Zookeeper)..."
+	$(DC) -f $(COMPOSE_DIR)/docker-compose.infra.yml up -d redis zookeeper
+
+	@echo "2️⃣  Starting TimescaleDB (OPTIMIZED)..."
+	$(DC_INGESTION) up -d timescaledb
+	@echo "⏳ Waiting for DB..."
+	@sleep 5
+	@make restore-check
+
+	@echo "3️⃣  Starting Kafka (No UI)..."
+	$(DC) -f $(COMPOSE_DIR)/docker-compose.infra.yml up -d kafka
+	@echo "⏳ Waiting for Kafka..."
+	@sleep 8
+
+	@echo "4️⃣  Starting Applications (Boosted)..."
+	@echo "   - Ingestion:  2 vCPU / 4GB RAM"
+	@echo "   - Processing: 4 vCPU / 8GB RAM"
+	@echo "   - DB:         8 vCPU / 16GB RAM (synchronous_commit=off)"
+	@echo "   - Analysis:   2 vCPU / 4GB RAM (For API Queries)"
+	$(DC_INGESTION) up -d --build ingestion processing backend-api analysis
+	
+	@echo ""
+	@echo "✅ High-Performance Pipeline Ready!"
+	@echo "   Run 'make backfill' to start fetching data."
+
+# Standard Development: All Services Except Notifications
+up-dev-standard: infra-core restore-check infra-kafka app-backend app-processing app-rest ui-and-observe ai gateway
 	@echo "✅ Development mode running!"
 	@echo ""
 	@echo "🌐 Available Services:"

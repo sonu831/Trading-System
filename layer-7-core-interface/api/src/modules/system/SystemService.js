@@ -2,9 +2,10 @@ const BaseService = require('../../common/services/BaseService');
 const axios = require('axios');
 
 class SystemService extends BaseService {
-  constructor({ systemRepository, logger, redis }) {
+  constructor({ systemRepository, logger, redis, stocksService }) {
     super({ logger, redis });
     this.systemRepository = systemRepository;
+    this.stocksService = stocksService;
   }
 
   /**
@@ -126,28 +127,78 @@ class SystemService extends BaseService {
    * @returns {Promise<Object>} { summary, symbols }
    */
   async getDataAvailability(symbol = null) {
+    // 1. Get DB Records
     const records = await this.systemRepository.getDataAvailability(symbol);
+    
+    // 2. Get Master List (Nifty 50) from StocksService
+    const masterSymbols = await this.stocksService.getSymbols().catch(() => []);
+    
+    // 3. Create Map of DB records for O(1) lookup
+    const dbMap = new Map();
+    records.forEach(r => dbMap.set(r.symbol, r));
 
-    // Map records to match Frontend expectations (BackfillPanel.jsx)
-    // - total_candles: used for "DB Sync" progress calculation
-    // - earliest/latest: used for determining gaps
-    const mappedRecords = records.map(r => ({
-      ...r,
-      total_candles: r.total_records ? Number(r.total_records) : 0, 
-      earliest: r.first_date, 
-      latest: r.last_date,    
-    }));
+    // 4. Merge: Ensure all Master Symbols are present
+    const mergedList = [];
+    
+    // If a specific symbol is requested, only check that one
+    const targetSymbols = symbol ? [symbol] : masterSymbols;
+
+    for (const s of targetSymbols) {
+      if (dbMap.has(s)) {
+        // Use DB record
+        const r = dbMap.get(s);
+        mergedList.push({
+          ...r,
+          total_candles: r.total_records ? Number(r.total_records) : 0, 
+          earliest: r.first_date, 
+          latest: r.last_date,
+        });
+      } else {
+        // Add "Missing" record
+        // Only if it's in the master list (or was specifically requested)
+        if (masterSymbols.includes(s) || symbol === s) {
+          mergedList.push({
+            symbol: s,
+            total_candles: 0,
+            earliest: null,
+            latest: null,
+            total_records: 0,
+            status: 'critical' // Explicitly mark as critical/missing
+          });
+        }
+      }
+    }
+    
+    // Also include any "Extra" symbols from DB that are NOT in master list (orphans/legacy)
+    if (!symbol) {
+      records.forEach(r => {
+        if (!masterSymbols.includes(r.symbol)) {
+           mergedList.push({
+            ...r,
+            total_candles: r.total_records ? Number(r.total_records) : 0, 
+            earliest: r.first_date, 
+            latest: r.last_date,
+          });
+        }
+      });
+    }
+
+    // Sort by Symbol (A-Z)
+    mergedList.sort((a, b) => a.symbol.localeCompare(b.symbol));
 
     // Calculate aggregated summary for the entire dataset
-    // This provides the "Grand Total" used in the dashboard progress bar
     const summary = {
-      totalSymbols: records.length,
-      totalRecords: records.reduce((sum, r) => sum + Number(r.total_records || 0), 0),
+      totalSymbols: mergedList.length,
+      totalRecords: mergedList.reduce((sum, r) => sum + Number(r.total_records || 0), 0),
       earliestDate: records.length ? records.reduce((min, r) => r.first_date < min ? r.first_date : min, records[0].first_date) : null,
       latestDate: records.length ? records.reduce((max, r) => r.last_date > max ? r.last_date : max, records[0].last_date) : null,
+      // Add count metrics
+      healthyCount: mergedList.filter(s => s.status === 'healthy').length,
+      warningCount: mergedList.filter(s => s.status === 'warning').length,
+      criticalCount: mergedList.filter(s => s.status === 'critical').length,
     };
 
-    return { summary, symbols: mappedRecords };
+    return { summary, symbols: mergedList };
   }
 
   /**

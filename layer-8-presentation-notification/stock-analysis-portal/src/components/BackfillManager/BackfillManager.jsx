@@ -137,10 +137,10 @@ export default function BackfillManager({
               <Button 
                 variant="primary" 
                 onClick={() => setShowBulkModal(true)}
-                disabled={laggingSymbols.length === 0}
+                disabled={loading}
                 size="sm"
               >
-                🚀 Bulk Backfill ({laggingSymbols.length})
+                🚀 Bulk Backfill
               </Button>
             </div>
           </div>

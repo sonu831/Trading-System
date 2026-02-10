@@ -205,6 +205,9 @@ async function initialize() {
 
     await logToRedis('🚀 Layer 1 Ingestion Service Started');
 
+    // Reset Backfill Status to Idle (prevent stuck state from restarts)
+    await updateBackfillStatus(0, 0, 'Service Restarted - Ready');
+
     // Start Metrics Publishing Loop
     setInterval(async () => {
       try {

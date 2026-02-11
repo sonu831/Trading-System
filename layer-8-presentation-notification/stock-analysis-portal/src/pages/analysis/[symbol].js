@@ -227,7 +227,7 @@ export default function AnalysisPage() {
 
           {/* Indicator Panels (RSI, MACD, Volume) */}
           {indicators && (
-            <IndicatorPanel candles={candleData} indicators={indicators} height={120} />
+            <IndicatorPanel candles={candleData} indicators={indicators} height={120} interval={interval} />
           )}
 
           {/* Multi-Timeframe Analysis Row */}
@@ -240,7 +240,12 @@ export default function AnalysisPage() {
             {/* Signal Breakdown */}
             {summary && (
               <Card variant="glass" className="p-4">
-                <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4">Signal Breakdown</h3>
+                <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4">
+                  Signal Breakdown
+                  <span className="ml-2 px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-400 text-[10px] font-mono normal-case">
+                    {interval}
+                  </span>
+                </h3>
                 <div className="space-y-4">
                   <div className="flex justify-between items-center border-b border-white/5 pb-2">
                     <span className="text-slate-400 text-sm">RSI (14)</span>

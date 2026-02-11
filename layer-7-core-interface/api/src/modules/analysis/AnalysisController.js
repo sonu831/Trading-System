@@ -126,11 +126,11 @@ class AnalysisController extends BaseController {
 
       const upperSymbol = symbol.toUpperCase();
 
-      // Fetch all data in parallel for maximum performance
-      const [candlesWithIndicators, overview, enhancedMultiTF, optionsAnalysis] = await Promise.all([
+      // Fetch analysis + overview + options in parallel
+      // Multi-TF is NOT included — frontend fetches it separately via /enhanced-multi-tf
+      const [candlesWithIndicators, overview, optionsAnalysis] = await Promise.all([
         this.analysisService.getCandlesWithFullIndicators(upperSymbol, interval, parseInt(limit, 10)),
         this.analysisService.getStockOverview(upperSymbol),
-        this.analysisService.getEnhancedMultiTimeframeSummary(upperSymbol),
         this.analysisService.getOptionsAnalysis(upperSymbol),
       ]);
 
@@ -139,7 +139,6 @@ class AnalysisController extends BaseController {
         interval,
         ...candlesWithIndicators,
         overview,
-        multiTimeframe: enhancedMultiTF,
         options: optionsAnalysis,
       });
     } catch (err) {

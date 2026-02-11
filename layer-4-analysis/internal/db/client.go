@@ -1,129 +1,102 @@
-// Package db provides TimescaleDB connection and candle fetching
+// Package db provides TimescaleDB connection and candle fetching via Bun ORM
 package db
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"os"
 	"time"
 
-	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/uptrace/bun"
+	"github.com/uptrace/bun/dialect/pgdialect"
+	"github.com/uptrace/bun/driver/pgdriver"
 )
 
 // Candle represents OHLCV data
 type Candle struct {
-	Time   time.Time
-	Symbol string
-	Open   float64
-	High   float64
-	Low    float64
-	Close  float64
-	Volume int64
+	bun.BaseModel `bun:"table:candles_1m,alias:c"`
+
+	Time   time.Time `bun:"time,pk"`
+	Symbol string    `bun:"symbol,pk"`
+	Open   float64   `bun:"open"`
+	High   float64   `bun:"high"`
+	Low    float64   `bun:"low"`
+	Close  float64   `bun:"close"`
+	Volume int64     `bun:"volume"`
 }
 
-// Client is the TimescaleDB client
+// Client is the TimescaleDB client wrapping Bun DB
 type Client struct {
-	pool *pgxpool.Pool
+	db *bun.DB
 }
 
-// NewClient creates a new TimescaleDB client with optimized pool configuration
-// Pool sizing per instruction §5a: 50 concurrent analysis queries + 10 headroom
+// NewClient creates a new TimescaleDB client with Bun
 func NewClient(ctx context.Context) (*Client, error) {
-	connURL := os.Getenv("TIMESCALE_URL")
-	if connURL == "" {
-		connURL = "postgresql://trading:trading123@localhost:5432/nifty50"
+	dsn := os.Getenv("TIMESCALE_URL")
+	if dsn == "" {
+		dsn = "postgres://trading:trading123@localhost:5432/nifty50?sslmode=disable"
 	}
 
-	// For local dev override (when running outside Docker)
+	// For local dev override
 	if os.Getenv("GO_ENV") == "local" {
-		connURL = "postgresql://trading:trading123@localhost:5432/nifty50"
-	}
-	config, err := pgxpool.ParseConfig(connURL)
-	if err != nil {
-		return nil, fmt.Errorf("parse db config: %w", err)
+		dsn = "postgres://trading:trading123@localhost:5432/nifty50?sslmode=disable"
 	}
 
-	// Pool configuration per instruction §5a (Pool Budget: L4=40, L5=20, L7=30)
-	config.MaxConns = 40                          // Reduced from 60 to fit multi-service pool budget
-	config.MinConns = 10                          // Keep warm connections for low-latency first query
-	config.MaxConnLifetime = 30 * time.Minute     // Recycle connections periodically
-	config.MaxConnIdleTime = 5 * time.Minute      // Release idle connections
-	config.HealthCheckPeriod = 30 * time.Second   // Periodic health checks
+	// Use pgdriver which supports pgx internally
+	sqldb := sql.OpenDB(pgdriver.NewConnector(pgdriver.WithDSN(dsn)))
 
-	pool, err := pgxpool.NewWithConfig(ctx, config)
-	if err != nil {
-		return nil, fmt.Errorf("create db pool: %w", err)
-	}
+	// Create Bun DB instance
+	db := bun.NewDB(sqldb, pgdialect.New())
+
+	// Configure pool
+	db.SetMaxOpenConns(40)
+	db.SetMaxIdleConns(10)
+	db.SetConnMaxLifetime(30 * time.Minute)
+	db.SetConnMaxIdleTime(5 * time.Minute)
 
 	// Test connection
-	if err := pool.Ping(ctx); err != nil {
+	if err := db.Ping(); err != nil {
 		return nil, fmt.Errorf("ping TimescaleDB: %w", err)
 	}
 
-	return &Client{pool: pool}, nil
+	// Add query hook for debugging in dev
+	// db.AddQueryHook(bundebug.NewQueryHook(bundebug.WithVerbose(true)))
+
+	return &Client{db: db}, nil
 }
 
-// FetchCandles retrieves candles for a symbol from TimescaleDB
+// FetchCandles retrieves candles for a symbol from candles_1m
 func (c *Client) FetchCandles(ctx context.Context, symbol string, limit int) ([]Candle, error) {
-	query := `
-		SELECT time, symbol, open, high, low, close, volume
-		FROM candles_1m
-		WHERE symbol = $1
-		ORDER BY time DESC
-		LIMIT $2
-	`
+	var candles []Candle
+	err := c.db.NewSelect().
+		Model(&candles).
+		Where("symbol = ?", symbol).
+		Order("time DESC").
+		Limit(limit).
+		Scan(ctx)
 
-	rows, err := c.pool.Query(ctx, query, symbol, limit)
 	if err != nil {
 		return nil, fmt.Errorf("query failed for %s: %w", symbol, err)
 	}
-	defer rows.Close()
 
-	// Pre-allocate with known capacity to reduce GC pressure (§4a)
-	candles := make([]Candle, 0, limit)
-	for rows.Next() {
-		var candle Candle
-		if err := rows.Scan(
-			&candle.Time,
-			&candle.Symbol,
-			&candle.Open,
-			&candle.High,
-			&candle.Low,
-			&candle.Close,
-			&candle.Volume,
-		); err != nil {
-			return nil, fmt.Errorf("scan candle row: %w", err)
-		}
-		candles = append(candles, candle)
-	}
-
-	// Reverse to get chronological order (oldest first)
-	for i, j := 0, len(candles)-1; i < j; i, j = i+1, j-1 {
-		candles[i], candles[j] = candles[j], candles[i]
-	}
-
+	// Reverse to chronological order
+	reverseCandles(candles)
 	return candles, nil
 }
 
 // GetAvailableSymbols returns list of symbols with data
 func (c *Client) GetAvailableSymbols(ctx context.Context) ([]string, error) {
-	query := `SELECT DISTINCT symbol FROM candles_1m ORDER BY symbol`
+	var symbols []string
+	err := c.db.NewSelect().
+		Table("candles_1m").
+		ColumnExpr("DISTINCT symbol").
+		Order("symbol").
+		Scan(ctx, &symbols)
 
-	rows, err := c.pool.Query(ctx, query)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-
-	var symbols []string
-	for rows.Next() {
-		var symbol string
-		if err := rows.Scan(&symbol); err != nil {
-			return nil, err
-		}
-		symbols = append(symbols, symbol)
-	}
-
 	return symbols, nil
 }
 
@@ -140,56 +113,35 @@ var IntervalTableMap = map[string]string{
 	"1w":  "candles_weekly",
 }
 
-// FetchCandlesTF retrieves candles for a specific timeframe
+// FetchCandlesTF retrieves candles for a specific timeframe by dynamically setting the table
 func (c *Client) FetchCandlesTF(ctx context.Context, symbol, interval string, limit int) ([]Candle, error) {
 	tableName, ok := IntervalTableMap[interval]
 	if !ok {
 		return nil, fmt.Errorf("unsupported interval: %s", interval)
 	}
 
-	query := fmt.Sprintf(`
-		SELECT time, symbol, open, high, low, close, volume
-		FROM %s
-		WHERE symbol = $1
-		ORDER BY time DESC
-		LIMIT $2
-	`, tableName)
+	var candles []Candle
+	err := c.db.NewSelect().
+		Model(&candles).
+		ModelTableExpr(tableName). // Override table name
+		Where("symbol = ?", symbol).
+		Order("time DESC").
+		Limit(limit).
+		Scan(ctx)
 
-	rows, err := c.pool.Query(ctx, query, symbol, limit)
 	if err != nil {
 		return nil, fmt.Errorf("query failed for %s at %s: %w", symbol, interval, err)
 	}
-	defer rows.Close()
 
-	var candles []Candle
-	for rows.Next() {
-		var candle Candle
-		if err := rows.Scan(
-			&candle.Time,
-			&candle.Symbol,
-			&candle.Open,
-			&candle.High,
-			&candle.Low,
-			&candle.Close,
-			&candle.Volume,
-		); err != nil {
-			return nil, err
-		}
-		candles = append(candles, candle)
-	}
-
-	// Reverse to get chronological order (oldest first)
-	for i, j := 0, len(candles)-1; i < j; i, j = i+1, j-1 {
-		candles[i], candles[j] = candles[j], candles[i]
-	}
-
+	// Reverse to chronological order
+	reverseCandles(candles)
 	return candles, nil
 }
 
 // DynamicQueryResult holds the result of a dynamic aggregation query
 type DynamicQueryResult struct {
-	Value  float64   `json:"value"`
-	Bucket time.Time `json:"bucket,omitempty"`
+	Value  float64   `bun:"value"`
+	Bucket time.Time `bun:"bucket"`
 }
 
 // ExecuteDynamicQuery runs a safe parameterized aggregation query for AI
@@ -199,7 +151,7 @@ func (c *Client) ExecuteDynamicQuery(ctx context.Context, symbol, interval, aggr
 		tableName = "candles_15m"
 	}
 
-	// Validate aggregation and field (prevent SQL injection)
+	// Validate inputs (Bun prevents SQL injection, but logic checks are good)
 	validAggregations := map[string]bool{"avg": true, "sum": true, "min": true, "max": true, "count": true, "stddev": true}
 	validFields := map[string]bool{"open": true, "high": true, "low": true, "close": true, "volume": true}
 
@@ -210,7 +162,9 @@ func (c *Client) ExecuteDynamicQuery(ctx context.Context, symbol, interval, aggr
 		return nil, fmt.Errorf("invalid field: %s", field)
 	}
 
-	var query string
+	var results []DynamicQueryResult
+	q := c.db.NewSelect().Table(tableName).Where("symbol = ?", symbol)
+
 	if groupBy != "" {
 		bucket := "1 hour"
 		switch groupBy {
@@ -219,52 +173,97 @@ func (c *Client) ExecuteDynamicQuery(ctx context.Context, symbol, interval, aggr
 		case "week":
 			bucket = "1 week"
 		}
-		query = fmt.Sprintf(`
-			SELECT time_bucket('%s', time) AS bucket, %s(%s) AS value
-			FROM %s
-			WHERE symbol = $1
-			ORDER BY bucket DESC
-			LIMIT $2
-		`, bucket, aggregation, field, tableName)
+		// TimescaleDB time_bucket query with grouping
+		q = q.ColumnExpr("time_bucket(?, time) AS bucket", bucket).
+			ColumnExpr(fmt.Sprintf("%s(%s) AS value", aggregation, field)).
+			Group("bucket").
+			Order("bucket DESC").
+			Limit(lookback)
 	} else {
-		query = fmt.Sprintf(`
-			SELECT %s(%s) AS value
-			FROM (
-				SELECT %s FROM %s
-				WHERE symbol = $1
-				ORDER BY time DESC
-				LIMIT $2
-			) sub
-		`, aggregation, field, field, tableName)
+		// Simple aggregation over latest N rows
+		// Subquery needed: SELECT avg(close) FROM (SELECT close FROM ... LIMIT N)
+		subq := c.db.NewSelect().
+			Table(tableName).
+			ColumnExpr(field).
+			Where("symbol = ?", symbol).
+			Order("time DESC").
+			Limit(lookback)
+
+		q = c.db.NewSelect().
+			ColumnExpr(fmt.Sprintf("%s(%s) AS value", aggregation, field)).
+			TableExpr("(?) AS sub", subq)
 	}
 
-	rows, err := c.pool.Query(ctx, query, symbol, lookback)
-	if err != nil {
+	if err := q.Scan(ctx, &results); err != nil {
 		return nil, fmt.Errorf("dynamic query failed: %w", err)
-	}
-	defer rows.Close()
-
-	var results []DynamicQueryResult
-	for rows.Next() {
-		var result DynamicQueryResult
-		if groupBy != "" {
-			if err := rows.Scan(&result.Bucket, &result.Value); err != nil {
-				return nil, err
-			}
-		} else {
-			if err := rows.Scan(&result.Value); err != nil {
-				return nil, err
-			}
-		}
-		results = append(results, result)
 	}
 
 	return results, nil
 }
 
+// FetchLatestPrice returns the most recent 1m candle for a symbol
+func (c *Client) FetchLatestPrice(ctx context.Context, symbol string) (*Candle, error) {
+	var candle Candle
+	err := c.db.NewSelect().
+		Model(&candle).
+		Where("symbol = ?", symbol).
+		Order("time DESC").
+		Limit(1).
+		Scan(ctx)
+
+	if err != nil {
+		return nil, fmt.Errorf("fetch latest price for %s: %w", symbol, err)
+	}
+	return &candle, nil
+}
+
+// FetchPreviousClose returns the previous day's closing price
+func (c *Client) FetchPreviousClose(ctx context.Context, symbol string) (float64, error) {
+	var closePrice float64
+	err := c.db.NewSelect().
+		Table("candles_1d").
+		Column("close").
+		Where("symbol = ?", symbol).
+		Order("time DESC").
+		Offset(1).
+		Limit(1).
+		Scan(ctx, &closePrice)
+
+	if err != nil {
+		return 0, fmt.Errorf("fetch previous close for %s: %w", symbol, err)
+	}
+	return closePrice, nil
+}
+
+// FetchHistoricalCandles returns up to `days` daily candles in chronological order
+func (c *Client) FetchHistoricalCandles(ctx context.Context, symbol string, days int) ([]Candle, error) {
+	var candles []Candle
+	err := c.db.NewSelect().
+		Model(&candles).
+		ModelTableExpr("candles_1d").
+		Where("symbol = ?", symbol).
+		Order("time DESC").
+		Limit(days).
+		Scan(ctx)
+
+	if err != nil {
+		return nil, fmt.Errorf("query historical candles for %s: %w", symbol, err)
+	}
+
+	reverseCandles(candles)
+	return candles, nil
+}
+
 // Close closes the database connection
 func (c *Client) Close() {
-	if c.pool != nil {
-		c.pool.Close()
+	if c.db != nil {
+		c.db.Close()
+	}
+}
+
+// Helper: Reverse slice in place
+func reverseCandles(candles []Candle) {
+	for i, j := 0, len(candles)-1; i < j; i, j = i+1, j-1 {
+		candles[i], candles[j] = candles[j], candles[i]
 	}
 }

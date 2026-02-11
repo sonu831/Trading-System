@@ -5,7 +5,7 @@ import PropTypes from 'prop-types';
  * IndicatorPanel Component
  * Renders RSI and MACD charts using Lightweight Charts v5 API
  */
-export default function IndicatorPanel({ candles, indicators, height = 120 }) {
+export default function IndicatorPanel({ candles, indicators, height = 120, interval }) {
   const rsiContainerRef = useRef(null);
   const macdContainerRef = useRef(null);
   const [chartModule, setChartModule] = useState(null);
@@ -253,7 +253,14 @@ export default function IndicatorPanel({ candles, indicators, height = 120 }) {
       {/* RSI Panel */}
       <div className="border border-white/10 rounded-lg overflow-hidden bg-slate-900/50 backdrop-blur-sm">
         <div className="px-3 py-2 border-b border-white/5 flex items-center justify-between">
-          <span className="text-xs font-bold text-slate-400">RSI (14)</span>
+          <span className="text-xs font-bold text-slate-400">
+            RSI (14)
+            {interval && (
+              <span className="ml-2 px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-400 text-[10px] font-mono uppercase">
+                {interval}
+              </span>
+            )}
+          </span>
           {indicators.rsi && (
             <span
               className={`text-xs font-mono font-bold ${
@@ -274,7 +281,14 @@ export default function IndicatorPanel({ candles, indicators, height = 120 }) {
       {/* MACD Panel */}
       <div className="border border-white/10 rounded-lg overflow-hidden bg-slate-900/50 backdrop-blur-sm">
         <div className="px-3 py-2 border-b border-white/5 flex items-center justify-between">
-          <span className="text-xs font-bold text-slate-400">MACD (12, 26, 9)</span>
+          <span className="text-xs font-bold text-slate-400">
+            MACD (12, 26, 9)
+            {interval && (
+              <span className="ml-2 px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-400 text-[10px] font-mono uppercase">
+                {interval}
+              </span>
+            )}
+          </span>
           <div className="flex gap-3 text-xs">
             <span className="flex items-center gap-1 text-slate-500">
               <span className="w-2 h-0.5 bg-blue-500"></span> MACD
@@ -301,4 +315,5 @@ IndicatorPanel.propTypes = {
     }),
   }),
   height: PropTypes.number,
+  interval: PropTypes.string,
 };

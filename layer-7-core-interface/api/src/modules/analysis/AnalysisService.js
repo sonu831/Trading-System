@@ -683,23 +683,48 @@ class AnalysisService {
 
   /**
    * Get candles with FULL indicators (11+ indicators)
-   * High performance: Worker Thread Parallel Execution
+   * PRIMARY: Proxy to Layer 4 (Go) — single source of truth for computation.
+   * FALLBACK: Local Piscina worker threads if Layer 4 is unavailable.
    * @param {string} symbol - Stock symbol
    * @param {string} interval - Timeframe
    * @param {number} limit - Number of candles
    * @returns {Promise<Object>} Full analysis data
    */
-
   async getCandlesWithFullIndicators(symbol, interval, limit = 500) {
+    // PRIMARY: Proxy to Layer 4
+    try {
+      const response = await axios.get(
+        `${this.analysisUrl}/analyze/full/${encodeURIComponent(symbol)}`,
+        {
+          params: { interval, limit },
+          timeout: 10000,
+        }
+      );
+
+      if (response.data && response.data.candles) {
+        return response.data;
+      }
+    } catch (err) {
+      console.warn(`Layer 4 full analysis proxy failed for ${symbol}/${interval}, using local fallback: ${err.message}`);
+    }
+
+    // FALLBACK: Local computation
+    return this._computeIndicatorsLocally(symbol, interval, limit);
+  }
+
+  /**
+   * Local fallback indicator computation using Piscina worker threads.
+   * Used when Layer 4 (Go analysis engine) is unavailable.
+   * @private
+   */
+  async _computeIndicatorsLocally(symbol, interval, limit = 500) {
     const candles = await this.repository.getCandles(symbol, interval, limit);
     if (!candles || candles.length === 0) {
       return { candles: [], indicators: null, patterns: [], verdict: null };
     }
 
-    // 🚀 OFF-THREAD EXECUTION (ZERO-BLOCKING)
-    // Dispatch massive array to worker for full calculation
     const indicatorsPromise = this.pool.run({
-      task: 'CALCULATE_INDICATORS_FULL', // Returns FULL arrays
+      task: 'CALCULATE_INDICATORS_FULL',
       data: candles
     });
 
@@ -708,17 +733,13 @@ class AnalysisService {
       data: candles
     });
 
-    // Run parallel with DB heavy lifting if any (but here we just wait)
     const [indicators, patterns] = await Promise.all([indicatorsPromise, patternsPromise]);
 
-    // Helper logic for light tasks
     const closes = candles.map(c => c.close);
     const volumes = candles.map(c => c.volume);
     const volumeSMA = SMA.calculate({ values: volumes, period: 20 });
-    
+
     const len = candles.length;
-    
-    // Structure expected by Frontend (Padded arrays)
     const pad = (arr) => this.padArray(arr, len);
 
     const formattedIndicators = {
@@ -749,7 +770,6 @@ class AnalysisService {
         d: pad(indicators?.stochastic?.d || []),
       },
       obv: pad(indicators?.obv || []),
-      // Keep lightweight iterative calcs local for now
       supertrend: this.calculateSupertrend(candles.map(c=>c.high), candles.map(c=>c.low), closes),
       volume: {
         values: volumes,
@@ -758,11 +778,10 @@ class AnalysisService {
       supportResistance: this.calculateSupportResistance(candles.map(c=>c.high), candles.map(c=>c.low), closes),
     };
 
-    // Verdict Logic uses latest values
     const latestIdx = len - 1;
     const latestRSI = formattedIndicators.rsi[latestIdx];
     const latestMACD = formattedIndicators.macd.histogram[latestIdx];
-    
+
     const verdict = this.computeVerdict({
         rsi: latestRSI,
         macdHistogram: latestMACD,
@@ -798,28 +817,45 @@ class AnalysisService {
     };
   }
 
-  // Renaming original method to enable safe refactoring
-  async getCandlesWithFullIndicatorsLocal(symbol, interval, limit) {
-      // ... original code ...
-      // I will implement this logic properly after fixing the worker.
-      // For now, let's just make the worker capable of returning full arrays.
-  }
-
   /**
    * Get enhanced multi-timeframe summary with verdicts
-   * High performance: parallel fetch across all timeframes
+   * PRIMARY: Proxy to Layer 4 /analyze/multi-tf/{symbol}
+   * FALLBACK: Local parallel computation across 6 timeframes
    * @param {string} symbol - Stock symbol
    * @returns {Promise<Object>} Multi-TF analysis
    */
   async getEnhancedMultiTimeframeSummary(symbol) {
+    // PRIMARY: Proxy to Layer 4
+    try {
+      const response = await axios.get(
+        `${this.analysisUrl}/analyze/multi-tf/${encodeURIComponent(symbol)}`,
+        { timeout: 15000 }
+      );
+
+      if (response.data?.timeframes) {
+        return response.data.timeframes;
+      }
+    } catch (err) {
+      console.warn(`Layer 4 multi-TF proxy failed for ${symbol}, using local fallback: ${err.message}`);
+    }
+
+    // FALLBACK: Local computation
+    return this._computeMultiTFLocally(symbol);
+  }
+
+  /**
+   * Local fallback for multi-timeframe analysis.
+   * Used when Layer 4 is unavailable.
+   * @private
+   */
+  async _computeMultiTFLocally(symbol) {
     const intervals = ['5m', '15m', '1h', '4h', '1d', '1w'];
 
-    // Parallel fetch with concurrency limit
     const results = await Promise.all(
       intervals.map((interval) =>
         this.limit(async () => {
           try {
-            const data = await this.getCandlesWithFullIndicators(symbol, interval, 100);
+            const data = await this._computeIndicatorsLocally(symbol, interval, 100);
             return { interval, data };
           } catch (err) {
             return { interval, data: null, error: err.message };
@@ -870,33 +906,65 @@ class AnalysisService {
 
   /**
    * Get AI prediction from Layer 9
+   * PRIMARY: Uses Layer 4 /analyze/features for feature computation, then sends to Layer 9.
+   * FALLBACK: Local feature computation if Layer 4 is unavailable.
    * @param {string} symbol - Stock symbol
    * @returns {Promise<Object>} AI prediction
    */
   async getAIPrediction(symbol) {
     try {
-      const recentCandles = await this.repository.getCandles(symbol, '1d', 30);
-      if (recentCandles.length < 14) {
-        return { error: 'Insufficient data' };
+      // Get features from Layer 4 (single source of truth for computation)
+      let features;
+      try {
+        const featureResponse = await axios.get(
+          `${this.analysisUrl}/analyze/features`,
+          {
+            params: { symbol, timeframes: '1d' },
+            timeout: 10000,
+          }
+        );
+
+        if (featureResponse.data?.features?.['1d']) {
+          const fv = featureResponse.data.features['1d'];
+          features = [
+            {
+              rsi: fv.indicators?.rsi,
+              macd: fv.indicators?.macd?.macd,
+              ema50: fv.indicators?.ema?.ema50,
+              ema200: fv.indicators?.ema?.ema200 || fv.indicators?.ema?.ema50,
+              close: fv.latestPrice,
+              volume: fv.indicators?.volumeRatio,
+            },
+          ];
+        }
+      } catch (featureErr) {
+        console.warn(`Layer 4 features proxy failed for ${symbol}, using local fallback: ${featureErr.message}`);
       }
 
-      const closes = recentCandles.map((c) => c.close);
-      const volumes = recentCandles.map((c) => c.volume);
+      // Fallback: compute features locally if Layer 4 unavailable
+      if (!features) {
+        const recentCandles = await this.repository.getCandles(symbol, '1d', 30);
+        if (recentCandles.length < 14) {
+          return { error: 'Insufficient data' };
+        }
 
-      const rsiValues = this.calculateRSI(closes);
-      const macdData = this.calculateMACD(closes);
-      const emaData = this.calculateEMAs(closes);
+        const closes = recentCandles.map((c) => c.close);
+        const volumes = recentCandles.map((c) => c.volume);
+        const rsiValues = this.calculateRSI(closes);
+        const macdData = this.calculateMACD(closes);
+        const emaData = this.calculateEMAs(closes);
 
-      const features = [
-        {
-          rsi: rsiValues[rsiValues.length - 1],
-          macd: macdData.macd[macdData.macd.length - 1],
-          ema50: emaData.ema50[emaData.ema50.length - 1],
-          ema200: emaData.ema200[emaData.ema200.length - 1] || emaData.ema50[emaData.ema50.length - 1],
-          close: closes[closes.length - 1],
-          volume: volumes[volumes.length - 1],
-        },
-      ];
+        features = [
+          {
+            rsi: rsiValues[rsiValues.length - 1],
+            macd: macdData.macd[macdData.macd.length - 1],
+            ema50: emaData.ema50[emaData.ema50.length - 1],
+            ema200: emaData.ema200[emaData.ema200.length - 1] || emaData.ema50[emaData.ema50.length - 1],
+            close: closes[closes.length - 1],
+            volume: volumes[volumes.length - 1],
+          },
+        ];
+      }
 
       const response = await axios.post(
         `${this.aiServiceUrl}/predict`,
@@ -917,7 +985,8 @@ class AnalysisService {
 
   /**
    * Run historical backtest for indicator conditions
-   * High performance: processes 2500 daily candles
+   * PRIMARY: Proxy to Layer 4 /analyze/backtest/{symbol}
+   * FALLBACK: Local computation with 2500 daily candles
    * @param {string} symbol - Stock symbol
    * @param {string} indicator - 'rsi' | 'macd_hist' | 'stochastic_k' | 'bb_position'
    * @param {string} operator - 'lt' | 'gt' | 'lte' | 'gte'
@@ -925,6 +994,32 @@ class AnalysisService {
    * @returns {Promise<Object>} Backtest results
    */
   async runBacktest(symbol, indicator, operator, threshold) {
+    // PRIMARY: Proxy to Layer 4
+    try {
+      const response = await axios.get(
+        `${this.analysisUrl}/analyze/backtest/${encodeURIComponent(symbol)}`,
+        {
+          params: { indicator, operator, threshold },
+          timeout: 15000,
+        }
+      );
+
+      if (response.data) {
+        return response.data;
+      }
+    } catch (err) {
+      console.warn(`Layer 4 backtest proxy failed for ${symbol}, using local fallback: ${err.message}`);
+    }
+
+    // FALLBACK: Local computation
+    return this._computeBacktestLocally(symbol, indicator, operator, threshold);
+  }
+
+  /**
+   * Local fallback for backtesting.
+   * @private
+   */
+  async _computeBacktestLocally(symbol, indicator, operator, threshold) {
     const candles = await this.repository.getHistoricalCandles(symbol, 2500);
 
     if (candles.length < 50) {
@@ -1051,8 +1146,28 @@ class AnalysisService {
 
   /**
    * Fetch candles with basic indicators (legacy)
+   * PRIMARY: Proxy to Layer 4 /analyze/full/{symbol}
+   * FALLBACK: Local computation
    */
   async getCandlesWithIndicators(symbol, interval, limit) {
+    // PRIMARY: Proxy to Layer 4 (reuse full analysis endpoint)
+    try {
+      const response = await axios.get(
+        `${this.analysisUrl}/analyze/full/${encodeURIComponent(symbol)}`,
+        {
+          params: { interval, limit },
+          timeout: 10000,
+        }
+      );
+
+      if (response.data && response.data.candles) {
+        return response.data;
+      }
+    } catch (err) {
+      console.warn(`Layer 4 legacy proxy failed for ${symbol}/${interval}, using local fallback: ${err.message}`);
+    }
+
+    // FALLBACK: Local computation
     const candles = await this.repository.getCandles(symbol, interval, limit);
 
     if (!candles || candles.length === 0) {
@@ -1094,8 +1209,33 @@ class AnalysisService {
 
   /**
    * Get stock overview
+   * PRIMARY: Proxy to Layer 4 /analyze/overview/{symbol}
+   * FALLBACK: Local computation
    */
   async getStockOverview(symbol) {
+    // PRIMARY: Proxy to Layer 4
+    try {
+      const response = await axios.get(
+        `${this.analysisUrl}/analyze/overview/${encodeURIComponent(symbol)}`,
+        { timeout: 10000 }
+      );
+
+      if (response.data && response.data.symbol) {
+        return response.data;
+      }
+    } catch (err) {
+      console.warn(`Layer 4 overview proxy failed for ${symbol}, using local fallback: ${err.message}`);
+    }
+
+    // FALLBACK: Local computation
+    return this._computeOverviewLocally(symbol);
+  }
+
+  /**
+   * Local fallback for stock overview.
+   * @private
+   */
+  async _computeOverviewLocally(symbol) {
     const [latest, prevClose] = await Promise.all([
       this.repository.getLatestPrice(symbol),
       this.repository.getPreviousClose(symbol),
@@ -1127,8 +1267,38 @@ class AnalysisService {
 
   /**
    * Get multi-timeframe summary (legacy)
+   * PRIMARY: Proxy to Layer 4 /analyze/multi-tf/{symbol}
+   * FALLBACK: Local computation
    */
   async getMultiTimeframeSummary(symbol) {
+    // PRIMARY: Proxy to Layer 4
+    try {
+      const response = await axios.get(
+        `${this.analysisUrl}/analyze/multi-tf/${encodeURIComponent(symbol)}`,
+        { timeout: 15000 }
+      );
+
+      if (response.data?.timeframes) {
+        // Filter to the 3 legacy timeframes
+        const allTF = response.data.timeframes;
+        const summary = {};
+        for (const tf of ['15m', '1h', '1d']) {
+          if (allTF[tf]) {
+            summary[tf] = {
+              rsi: allTF[tf].rsi,
+              trend: allTF[tf].trend || 'Unknown',
+            };
+          } else {
+            summary[tf] = { rsi: null, trend: 'No Data' };
+          }
+        }
+        return summary;
+      }
+    } catch (err) {
+      console.warn(`Layer 4 legacy multi-TF proxy failed for ${symbol}, using local fallback: ${err.message}`);
+    }
+
+    // FALLBACK: Local computation
     const intervals = ['15m', '1h', '1d'];
     const summary = {};
 

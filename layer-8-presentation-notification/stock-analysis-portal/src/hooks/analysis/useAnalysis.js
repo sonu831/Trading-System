@@ -71,19 +71,13 @@ export default function useAnalysis(symbolProp) {
 
       const result = data.data;
 
-      // Update all state from combined response
+      // Update state from combined response (multi-TF is fetched separately)
       setCandleData(result.candles || []);
       setIndicators(result.indicators || null);
       setSummary(result.summary || null);
       setPatterns(result.patterns || []);
       setOverview(result.overview || null);
-      setEnhancedMultiTF(result.multiTimeframe || null);
       setOptionsData(result.options || null);
-
-      // Also set legacy multiTF for backward compatibility
-      if (result.multiTimeframe?.timeframes) {
-        setMultiTF(result.multiTimeframe.timeframes);
-      }
     } catch (e) {
       if (e.name === 'AbortError') return; // Ignore aborted requests
       console.error('Failed to fetch full analysis:', e);
@@ -272,12 +266,14 @@ export default function useAnalysis(symbolProp) {
     setBacktestError(null);
   }, []);
 
-  // Initial load - use combined endpoint for performance
+  // Initial load - fetch analysis + multi-TF separately
+  // Multi-TF is NOT re-fetched on timeframe change (only on page load / refresh)
   useEffect(() => {
     if (symbolProp) {
       const sym = symbolProp.toUpperCase();
       setSymbol(sym);
       fetchFullAnalysis(sym, interval);
+      fetchEnhancedMultiTF(sym);
     }
 
     // Cleanup on unmount
@@ -286,7 +282,8 @@ export default function useAnalysis(symbolProp) {
         abortControllerRef.current.abort();
       }
     };
-  }, [symbolProp, fetchFullAnalysis, interval]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [symbolProp]);
 
   /**
    * Change interval - refetches data
@@ -309,12 +306,13 @@ export default function useAnalysis(symbolProp) {
   }, [symbol, interval, fetchFullAnalysis]);
 
   /**
-   * Full refresh including AI prediction
+   * Full refresh including multi-TF and AI prediction
    */
   const refreshAll = useCallback(() => {
     fetchFullAnalysis(symbol, interval);
+    fetchEnhancedMultiTF(symbol);
     fetchAIPrediction(symbol);
-  }, [symbol, interval, fetchFullAnalysis, fetchAIPrediction]);
+  }, [symbol, interval, fetchFullAnalysis, fetchEnhancedMultiTF, fetchAIPrediction]);
 
   return {
     // Core

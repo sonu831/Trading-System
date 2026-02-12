@@ -4,6 +4,7 @@ from typing import List, Optional
 import os
 import logging
 from app.core.engine import FeatureVector, PredictionResult
+from app.core.layer4_client import layer4_client
 from app.engines.heuristic import HeuristicEngine
 from app.engines.openai_engine import OpenAIEngine
 from app.engines.claude_engine import ClaudeEngine
@@ -91,6 +92,17 @@ class MarketAnalysisResponse(BaseModel):
     summary: str
     confidence: float
     usage: dict
+
+class ChatRequest(BaseModel):
+    symbol: str
+    prompt: str
+    history: Optional[List[dict]] = None
+
+class ChatResponse(BaseModel):
+    response: str
+    model: str
+    usage: dict
+    context_summary: str
 
 @app.get("/health")
 def health_check():
@@ -181,3 +193,62 @@ def analyze_market(request: MarketAnalysisRequest):
 
 # Instrument FastAPI for Prometheus
 Instrumentator().instrument(app).expose(app, endpoint="/metrics")
+
+@app.post("/chat", response_model=ChatResponse)
+async def chat(request: ChatRequest):
+    start_time = time.time()
+    try:
+        # Check if engine supports chat
+        if not hasattr(engine, 'chat'):
+            return {
+                "response": "Chat is not supported by the current AI engine. Switch to Ollama.",
+                "model": AI_PROVIDER,
+                "usage": {},
+                "context_summary": "unsupported"
+            }
+
+        # Fetch stock context from Layer 4
+        context = {}
+        try:
+            context = await layer4_client.get_features(
+                request.symbol,
+                timeframes="5m,15m,1h,4h,1d"
+            )
+        except Exception as ctx_err:
+            logger.warning(f"Could not fetch L4 context for {request.symbol}: {ctx_err}")
+            context = {"features": {}}
+
+        result = engine.chat(
+            symbol=request.symbol,
+            prompt=request.prompt,
+            context=context,
+            history=request.history
+        )
+
+        duration = time.time() - start_time
+        model_name = result.get("model", f"ollama-{os.getenv('OLLAMA_MODEL', 'ukn')}")
+
+        # Metrics
+        usage = result.get("usage", {})
+        TOKEN_USAGE.labels(type="input", model=model_name, context="chat").inc(usage.get("prompt_tokens", 0))
+        TOKEN_USAGE.labels(type="output", model=model_name, context="chat").inc(usage.get("completion_tokens", 0))
+        REQUEST_DURATION.labels(model=model_name, endpoint="chat").observe(duration)
+
+        # Log
+        log_payload = {
+            "event": "ai_inference",
+            "type": "chat",
+            "symbol": request.symbol,
+            "model": model_name,
+            "input_tokens": usage.get("prompt_tokens", 0),
+            "output_tokens": usage.get("completion_tokens", 0),
+            "duration_s": round(duration, 3),
+            "prompt_length": len(request.prompt)
+        }
+        logger.info(json.dumps(log_payload))
+
+        return result
+    except Exception as e:
+        logger.error(f"Chat failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Chat failed: {str(e)}")
+

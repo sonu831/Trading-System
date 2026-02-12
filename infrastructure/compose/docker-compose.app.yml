@@ -179,7 +179,9 @@ services:
       - '4000:4000'
     environment:
       - REDIS_URL=redis://redis:6379
+      - REDIS_URL=redis://redis:6379
       - TIMESCALE_URL=postgresql://${POSTGRES_USER:-trading}:${POSTGRES_PASSWORD:-trading123}@timescaledb:5432/${POSTGRES_DB:-nifty50}
+      - AI_SERVICE_URL=http://ai-inference:8000
     volumes:
       - ../../layer-7-core-interface/api/src:/app/src
       - ../../shared:/app/shared:ro

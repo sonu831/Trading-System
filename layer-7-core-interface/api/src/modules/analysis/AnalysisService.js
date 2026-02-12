@@ -844,6 +844,29 @@ class AnalysisService {
   }
 
   /**
+   * Get indicator metadata with descriptions, formulas, and current interpretations
+   * Proxy to Layer 4 /analyze/metadata
+   * @param {string} symbol - Stock symbol
+   * @param {string} interval - Timeframe (default: 15m)
+   * @returns {Promise<Object|null>} Indicator metadata
+   */
+  async getIndicatorMetadata(symbol, interval = '15m') {
+    try {
+      const response = await axios.get(
+        `${this.analysisUrl}/analyze/metadata`,
+        {
+          params: { symbol, interval },
+          timeout: 10000,
+        }
+      );
+      return response.data || null;
+    } catch (err) {
+      console.warn(`Layer 4 metadata proxy failed for ${symbol}/${interval}: ${err.message}`);
+      return null;
+    }
+  }
+
+  /**
    * Local fallback for multi-timeframe analysis.
    * Used when Layer 4 is unavailable.
    * @private
@@ -980,6 +1003,34 @@ class AnalysisService {
       };
     } catch (err) {
       return { error: 'AI service unavailable' };
+    }
+  }
+
+  /**
+   * Chat with AI about a specific stock
+   * Sends prompt to Layer 9 /chat which enriches with L4 context and calls Ollama
+   * @param {string} symbol - Stock symbol
+   * @param {string} prompt - User's question
+   * @param {Array} history - Previous chat messages
+   * @returns {Promise<Object>} AI chat response
+   */
+  async chatWithAI(symbol, prompt, history = []) {
+    try {
+      const response = await axios.post(
+        `${this.aiServiceUrl}/chat`,
+        { symbol, prompt, history },
+        { timeout: 130000 }
+      );
+
+      return {
+        response: response.data.response,
+        model: response.data.model,
+        usage: response.data.usage,
+        contextSummary: response.data.context_summary,
+      };
+    } catch (err) {
+      console.error(`AI Chat error for ${symbol}:`, err.message);
+      return { error: err.response?.data?.detail || 'AI chat service unavailable' };
     }
   }
 

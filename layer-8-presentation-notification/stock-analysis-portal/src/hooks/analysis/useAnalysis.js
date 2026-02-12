@@ -34,10 +34,15 @@ export default function useAnalysis(symbolProp) {
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState(null);
 
+  // AI Chat state
+  const [chatHistory, setChatHistory] = useState([]);
+  const [chatLoading, setChatLoading] = useState(false);
+
   // Backtest state
   const [backtestResults, setBacktestResults] = useState(null);
   const [backtestLoading, setBacktestLoading] = useState(false);
   const [backtestError, setBacktestError] = useState(null);
+
 
   // Abort controller for cancelling requests
   const abortControllerRef = useRef(null);
@@ -171,6 +176,8 @@ export default function useAnalysis(symbolProp) {
     }
   }, []);
 
+
+
   /**
    * Fetch AI prediction from Layer 9
    */
@@ -197,6 +204,57 @@ export default function useAnalysis(symbolProp) {
       setAiLoading(false);
     }
   }, []);
+
+  /**
+   * Send chat prompt to AI
+   */
+  const sendAIChat = useCallback(async (sym, prompt) => {
+    if (!sym || !prompt) return;
+
+    try {
+      setChatLoading(true);
+      // Add user message immediately
+      const userMsg = { role: 'user', content: prompt, timestamp: Date.now() };
+      setChatHistory(prev => [...prev, userMsg]);
+
+      const res = await fetch(`${API_URL}/api/market/ai-chat/${encodeURIComponent(sym)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt,
+          history: chatHistory.map(m => ({ role: m.role, content: m.content }))
+        })
+      });
+      
+      const data = await res.json();
+
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Failed to get AI response');
+      }
+
+      // Add AI response
+      const aiMsg = { 
+        role: 'assistant', 
+        content: data.data.response, 
+        timestamp: Date.now(),
+        model: data.data.model,
+        usage: data.data.usage
+      };
+      setChatHistory(prev => [...prev, aiMsg]);
+      return aiMsg;
+    } catch (e) {
+      console.error('AI Chat error:', e);
+      // Add error message
+      setChatHistory(prev => [...prev, { 
+        role: 'system', 
+        content: `Error: ${e.message}`, 
+        isError: true,
+        timestamp: Date.now() 
+      }]);
+    } finally {
+      setChatLoading(false);
+    }
+  }, [chatHistory]);
 
   /**
    * Fetch options analysis (PCR, Max Pain)
@@ -339,7 +397,13 @@ export default function useAnalysis(symbolProp) {
     aiPrediction,
     aiLoading,
     aiError,
+    aiPrediction,
+    aiLoading,
+    aiError,
     fetchAIPrediction,
+    chatHistory,
+    chatLoading,
+    sendAIChat,
 
     // Backtest
     backtestResults,

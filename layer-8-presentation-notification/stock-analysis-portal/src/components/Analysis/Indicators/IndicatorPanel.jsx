@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
+import InfoIcon from '../shared/InfoIcon';
 
 /**
  * IndicatorPanel Component
@@ -260,6 +261,7 @@ export default function IndicatorPanel({ candles, indicators, height = 120, inte
                 {interval}
               </span>
             )}
+            <InfoIcon indicatorKey="rsi" indicators={indicators} />
           </span>
           {indicators.rsi && (
             <span
@@ -288,6 +290,7 @@ export default function IndicatorPanel({ candles, indicators, height = 120, inte
                 {interval}
               </span>
             )}
+            <InfoIcon indicatorKey="macd" indicators={indicators} />
           </span>
           <div className="flex gap-3 text-xs">
             <span className="flex items-center gap-1 text-slate-500">
@@ -316,4 +319,5 @@ IndicatorPanel.propTypes = {
   }),
   height: PropTypes.number,
   interval: PropTypes.string,
+  metadata: PropTypes.object,
 };

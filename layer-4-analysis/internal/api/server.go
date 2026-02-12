@@ -48,6 +48,7 @@ func (s *Server) routes() {
 	s.router.HandleFunc("/analyze/full/{symbol}", s.handleFullAnalysis).Methods("GET")
 	s.router.HandleFunc("/analyze/multi-tf/{symbol}", s.handleMultiTFVerdict).Methods("GET")
 	s.router.HandleFunc("/analyze/overview/{symbol}", s.handleOverview).Methods("GET")
+	s.router.HandleFunc("/analyze/metadata", s.handleMetadata).Methods("GET")
 	s.router.HandleFunc("/analyze/backtest/{symbol}", s.handleBacktest).Methods("GET")
 
 	// AI Service Endpoints
@@ -241,6 +242,45 @@ func (s *Server) handleSymbols(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
+}
+
+// handleMetadata returns indicator metadata with descriptions, formulas, and current interpretations.
+// GET /analyze/metadata?symbol=RELIANCE&interval=15m
+func (s *Server) handleMetadata(w http.ResponseWriter, r *http.Request) {
+	symbol := r.URL.Query().Get("symbol")
+	if symbol == "" {
+		http.Error(w, "symbol query parameter is required", http.StatusBadRequest)
+		return
+	}
+
+	interval := r.URL.Query().Get("interval")
+	if interval == "" {
+		interval = "15m"
+	}
+
+	limit := parseIntParam(r.URL.Query().Get("limit"), 500)
+
+	var candles []db.Candle
+	var err error
+	if interval == "1m" {
+		candles, err = s.engine.GetDBClient().FetchCandles(r.Context(), symbol, limit)
+	} else {
+		candles, err = s.engine.GetDBClient().FetchCandlesTF(r.Context(), symbol, interval, limit)
+	}
+	if err != nil {
+		log.Printf("metadata: fetch error for %s/%s: %v", symbol, interval, err)
+		http.Error(w, "failed to fetch candle data", http.StatusInternalServerError)
+		return
+	}
+
+	result := indicators.GenerateMetadata(symbol, interval, candles)
+	if result == nil {
+		http.Error(w, "insufficient data for metadata generation", http.StatusUnprocessableEntity)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(result)
 }
 
 // handleFullAnalysis returns chart-ready indicator arrays for a single symbol/timeframe.

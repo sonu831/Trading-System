@@ -15,6 +15,7 @@ import {
   BacktestPanel,
   IndicatorOverlayToggle,
 } from '@/components/Analysis';
+import InfoIcon from '@/components/Analysis/shared/InfoIcon';
 import { Card, Badge, Button } from '@/components/ui';
 import { PageHeader, EmptyState, ErrorBoundary } from '@/components/common';
 
@@ -57,6 +58,9 @@ export default function AnalysisPage() {
     aiLoading,
     aiError,
     fetchAIPrediction,
+    chatHistory,
+    chatLoading,
+    sendAIChat,
     // Backtest
     backtestResults,
     backtestLoading,
@@ -140,7 +144,7 @@ export default function AnalysisPage() {
         </header>
 
         {/* Main Content */}
-        <div className="max-w-7xl mx-auto px-4 py-6 space-y-6">
+        <div className="w-full mx-auto px-4 md:px-6 lg:px-8 py-6 space-y-6">
           {/* Stock Header Card */}
           <Card variant="glass" className="p-6">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -248,7 +252,7 @@ export default function AnalysisPage() {
                 </h3>
                 <div className="space-y-4">
                   <div className="flex justify-between items-center border-b border-white/5 pb-2">
-                    <span className="text-slate-400 text-sm">RSI (14)</span>
+                    <span className="text-slate-400 text-sm">RSI (14)<InfoIcon indicatorKey="rsi" indicators={indicators} /></span>
                     <span
                       className={`font-mono font-bold ${
                         summary.latestRSI > 70
@@ -263,7 +267,7 @@ export default function AnalysisPage() {
                   </div>
                   {indicators?.macd && (
                     <div className="flex justify-between items-center border-b border-white/5 pb-2">
-                      <span className="text-slate-400 text-sm">MACD Histogram</span>
+                      <span className="text-slate-400 text-sm">MACD Histogram<InfoIcon indicatorKey="macd" indicators={indicators} /></span>
                       <span
                         className={`font-mono font-bold ${
                           indicators.macd.histogram?.[indicators.macd.histogram.length - 1] > 0
@@ -277,7 +281,7 @@ export default function AnalysisPage() {
                   )}
                   {indicators?.supertrend && (
                     <div className="flex justify-between items-center border-b border-white/5 pb-2">
-                      <span className="text-slate-400 text-sm">Supertrend</span>
+                      <span className="text-slate-400 text-sm">Supertrend<InfoIcon indicatorKey="supertrend" indicators={indicators} /></span>
                       <span
                         className={`font-mono font-bold ${
                           indicators.supertrend.direction?.[indicators.supertrend.direction.length - 1] === 1
@@ -303,17 +307,21 @@ export default function AnalysisPage() {
           </div>
 
           {/* AI Prediction + Options PCR Row */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className={`grid grid-cols-1 ${optionsData ? 'md:grid-cols-2' : ''} gap-6`}>
             {/* AI Prediction Panel */}
             <AIPredictionPanel
+              symbol={symbol}
               data={aiPrediction}
               loading={aiLoading}
               error={aiError}
               onFetch={handleFetchAI}
+              chatHistory={chatHistory}
+              chatLoading={chatLoading}
+              onChat={sendAIChat}
             />
 
             {/* Options PCR Panel (hidden if no data) */}
-            <PCRPanel data={optionsData} />
+            {optionsData && <PCRPanel data={optionsData} />}
           </div>
 
           {/* Historical Backtest Panel (Full Width) */}

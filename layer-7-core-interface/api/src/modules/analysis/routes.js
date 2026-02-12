@@ -183,6 +183,45 @@ async function analysisRoutes(fastify, options) {
     handler: analysisController.getAIPrediction,
   });
 
+  // POST /api/market/ai-chat/:symbol - Interactive AI Chat
+  fastify.post('/api/market/ai-chat/:symbol', {
+    schema: {
+      params: {
+        type: 'object',
+        properties: {
+          symbol: { type: 'string', description: 'Stock symbol' },
+        },
+        required: ['symbol'],
+      },
+      body: {
+        type: 'object',
+        properties: {
+          prompt: { type: 'string', description: 'User question about the stock' },
+          history: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                role: { type: 'string' },
+                content: { type: 'string' },
+              },
+            },
+            description: 'Previous chat messages for context',
+          },
+        },
+        required: ['prompt'],
+      },
+      tags: ['AI'],
+      summary: 'Interactive AI chat about a stock',
+      description: `
+        Send a question about a stock to Ollama AI.
+        The AI uses real-time technical indicator data for context.
+        Supports multi-turn conversations via history array.
+      `,
+    },
+    handler: analysisController.postAIChat,
+  });
+
   // GET /api/market/enhanced-multi-tf/:symbol - Enhanced Multi-TF
   fastify.get('/api/market/enhanced-multi-tf/:symbol', {
     schema: {
@@ -204,6 +243,41 @@ async function analysisRoutes(fastify, options) {
       `,
     },
     handler: analysisController.getEnhancedMultiTimeframe,
+  });
+
+  // GET /api/market/metadata/:symbol - Indicator Metadata
+  fastify.get('/api/market/metadata/:symbol', {
+    schema: {
+      params: {
+        type: 'object',
+        properties: {
+          symbol: { type: 'string', description: 'Stock symbol (e.g., RELIANCE)' },
+        },
+        required: ['symbol'],
+      },
+      querystring: {
+        type: 'object',
+        properties: {
+          interval: {
+            type: 'string',
+            enum: ['1m', '5m', '10m', '15m', '30m', '1h', '4h', '1d', '1w'],
+            default: '15m',
+            description: 'Timeframe for indicator calculations',
+          },
+        },
+      },
+      tags: ['Analysis'],
+      summary: 'Indicator metadata with descriptions, formulas, and current interpretations',
+      description: `
+        Returns per-indicator metadata including:
+        - Name, description, and formula
+        - Current value and interpretation state
+        - Interpretation zones (overbought/oversold/etc.)
+        - Verdict contribution (score + reason)
+        - Overall verdict breakdown string
+      `,
+    },
+    handler: analysisController.getMetadata,
   });
 
   // GET /api/market/options/:symbol - Options Analysis

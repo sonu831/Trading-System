@@ -220,6 +220,34 @@ class AnalysisController extends BaseController {
   };
 
   /**
+   * POST /api/market/ai-chat/:symbol
+   * Interactive AI chat about a stock
+   */
+  postAIChat = async (req, reply) => {
+    try {
+      const { symbol } = req.params;
+      const { prompt, history } = req.body || {};
+
+      if (!symbol) {
+        return this.sendError(reply, { message: 'Symbol is required' }, 400);
+      }
+      if (!prompt) {
+        return this.sendError(reply, { message: 'Prompt is required' }, 400);
+      }
+
+      const result = await this.analysisService.chatWithAI(
+        symbol.toUpperCase(),
+        prompt,
+        history || []
+      );
+
+      return this.sendSuccess(reply, result);
+    } catch (err) {
+      return this.sendError(reply, err);
+    }
+  };
+
+  /**
    * GET /api/market/enhanced-multi-tf/:symbol
    * Enhanced multi-timeframe summary with 7-factor verdicts
    */
@@ -232,6 +260,31 @@ class AnalysisController extends BaseController {
       }
 
       const data = await this.analysisService.getEnhancedMultiTimeframeSummary(symbol.toUpperCase());
+
+      return this.sendSuccess(reply, data);
+    } catch (err) {
+      return this.sendError(reply, err);
+    }
+  };
+
+  /**
+   * GET /api/market/metadata/:symbol
+   * Indicator metadata with descriptions, formulas, and current interpretations
+   */
+  getMetadata = async (req, reply) => {
+    try {
+      const { symbol } = req.params;
+      const { interval = '15m' } = req.query;
+
+      if (!symbol) {
+        return this.sendError(reply, { message: 'Symbol is required' }, 400);
+      }
+
+      const data = await this.analysisService.getIndicatorMetadata(symbol.toUpperCase(), interval);
+
+      if (!data) {
+        return this.sendSuccess(reply, { message: 'Metadata unavailable', data: null });
+      }
 
       return this.sendSuccess(reply, data);
     } catch (err) {

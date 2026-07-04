@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "tradingview": {
+      "command": "C:\\nvm4w\\nodejs\\node.exe",
+      "args": ["C:\\learning\\tradingview-mcp\\src\\server.js"],
+      "env": {
+        "PATH": "C:\\WINDOWS\\System32;C:\\WINDOWS;C:\\nvm4w\\nodejs"
+      }
+    }
+  }
+}

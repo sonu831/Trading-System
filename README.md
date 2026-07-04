@@ -314,6 +314,8 @@ graph TB
         Zerodha[Zerodha Kite] -.WebSocket.-> L1
         MStock[MStock API] -.WebSocket.-> L1
         FlatTrade[FlatTrade] -.WebSocket.-> L1
+        TradingView[TradingView Desktop] -.CDP.-> L1TV[Layer 1b: TradingView MCP<br/>AI Chart Analysis]
+        L1TV -.discretionary bias.-> L6
     end
 
     subgraph "Monitoring"
@@ -486,6 +488,7 @@ Total time: 600ms (less than 1 second!)
 - **Go**: High-performance analysis (Layer 4, 5)
 - **Node.js**: API, bots, data processing (Layer 1, 2, 6, 7, 8)
 - **Python**: AI/ML inference (Layer 9)
+- **MCP + CDP**: TradingView Desktop control for AI chart analysis (Layer 1b, `layer-1-tradingview`)
 
 ### Databases
 

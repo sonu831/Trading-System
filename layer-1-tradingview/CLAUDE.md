@@ -152,3 +152,11 @@ Each asset should show: Symbol | Bias | Price | Key Level | Per-Timeframe Breakd
 
 ### Summary Section
 End with a summary grouping assets by Bullish/Bearish/Neutral, plus any risk checklist items from `rules.json.riskRules`
+
+## Intraday Options Strategy — Trend-Pullback
+
+The repo carries a planned NIFTY/BANKNIFTY intraday options signal strategy:
+- Full spec: `strategies/nifty-banknifty-trend-pullback.md` (15m trend filter, 10m pullback trigger, ATM CE/PE)
+- Parameters: `rules.json → intradayStrategy`
+- Status is tracked in the doc header — it must pass Pine backtest (Phase 1) and paper signals (Phase 2) before any live use
+- When the user asks to "backtest the strategy", implement the doc's rules as a Pine v6 strategy, inject with `pine_set_source`, compile with `pine_smart_compile`, add to a 10m index chart, then read `data_get_strategy_results`

@@ -20,6 +20,25 @@
       "RSI between 45-55 with no clear trend"
     ]
   },
+  "intradayStrategy": {
+    "name": "trend-pullback",
+    "docFile": "strategies/nifty-banknifty-trend-pullback.md",
+    "status": "plan-unvalidated",
+    "trendTimeframe": "15",
+    "triggerTimeframe": "10",
+    "entryWindowIST": ["09:45", "14:30"],
+    "hardExitIST": "15:15",
+    "rsiLongMin": 52,
+    "rsiShortMax": 48,
+    "atrFloorPct": 0.05,
+    "pullbackLookback": 5,
+    "stopLookback": 3,
+    "stopAtrBuffer": 0.1,
+    "targetR": 2,
+    "premiumStopPct": 35,
+    "maxSignalsPerIndexPerDay": 2,
+    "maxConsecutiveLossesPerDay": 2
+  },
   "riskRules": {
     "maxPositionSize": "2% of portfolio per trade",
     "stopLossRequired": true,

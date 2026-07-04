@@ -314,6 +314,8 @@ graph TB
         Zerodha[Zerodha Kite] -.WebSocket.-> L1
         MStock[MStock API] -.WebSocket.-> L1
         FlatTrade[FlatTrade] -.WebSocket.-> L1
+        TradingView[TradingView Desktop] -.CDP.-> L1TV[Layer 1b: TradingView MCP<br/>AI Chart Analysis]
+        L1TV -.discretionary bias.-> L6
     end
 
     subgraph "Monitoring"
@@ -338,6 +340,14 @@ graph TB
 **What it does**: Like a news reporter at the stock exchange, constantly listening for price updates
 **Technology**: Node.js, WebSocket
 **Output**: "RELIANCE price is now ₹2850.50"
+
+#### Layer 1b: TradingView Adapter 📺 (`layer-1-tradingview`)
+
+**Purpose**: Secondary/manual data source — reads charts, indicator values, and Pine Script levels straight from TradingView Desktop
+**What it does**: An MCP server (68 tools) that remote-controls TradingView via Chrome DevTools Protocol — quotes, OHLCV, study values, Pine lines/labels/tables, screenshots, replay trading, and chart control. Drives the `rules.json` watchlist bias scans (Bullish/Bearish/Neutral)
+**Technology**: Node.js, MCP (stdio), CDP (port 9222)
+**Constraints**: NOT a streaming source — requires TradingView Desktop running with CDP enabled, works one symbol at a time, cannot run headless. Use for AI-assisted analysis and discretionary signals, not the tick pipeline
+**Output**: "NIFTY: RSI=58, above 21/50 EMA → Bias BULLISH, key level 24550"
 
 #### Layer 2: Processing ⚙️
 
@@ -478,6 +488,7 @@ Total time: 600ms (less than 1 second!)
 - **Go**: High-performance analysis (Layer 4, 5)
 - **Node.js**: API, bots, data processing (Layer 1, 2, 6, 7, 8)
 - **Python**: AI/ML inference (Layer 9)
+- **MCP + CDP**: TradingView Desktop control for AI chart analysis (Layer 1b, `layer-1-tradingview`)
 
 ### Databases
 

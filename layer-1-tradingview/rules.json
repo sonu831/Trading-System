@@ -1,0 +1,61 @@
+{
+  "watchlist": ["NSE:NIFTY", "NSE:BANKNIFTY"],
+  "timeframes": ["1W", "1D", "4H"],
+  "biasCriteria": {
+    "bullish": [
+      "RSI(14) above 50 and rising",
+      "MACD histogram positive and increasing",
+      "Price above 21 EMA and 50 EMA",
+      "21 EMA above 50 EMA (golden alignment)"
+    ],
+    "bearish": [
+      "RSI(14) below 50 and falling",
+      "MACD histogram negative and decreasing",
+      "Price below 21 EMA and 50 EMA",
+      "21 EMA below 50 EMA (death alignment)"
+    ],
+    "neutral": [
+      "Mixed signals across indicators",
+      "Price choppy between 21 and 50 EMA",
+      "RSI between 45-55 with no clear trend"
+    ]
+  },
+  "intradayStrategy": {
+    "name": "trend-pullback",
+    "docFile": "strategies/nifty-banknifty-trend-pullback.md",
+    "status": "plan-unvalidated",
+    "trendTimeframe": "15",
+    "triggerTimeframe": "10",
+    "entryWindowIST": ["09:45", "14:30"],
+    "hardExitIST": "15:15",
+    "rsiLongMin": 52,
+    "rsiShortMax": 48,
+    "atrFloorPct": 0.05,
+    "pullbackLookback": 5,
+    "stopLookback": 3,
+    "stopAtrBuffer": 0.1,
+    "targetR": 2,
+    "premiumStopPct": 35,
+    "maxSignalsPerIndexPerDay": 2,
+    "maxConsecutiveLossesPerDay": 2
+  },
+  "riskRules": {
+    "maxPositionSize": "2% of portfolio per trade",
+    "stopLossRequired": true,
+    "riskRewardMinimum": 2.0,
+    "preSessionChecklist": [
+      "Check for major news events",
+      "Verify no earnings announcements today",
+      "Check overall market sentiment (SPX/VIX)"
+    ]
+  },
+  "twelveHrUpdate": {
+    "enabled": true,
+    "scheduleHours": [9, 21],
+    "reportFormat": "structured",
+    "includeKeyLevels": true,
+    "includeVolumeAnalysis": true,
+    "saveHistory": true,
+    "historyDir": "~/.tradingview-mcp/sessions"
+  }
+}

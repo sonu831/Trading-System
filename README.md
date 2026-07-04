@@ -339,6 +339,14 @@ graph TB
 **Technology**: Node.js, WebSocket
 **Output**: "RELIANCE price is now ₹2850.50"
 
+#### Layer 1b: TradingView Adapter 📺 (`layer-1-tradingview`)
+
+**Purpose**: Secondary/manual data source — reads charts, indicator values, and Pine Script levels straight from TradingView Desktop
+**What it does**: An MCP server (68 tools) that remote-controls TradingView via Chrome DevTools Protocol — quotes, OHLCV, study values, Pine lines/labels/tables, screenshots, replay trading, and chart control. Drives the `rules.json` watchlist bias scans (Bullish/Bearish/Neutral)
+**Technology**: Node.js, MCP (stdio), CDP (port 9222)
+**Constraints**: NOT a streaming source — requires TradingView Desktop running with CDP enabled, works one symbol at a time, cannot run headless. Use for AI-assisted analysis and discretionary signals, not the tick pipeline
+**Output**: "NIFTY: RSI=58, above 21/50 EMA → Bias BULLISH, key level 24550"
+
 #### Layer 2: Processing ⚙️
 
 **Purpose**: Organize prices into charts

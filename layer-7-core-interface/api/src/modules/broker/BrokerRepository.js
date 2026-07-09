@@ -79,6 +79,10 @@ class BrokerRepository extends BaseRepository {
     return this.prisma.broker_sessions.findUnique({ where: { provider } });
   }
 
+  async deleteProvider(id) {
+    return this.prisma.broker_providers.delete({ where: { id } });
+  }
+
   async publishConfigChange(provider) {
     await this.redis.publisher.publish('providers-changed', JSON.stringify({ provider, timestamp: Date.now() }));
   }

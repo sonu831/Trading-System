@@ -32,11 +32,37 @@ breadth → signals → API → Telegram/dashboard). **Current focus:** an autom
 | L7 Core API (Node) | Fastify REST + Socket.io | ✅ | Signals module + WebSocket present |
 | L8 Presentation (Node/React) | Telegram bot, dashboard | ✅ | Alerts, `/kill`, market commands |
 | L9 AI Service (Py) | ML inference | ✅/❓ | Present; role in momentum = optional backtest/scoring |
-| **L10 Execution (Node)** | **Order execution engine** | ✅ | FlatTrade-first OMS, risk manager, position manager, strike selector, trade journal, paper/shadow/live modes; migration 005 |
-| Infra | Docker, Kafka, Prometheus/Grafana/Loki | ✅ | `execution` service added to docker-compose.app.yml |
+| **L10 Execution (Node)** | **Order execution engine** | 🟡 | **AUDITED + FIXED 2026-07-09** (see §2a). Paper/shadow verified by tests. `live` is code-complete but **UNPROVEN against a real broker** and fails closed unless `LIVE_TRADING_ARMED=true` |
+| Infra | Docker, Kafka, Prometheus/Grafana/Loki | 🟡 | `execution` service in docker-compose.app.yml. **L1 Dockerfile disables TLS verification at runtime** — must fix |
 
-> ❓ **Not verified this session:** runtime health, test pass/fail, and whether each service actually boots.
-> Status above reflects code presence (via graphify) + design docs, not a live smoke test.
+> ❓ **Not verified:** runtime health of L1–L9, whether each service boots, and live broker behaviour.
+> L10 is the only layer with executable regression tests (`npm run verify` — 56 assertions).
+
+---
+
+## 2a. Execution Engine Audit (2026-07-09) — what was actually broken
+
+An audit of L10 against the architecture found the engine **did not work as documented**. All items below were
+fixed and are now locked in by regression tests (`layer-10-execution/tests/`, `npm run verify`).
+
+| Severity | Bug (before) | Now |
+|---|---|---|
+| 🔴 Showstopper | `entryPrice` was the **index spot** (~25000) while quotes were the **option premium** (~₹150) → every position instantly hit "stop_loss" | Entry is priced off the option premium |
+| 🔴 Showstopper | `position.nfoSymbol` never set → `getQuote(undefined)` → prices never updated → **every trade exited on `time_stop` with ₹0 P&L** | Symbol persisted + registered with the quote feed |
+| 🔴 Showstopper | `live` mode ran `PaperExecutor` — **no broker order was ever placed**, and it skipped journaling | Separate `LiveExecutor`; `PaperExecutor` throws on live |
+| 🔴 Critical | `LiveExecutor` did `direction==='LONG' ? 'BUY' : 'SELL'` → a bearish signal would **SELL a naked option** (unbounded risk), and called methods that don't exist (`calculateSize`, `logTrade`, `isKilled`) | **Always BUYs premium** (CE for long, PE for short); APIs corrected |
+| 🔴 Critical | No stop-loss was ever placed at the broker (`FlatTradeOMS` hardcoded `trgprc:'0'`, dropped `ordertag`, sent no product type) | OMS supports `SL-MKT` + `ordertag` + `INTRADAY`; entry+SL atomic, **emergency flatten if SL fails** |
+| 🔴 Critical | Position opened without any fill confirmation (`await delay(500)` and assume) | Opens only on a **broker-confirmed fill**, at the broker's fill price |
+| 🔴 Critical | node-redis v4 subscriber-mode misuse → `.get()`/`.set()` on a subscribed client → **crash at startup** and every 5s | Dedicated `duplicate()` subscriber |
+| 🔴 Critical | Kill switch was in-memory only → restart silently resumed trading after a daily-loss breaker trip | Persisted to Redis; restored on boot |
+| 🟠 High | P&L ignored `lotSize` (75× understated) and sign-flipped PE (we are long premium) | Correct rupee P&L for CE and PE |
+| 🟠 High | Lot sizing ignored `lotSize` and `Math.max(1,…)` forced ≥1 lot → capital-at-risk never bound | Sizes off premium × lotSize; returns 0 → reject |
+| 🟠 High | Trailing stop exited on **any** pullback from the peak (`trailStep` ignored) | Ratchets; exits only at the stop level |
+| 🟡 Med | Daily counters keyed on UTC date in one place, IST in another | IST everywhere |
+| 🟡 Med | 15:15 square-off closed positions **locally only** (would leave real broker positions open) | Routed through the executor |
+
+**Consequence:** any earlier paper-mode results are meaningless (all trades exited flat on a time-stop) and
+must be re-run. `live` has never been exercised against a real broker.
 
 ---
 
@@ -54,7 +80,9 @@ T2 intraday (10–30m), T3 positional (1h–daily, overnight long-only). Lag acc
 - **Multi-TF Regime Engine:** ✅ built (Phase B) — 5m/15m/1h/D classifier, publishes to `market-regime` topic + Redis.
 - **Adaptive Strategy Framework (registry + router):** ✅ built (Phase C) — momentum-burst + trend-pullback plugins.
 - **Backtest harness (2-stage) + optimizer:** ✅ built (Phase D) — signal backtest + option-leg simulator + grid optimizer + decay monitor + human-gated promotion.
-- **Execution engine (L10):** ✅ built (Phase E) — FlatTrade-first OMS, risk manager, position manager, strike selector, trade journal, paper/shadow/live modes.
+- **Execution engine (L10):** 🟡 built + **audited/fixed** (see §2a). Paper & shadow verified by 56 regression
+  assertions (`cd layer-10-execution && npm run verify`). `live` is code-complete, fails closed behind
+  `LIVE_TRADING_ARMED=true`, and is **unproven against a real broker** — do not arm it.
 
 ### Phase F — Validation Roadmap (🔨 built 2026-07-09)
 | Component | Status | Notes |
@@ -139,21 +167,43 @@ Scalp feed = **Zerodha + FlatTrade (failover)** · Execution broker = **FlatTrad
 
 ## 4. Biggest Gaps / Risks (ordered)
 
-1. **MStock index tokens unverified** ❌ — NIFTY, BANKNIFTY, INDIAVIX tokens need user to provide from MStock UI.
-2. **Regime engine + strategy framework unverified against live data** ❓ — built from code logic; needs verification against real candle + breadth data.
-3. **Historical option data for backtest** ❌ — hard to source retail; interim plan = validate signal on index data + record option snapshots forward.
-4. **L10 execution not tested** ❓ — built in paper mode; needs end-to-end test with live signals.
-5. **Option chain poller unverified** ❓ — configured for FlatTrade API; may need adaptation for MStock.
-6. **Compliance** — SEBI retail-algo registration + broker API rate limits unconfirmed (blocks *live* only).
+1. **🔴 `live` mode is unproven** — the LiveExecutor was rewritten from a dangerous baseline and passes mock-broker
+   invariant tests, but has **never placed an order at a real broker**. Requires a controlled 1-lot dry run.
+   Gated behind `LIVE_TRADING_ARMED=true`; leave it unset.
+2. **🟠 Earlier paper results are invalid** — the pre-audit engine exited every trade flat on a time-stop.
+   All paper/backtest evidence must be regenerated before it means anything.
+3. **🟠 Only L10 has tests.** L6 (regime engine, strategy framework) and the backtest/optimizer have **no
+   executable verification** — they were written from logic and never run against real candles.
+4. **MStock index tokens unverified** ❌ — NIFTY/BANKNIFTY/INDIAVIX tokens needed from the MStock UI.
+5. **Option chain poller unverified** ❓ — written for FlatTrade; may need adaptation for MStock.
+6. **Historical option data for backtest** ❌ — hard to source retail; interim = validate signal on index data +
+   record option snapshots forward.
+7. **Credentials still come from `.env`** — the provider registry / credential vault / central broker session
+   (see [`docs/SIMPLE_ROBUST_ARCHITECTURE_PLAN.md`](docs/SIMPLE_ROBUST_ARCHITECTURE_PLAN.md) §4) is **not built**.
+8. **Compliance** — SEBI retail-algo registration + broker API rate limits unconfirmed (blocks *live* only).
+
+> ✅ **Resolved 2026-07-09:** the L1 Dockerfile no longer disables TLS verification at runtime
+> (`NODE_TLS_REJECT_UNAUTHORIZED=0` removed). Runtime broker TLS is fully verified; only npm's build-time
+> `strict-ssl` is relaxed for corporate proxies.
 
 ---
 
 ## 5. Immediate Next Steps
 
-1. **Provide MStock index tokens** — Check MStock UI for NIFTY/BANKNIFTY/INDIAVIX tokens, update `vendor/nifty50_shared.json`.
-2. **Run `npm install`** in `layer-6-signal/`, `layer-10-execution/`, `scripts/backtest/`, and `scripts/validation/`.
-3. **Run validation**: `node scripts/validation/run.js run backtest` to start Phase F.
-4. **Phase G (optional)** — Hot-path upgrade for T1 (§9), if Event Pipeline proves too slow.
+1. **Provide MStock index tokens** — NIFTY/BANKNIFTY/INDIAVIX from the MStock UI → `vendor/nifty50_shared.json`.
+2. **Re-run paper mode from scratch** with the fixed engine — all prior results are void. Use a real quote source
+   (`QUOTE_SOURCE=broker`); the synthetic random-walk feed is meaningless for evaluating a strategy.
+3. **Add executable tests for L6** (regime engine + strategy router), mirroring `layer-10-execution/tests/`.
+4. **Build the control plane + dashboard** — provider registry, credential vault, broker session service, and the
+   richer operator UI (see [`docs/DASHBOARD_PLAN.md`](docs/DASHBOARD_PLAN.md) and
+   [`docs/SIMPLE_ROBUST_ARCHITECTURE_PLAN.md`](docs/SIMPLE_ROBUST_ARCHITECTURE_PLAN.md) §4, §4.6, §4.7).
+5. **Do NOT set `LIVE_TRADING_ARMED`** until (1)–(2) are done and the validation roadmap passes.
+
+**Verify the execution engine any time:**
+
+```bash
+cd layer-10-execution && npm install && npm run verify   # 56 assertions: paper + live invariants
+```
 
 ---
 

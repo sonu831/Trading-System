@@ -206,13 +206,59 @@ Single layer (L10), single broker-facing surface, mode-aware.
               reject/allow    resolve symbol   place/modify/cancel
 ```
 
-- **One `BrokerAdapter` contract** shared with L1 (data): `placeOrder / modifyOrder / cancelOrder / getOrderBook /
-  getPositions / getQuote`. FlatTrade-first; fail over by registry priority.
 - **Modes** (`TRADE_MODE`): `paper` (simulated fills vs live LTP) → `shadow` (alerts only, you fire) → `live`.
-- **Safety guarantees** (from `OPTIONS_SCALPING_RULES.md`): entry+SL atomic, broker-side resting SL-M, idempotent
-  `ordertag`, order-book reconciliation, never naked.
+  `live` additionally requires `LIVE_TRADING_ARMED=true` and **fails closed** otherwise.
 - **Positional additions:** overnight carry only if regime valid; long-premium only (never sell); gap-aware stop;
   net-greeks awareness.
+
+### 6.1 The `BrokerAdapter` contract (execution)
+
+The 2026-07-09 audit found the OMS **could not** place a resting stop or confirm a fill, which makes the
+"entry+SL atomic" rule *unimplementable*. The contract is therefore explicit:
+
+```
+BrokerAdapter (execution surface)
+  placeOrder({symbol, action, quantity, orderType, price, triggerPrice, productType, validity, ordertag})
+                                       // orderType: MKT | LMT | SL-MKT | SL-LMT
+                                       // ordertag MUST reach the broker (idempotency key)
+  modifyOrder(orderId, {...})          // trail by MODIFYING the resting stop, never cancel+replace
+  cancelOrder(orderId)
+  getOrderBook()
+  getOrderStatus(orderId) -> {status, filledQty, avgPrice}   // REQUIRED: broker is source of truth
+  getPositions() / getQuote(symbol)
+  supportsRestingStop() -> boolean                            // REQUIRED capability probe
+```
+
+**An adapter that cannot do `SL-MKT` or `getOrderStatus` must not be used for live execution.** The executor
+refuses to construct against one.
+
+### 6.2 Execution invariants (enforced in code + regression tests)
+
+These are not advisory. `layer-10-execution/tests/` asserts every one of them (`npm run verify`).
+
+| # | Invariant | Why |
+|---|-----------|-----|
+| E1 | **Only ever BUY premium** — CE for a bullish signal, PE for a bearish one. Never sell to open. | A naked short option has unbounded risk. A `direction==='LONG'?'BUY':'SELL'` shortcut once made the engine sell naked options. |
+| E2 | **Entry and stop are atomic.** On fill, place a resting SL-M. If the SL cannot be placed after retries, **market-exit immediately**. | Never sit unprotected in a weekly option. |
+| E3 | **The broker is the source of truth.** Open a position only on a *confirmed* fill, and use the broker's average fill price — never the requested price. | Assumed fills silently invent positions that don't exist. |
+| E4 | **Every order carries a unique `ordertag`.** | Retries must never double-fire. |
+| E5 | **Prices are option premiums, never the index spot.** The signal carries `spotPrice` (to pick a strike); the *premium* is discovered from the option book at entry. | Mixing the two makes P&L nonsense (a −99% instant "stop-loss"). |
+| E6 | **Rupee P&L = (exit − entry) × lots × lotSize**, sign-neutral to `direction` (we are long premium either way). | Omitting `lotSize` understates risk ~75×; sign-flipping PE inverts every bearish trade. |
+| E7 | **The kill switch is persisted** (Redis), not just in memory. | A restart must not silently resume trading after a daily-loss breaker trip. |
+| E8 | **Live fails closed**: `LIVE_TRADING_ARMED` + capability probe + passing invariant tests. | Defence in depth before real money. |
+
+### 6.3 `trade-signals` contract (L6 → L10)
+
+Ambiguity here caused the worst bug in the audit. Pinned down:
+
+| Field | Meaning |
+|-------|---------|
+| `spotPrice` | **Index spot** at signal time — used ONLY to select a strike. **Never** a tradable price. |
+| `direction` | `LONG` \| `SHORT` — selects **CE** vs **PE**. It does **not** mean buy-vs-sell. |
+| `tier`, `strategyId`, `regime`, `reasons[]` | provenance for journaling and analysis |
+| `params` | per-strategy `stopLossPct`, `targetPct`, `trailingTriggerPct`, `trailingStepPct`, `timeStopMinutes` |
+
+L10 discovers the option premium itself; L6 never sends one.
 
 ---
 

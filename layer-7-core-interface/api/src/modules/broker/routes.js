@@ -65,6 +65,14 @@ async function brokerRoutes(fastify, options) {
     handler: brokerController.getProviderStatus,
   });
 
+  fastify.delete('/api/v1/providers/:id', {
+    schema: {
+      description: 'Delete a broker provider and its credentials',
+      tags: ['Providers'],
+    },
+    handler: brokerController.deleteProvider,
+  });
+
   fastify.post('/api/v1/providers/:provider/test', {
     schema: {
       description: 'Test broker connection (login + TOTP)',

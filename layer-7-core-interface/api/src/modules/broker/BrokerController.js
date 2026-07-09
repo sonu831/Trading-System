@@ -9,7 +9,7 @@ class BrokerController extends BaseController {
   listProviders = async (req, reply) => {
     try {
       const data = await this.brokerService.listProviders();
-      return this.sendSuccess(reply, data);
+      return reply.send({ success: true, data: JSON.parse(JSON.stringify(data)) });
     } catch (err) {
       return this.sendError(reply, err);
     }
@@ -18,7 +18,7 @@ class BrokerController extends BaseController {
   getProvider = async (req, reply) => {
     try {
       const data = await this.brokerService.getProvider(parseInt(req.params.id));
-      return this.sendSuccess(reply, data);
+      return reply.send({ success: true, data: JSON.parse(JSON.stringify(data)) });
     } catch (err) {
       return this.sendError(reply, err, err.statusCode || 500);
     }
@@ -83,6 +83,15 @@ class BrokerController extends BaseController {
       return this.sendSuccess(reply, data);
     } catch (err) {
       return this.sendError(reply, err);
+    }
+  };
+
+  deleteProvider = async (req, reply) => {
+    try {
+      await this.brokerService.deleteProvider(parseInt(req.params.id));
+      return this.sendSuccess(reply, null, 'Provider deleted');
+    } catch (err) {
+      return this.sendError(reply, err, err.statusCode || 500);
     }
   };
 }

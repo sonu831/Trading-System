@@ -17,7 +17,7 @@ class BrokerService extends BaseService {
       priority: p.priority,
       status: p.status,
       last_tested_at: p.last_tested_at,
-      credentials: p.credentials.map((c) => ({ field_name: c.field_name, is_active: c.is_active })),
+      credentials: (p.credentials || []).map((c) => ({ field_name: c.field_name, is_active: c.is_active })),
       created_at: p.created_at,
       updated_at: p.updated_at,
     }));
@@ -144,6 +144,17 @@ class BrokerService extends BaseService {
       expires_at: session?.expires_at,
       last_error: session?.last_error,
     };
+  }
+
+  async deleteProvider(id) {
+    const provider = await this.brokerRepository.findProviderById(id);
+    if (!provider) {
+      const err = new Error('Provider not found');
+      err.statusCode = 404;
+      throw err;
+    }
+    await this.brokerRepository.deleteProvider(id);
+    await this.brokerRepository.publishConfigChange(provider.provider);
   }
 }
 

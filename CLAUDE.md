@@ -64,7 +64,7 @@ This project uses a hub-and-spoke AI configuration system. The canonical source 
 - **Tool/agent:** Claude Code (system-architect)
 - **Files touched:** `.ai/ai-manifest.json`, `.ai/CONTRACT.md`, `.ai/MEMORY.md`, `.ai/agents/*.md` (12 agents), `.ai/skills/*.md` (5 skills), `.claude/settings.json`, `CLAUDE.md`, `AGENTS.md`, `MEMORY.md`, `scripts/sync-ai.mjs`, `.ai/tools/opencode/opencode.json`, `.ai/tools/commandcode/settings.json`
 - **Why:** Established agentic AI workflow: graphify-first knowledge graph, 12 specialist agents, hub-and-spoke config sync, PreToolUse hooks, contract-driven governance
-- **Knowledge graph:** Built with 3790 nodes, 4410 edges, 354 communities
+- **Knowledge graph:** Built with 4436 nodes, 4258 edges, 1351 communities (indexed by graphify)
 - **Hand-offs surfaced:** None
 - **DO NOT REDO:** The AI workflow infrastructure is complete. Add new agents/skills to `.ai/` and run `npm run sync-ai`.
 

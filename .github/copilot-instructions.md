@@ -2,6 +2,20 @@
 
 <!-- Use this file to provide workspace-specific custom instructions to Copilot and other AI agents. -->
 
+## ⚠️ GRAPHIFY-FIRST: ABSOLUTE MANDATE (NON-NEGOTIABLE)
+
+> **THIS IS THE SINGLE MOST IMPORTANT RULE. Every AI tool MUST go through graphify for EVERY codebase access — 100% of the time, zero exceptions.**
+
+The knowledge graph (4,428+ nodes, 4,259+ edges) is the ONLY allowed entry point to the codebase. It captures all architecture relationships, imports, calls, and dependencies.
+
+**MANDATORY COMMANDS (use these, never grep/search directly):**
+- `graphify query "<concept>"` — broad search, ALWAYS start here
+- `graphify explain "<symbol>"` — deep-dive on one symbol
+- `graphify path "<A>" "<B>"` — trace dependency path
+- `graphify update .` — run after ANY code change
+
+**STRICTLY FORBIDDEN:** Any grep, text search, file find, or Glob as primary search. These are allowed ONLY as one-shot verification AFTER graphify pointed you to a specific location.
+
 ## Project Overview
 
 **Stock Analysis By Gurus** is a premium, high-performance financial analytics platform. The system processes real-time Nifty 50 market data to provide institutional-grade insights to retail traders.

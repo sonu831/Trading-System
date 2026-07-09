@@ -2,6 +2,24 @@
 
 > **Every AI tool and every sub-agent inherits this contract.** Same skills, same pattern, same memory, same rules. Read first, every session.
 
+## ⚠️ GRAPHIFY-FIRST: ABSOLUTE MANDATE (NON-NEGOTIABLE, ZERO EXCEPTIONS)
+
+**This is the single most important rule in this project. Every AI tool MUST go through graphify for EVERY codebase access — 100% of the time, no excuses, no shortcuts, no bypassing.**
+
+The knowledge graph (4,428+ nodes, 4,259+ edges across 1,341 communities) is the **ONLY** allowed entry point to the codebase. It captures all architecture relationships, cross-layer dependencies, and file structures. Any AI that reads files, greps, or searches without graphify first is **working blind** and **WILL produce incomplete or incorrect results**.
+
+**Mandatory commands (use these, never grep/find/Glob directly):**
+
+| Scenario | Command |
+|----------|---------|
+| First entry into codebase | `graphify query "<what you're looking for>"` |
+| Understand a symbol | `graphify explain "<symbol-name>"` |
+| Trace dependency path | `graphify path "<A>" "<B>"` |
+| After editing code | `graphify update .` |
+| CLI blocked fallback | Read `graphify-out/GRAPH_REPORT.md` directly |
+
+**STRICTLY FORBIDDEN:** Grep, find, Glob, ripgrep, or file Read as primary search. These are allowed **ONLY** as one-shot verification AFTER graphify directed you to a specific symbol. Violation = contract breach.
+
 ## 0. Read order -- every session, every tool
 
 1. [`CLAUDE.md`](../CLAUDE.md) -- project rules, architecture, active state
@@ -14,7 +32,7 @@
 
 | # | Rule | What it means for you |
 |---|------|----------------------|
-| 1 | **Graphify-first** | Before any `grep`/`find`/`Glob`, run `graphify query "<concept>"` or `graphify explain "<symbol>"`. Grep is for verifying a graphify finding, never the primary scan. |
+| 1 | **GRAPHIFY-FIRST (ABSOLUTE MANDATE)** | YOU MUST use graphify for EVERY codebase access. NO grep/find/Glob/Read as primary scan. EVER. Violation = contract breach. |
 | 2 | **RTK for all commands** | Prefix every shell command with `rtk` -- 60-90% token savings. |
 | 3 | **Shared-tier dedup** | Search `shared/` first before declaring any cross-layer constant/enum/type/Kafka-topic. |
 | 4 | **Event-driven contracts** | Layers talk only via Kafka. Consumers must be idempotent. Schemas in shared/. |
@@ -64,7 +82,7 @@ Every AI tool uses the same shared-skills set:
 
 | Skill | File | When to use |
 |-------|------|-------------|
-| Knowledge graph | `skills/graphify.md` | Every codebase scan (mandatory per #1) |
+| Knowledge graph | `skills/graphify.md` | EVERY codebase scan (MANDATORY per #1) |
 | TradingView MCP | `skills/tradingview.md` | Chart analysis, indicator work, Pine Script |
 | Kafka event patterns | `skills/kafka-patterns.md` | Adding/modifying Kafka producers/consumers |
 | Database operations | `skills/database.md` | TimescaleDB/Redis schema changes, queries |
@@ -76,14 +94,16 @@ Every AI tool uses the same shared-skills set:
 
 **Rule:** If Claude and another tool disagree, Claude wins.
 
-## 7. Codebase scanning rule (graphify-first)
+## 7. Codebase scanning rule (graphify-first — ENFORCED)
 
 ```bash
-graphify query "<concept>"              # broad concept search
-graphify explain "<symbol-or-file>"     # single node: definition, neighbors
-graphify path "<A>" "<B>"              # shortest dependency path
-graphify update .                       # ALWAYS run after modifying code
+graphify query "<concept>"              # BROAD CONCEPT SEARCH — START HERE
+graphify explain "<symbol-or-file>"     # SINGLE NODE: definition, neighbors, edges
+graphify path "<A>" "<B>"              # SHORTEST DEPENDENCY PATH
+graphify update .                       # RUN AFTER EVERY CODE MODIFICATION
 ```
+
+**NEVER** use grep/find/Glob/ripgrep as a primary search tool. Only use them to confirm a specific finding AFTER graphify pointed you to the exact location.
 
 ## 8. Layer boundaries
 
@@ -125,6 +145,7 @@ See [`.ai/agents/`](agents/) for 12 specialist agents:
 - Do **not** mask test failures
 - Do **not** introduce magic numbers/strings -- use shared/ constants
 - Do **not** skip the Update Protocol (#3)
+- Do **not** bypass graphify — this is the #1 violation
 
 ## 11. When you fail / get stuck
 
@@ -133,7 +154,7 @@ End with a `## Hand-off` section listing the blocker and which agent can unblock
 ## 12. Conformance checklist
 
 A session is contract-compliant if:
-1. Used graphify before any grep/find (or none was needed)
+1. Used graphify before any grep/find (ZERO exceptions)
 2. Searched shared/ before declaring any cross-layer symbol
 3. Followed event-driven patterns for inter-layer communication
 4. Used CQRS for database access
@@ -141,5 +162,6 @@ A session is contract-compliant if:
 6. Final report has Hand-off section
 7. Did not commit/push without instruction
 8. Did not introduce undeclared dependencies
+9. Ran `graphify update .` after any code modification
 
 > _Last updated: 2026-07-09. Owner: System Architect + human._

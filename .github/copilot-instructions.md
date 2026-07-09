@@ -27,6 +27,17 @@ The system is organized into **9 distinct layers**. When generating code or navi
 | **Layer 8** | Presentation & Notification | Next.js / Node.js | Stock Analysis Portal (React), Telegram Bot, Email Service. |
 | **Layer 9** | AI Service | Python 3.11 (FastAPI) | ML inference — supports Heuristic, PyTorch, OpenAI, Claude, Ollama engines. |
 
+## GRAPHIFY-FIRST — STRICT MANDATE (ALL AI TOOLS)
+
+You MUST use graphify for EVERY codebase access. This is NON-NEGOTIABLE.
+
+- **Before ANY grep/find/glob/read/search**: run `graphify query "<concept>"` (broad), `graphify explain "<symbol>"` (one node), or `graphify path "<A>" "<B>"` (relationship).
+- **NO direct grep/find/Glob/Read as primary scan** — it is STRICTLY PROHIBITED. Only allowed as one-shot verification AFTER graphify directed you to a symbol.
+- **After editing code**: always run `graphify update .` to refresh the graph.
+- **If CLI blocked**: read `graphify-out/GRAPH_REPORT.md` directly as fallback.
+
+> **Why**: The knowledge graph (2,055+ nodes, 3,858+ edges) is the single source of truth for codebase navigation. Bypassing it causes incomplete understanding of architecture relationships, cross-layer dependencies, and community structure.
+
 ## Critical Directives
 
 - **NEVER** hardcode secrets (API keys, passwords, TOTP codes). Use `process.env` or `os.Getenv` loading from `.env`. **Never log TOTP codes or tokens to stdout.**

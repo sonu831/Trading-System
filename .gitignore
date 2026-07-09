@@ -67,3 +67,6 @@ project.tar.gz
 
 # Backups
 backups/
+
+# Graphify (local knowledge graph cache/output)
+graphify-out/

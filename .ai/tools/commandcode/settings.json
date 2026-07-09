@@ -1,0 +1,38 @@
+{
+  "name": "Trading-System",
+  "entry_point": "AGENTS.md",
+  "universal_contract": ".ai/CONTRACT.md",
+  "canonical_memory": ".ai/MEMORY.md",
+  "working_state": "MEMORY.md",
+  "project_state": "CHANGELOG.md",
+  "agents_path": ".ai/agents",
+  "skills_path": ".ai/skills",
+  "read_order": [
+    "CLAUDE.md",
+    ".ai/MEMORY.md",
+    "MEMORY.md",
+    ".ai/CONTRACT.md",
+    ".ai/skills/<task-relevant>.md",
+    "graphify-out/ (knowledge graph)"
+  ],
+  "rules": [
+    "Graphify-first (MANDATORY for every codebase scan): Before ANY grep/find/glob/ripgrep, you MUST run graphify: `graphify query \"<concept>\"` (broad), `graphify explain \"<symbol>\"` (one node + neighbors), or `graphify path \"<A>\" \"<B>\"` (relationship). If the CLI is blocked, read graphify-out/GRAPH_REPORT.md directly. Grep/find are allowed ONLY as a one-shot verification AFTER graphify pointed you at a symbol -- never the primary scan. Run `graphify update .` after modifying code. (PreToolUse hook)",
+    "Token-optimized commands (RTK, MANDATORY): Prefix EVERY shell command with `rtk` -- e.g. `rtk git status`, `rtk git diff`, `rtk cargo check`, `rtk npm run lint`, `rtk docker ps`. RTK filters verbose tool output (60-90% token reduction) and passes commands through unchanged when it has no filter, so it is ALWAYS safe. Use `rtk` even inside chains (`rtk git add . && rtk git commit ...`). (contract + review)",
+    "Shared-tier dedup: Any constant/enum/type/error-code/event-name/Kafka-topic used cross-layer MUST live in shared/. Search shared/ first; never re-declare layer-locally. (code review)",
+    "Event-driven contracts: Layers communicate ONLY via Kafka topics. No direct HTTP calls between layers. Every consumer must be idempotent. Every message must have a schema defined in shared/. (architecture)",
+    "Database access pattern (CQRS): Redis for reads, TimescaleDB for writes. No direct DB access from layers 1-2. Layers 3+ use repository pattern. Always use ON CONFLICT DO NOTHING for idempotent inserts. (code review + CI)",
+    "No hardcoded secrets or credentials: All secrets (broker API keys, DB passwords, Kafka creds) come from environment variables. Never commit .env files. Use .env.example as template only. (CI secret-scan gate)",
+    "PR workflow (never push to main): Feature branches -> PR into main. Do not push directly to main. Write conventional commit messages. Review checklist in .github/PULL_REQUEST_TEMPLATE.md. (branch protection)",
+    "Language-specific conventions: Node.js: ESLint + Prettier. Go: gofmt + golangci-lint. Python: Black + ruff. Each layer follows its language's idiomatic patterns. See CONTRIBUTING.md. (lint-staged + husky)",
+    "No git writes without owner instruction: Do not run git commit / push / branch or gh pr create unless explicitly asked. Leave work staged for review. (honor-system)",
+    "Hand-off on exit: Every report to the orchestrator ends with a ## Hand-off section listing what other agents/tools must pick up (write '- None.' if empty). (next-agent-observable)"
+  ],
+  "skills": [
+    ".ai/skills/database.md",
+    ".ai/skills/docker.md",
+    ".ai/skills/graphify.md",
+    ".ai/skills/kafka-patterns.md",
+    ".ai/skills/tradingview.md"
+  ],
+  "_generated": "read_order/rules/skills are generated from .ai/ai-manifest.json by scripts/sync-ai.mjs. Edit the manifest, then run `npm run sync-ai`."
+}

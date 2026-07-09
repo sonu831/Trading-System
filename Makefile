@@ -576,7 +576,28 @@ up-prod:
 	@echo "✅ Production running!"
 
 # ===========================================================
-# 11. LEGACY ALIASES
+# 11. KNOWLEDGE GRAPH (graphify)
+# ===========================================================
+
+GRAPHIFY := uv tool run --from graphifyy graphify
+
+graph:
+	@echo "Updating knowledge graph from code changes..."
+	$(GRAPHIFY) update .
+
+graph-full:
+	@echo "Rebuilding full knowledge graph..."
+	$(GRAPHIFY) extract .
+
+graph-query:
+	@echo "Usage: make graph-query Q=\"your question\""
+	$(GRAPHIFY) query "$(Q)"
+
+graph-open:
+	@echo "Open graphify-out/graph.html in your browser"
+
+# ===========================================================
+# 12. LEGACY ALIASES
 # ===========================================================
 
 docker-up: up

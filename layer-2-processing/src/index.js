@@ -1,24 +1,16 @@
-/**
- * Layer 2: Processing Service
- *
- * Consumes market data from Kafka,
- * validates and transforms it,
- * and persists to TimescaleDB.
- *
- * @author Yogendra Singh
- */
-
 require('dotenv').config();
 const express = require('express');
 const client = require('prom-client');
-const logger = require('./utils/logger'); // Import Logger
+const logger = require('./utils/logger');
 
-// Import shared health-check library
 const { waitForAll, initHealthMetrics } = require('/app/shared/health-check');
 
 const { connectDB, pool } = require('./db/client');
 const { startConsumer, stopConsumer } = require('./kafka/consumer');
+const { startOptionChainConsumer, stopOptionChainConsumer } = require('./kafka/optionChainConsumer');
+const { OptionChainWriter } = require('./services/optionChainWriter');
 const { insertCandle } = require('./services/candleWriter');
+const { CandleAggregator } = require('./services/candleAggregator');
 const {
   connectRedis,
   setLatestPrice,
@@ -27,21 +19,25 @@ const {
   setMetrics,
 } = require('./services/redisCache');
 
-// Initialize Express for health checks & metrics
 const app = express();
 const PORT = process.env.PORT || 3002;
 
-// Prometheus Registry
 const register = new client.Registry();
 client.collectDefaultMetrics({ register });
 
-// Custom Metrics
 const candlesProcessedCounter = new client.Counter({
   name: 'candles_processed_total',
   help: 'Total number of candles processed',
   labelNames: ['symbol'],
 });
 register.registerMetric(candlesProcessedCounter);
+
+const ticksReceivedCounter = new client.Counter({
+  name: 'ticks_received_total',
+  help: 'Total number of ticks received',
+  labelNames: ['symbol'],
+});
+register.registerMetric(ticksReceivedCounter);
 
 const processingLatencyHistogram = new client.Histogram({
   name: 'candle_processing_latency_seconds',
@@ -58,7 +54,6 @@ const httpRequestDurationMicroseconds = new client.Histogram({
 });
 register.registerMetric(httpRequestDurationMicroseconds);
 
-// Middleware for HTTP request duration
 app.use((req, res, next) => {
   const end = httpRequestDurationMicroseconds.startTimer();
   res.on('finish', () => {
@@ -67,7 +62,6 @@ app.use((req, res, next) => {
   next();
 });
 
-// Health check endpoint
 app.get('/health', (req, res) => {
   res.json({
     status: 'healthy',
@@ -76,24 +70,26 @@ app.get('/health', (req, res) => {
   });
 });
 
-// Metrics endpoint
 app.get('/metrics', async (req, res) => {
   res.set('Content-Type', register.contentType);
   res.end(await register.metrics());
 });
 
+let candleAggregator;
+
+/**
+ * Global writer instance for option chain
+ */
+let optionChainWriter;
+
 /**
  * Handle incoming Kafka message
- * @param {Object} message - Parsed JSON message from Kafka
  */
 async function handleMessage(message) {
   const end = processingLatencyHistogram.startTimer();
 
   try {
-    // Expected message format from Layer 1:
-    // { type: 'historical_candle', symbol: 'RELIANCE', timestamp: '...', open, high, low, close, volume }
-
-    if (message.type === 'historical_candle' || message.type === 'live_tick') {
+    if (message.type === 'historical_candle') {
       const candle = {
         symbol: message.symbol,
         timestamp: message.timestamp,
@@ -105,49 +101,74 @@ async function handleMessage(message) {
         volume: message.volume,
       };
 
-      // 1. Persist to TimescaleDB
       await insertCandle(candle);
-
-      // 2. Update Redis Hot Cache (LTP & Latest Candle)
       await setLatestPrice(message.symbol, {
         price: message.close,
         time: message.timestamp,
         volume: message.volume,
       });
-
       await setLatestCandle(message.symbol, '1m', candle);
-
       candlesProcessedCounter.inc({ symbol: message.symbol });
+    } else if (message.type === 'live_tick' && candleAggregator) {
+      ticksReceivedCounter.inc({ symbol: message.symbol });
+      candleAggregator.processTick(message);
+    } else if (message.type === undefined && candleAggregator) {
+      // Raw tick from ingestion (no type field) — treat as live_tick
+      ticksReceivedCounter.inc({ symbol: message.symbol });
+      candleAggregator.processTick({
+        type: 'live_tick',
+        symbol: message.symbol,
+        exchange: message.exchange || 'NSE',
+        timestamp: message.timestamp || Date.now(),
+        ltp: message.ltp,
+        volume: message.volume || 0,
+      });
     } else {
-      logger.warn({ type: message.type }, '⚠️ Unknown message type');
+      logger.warn({ type: message.type }, 'Unknown message type');
     }
   } catch (err) {
-    logger.error({ err }, '❌ Failed to process message');
+    logger.error({ err }, 'Failed to process message');
   } finally {
     end();
   }
 }
 
-/**
- * Main entry point
- */
-async function main() {
-  logger.info('🚀 Starting Layer 2: Processing Service...');
+async function onCandleComplete(candle) {
+  try {
+    await insertCandle(candle);
+    await setLatestPrice(candle.symbol, {
+      price: candle.close,
+      time: candle.time,
+      volume: candle.volume,
+    });
+    await setLatestCandle(candle.symbol, '1m', {
+      symbol: candle.symbol,
+      timestamp: candle.time,
+      open: candle.open,
+      high: candle.high,
+      low: candle.low,
+      close: candle.close,
+      volume: candle.volume,
+    });
+    candlesProcessedCounter.inc({ symbol: candle.symbol });
+  } catch (err) {
+    logger.error({ err, symbol: candle.symbol }, 'Failed to write completed candle');
+  }
+}
 
-  // 1. Start Express Server FIRST (so Prometheus can always scrape)
+async function main() {
+  logger.info('Starting Layer 2: Processing Service...');
+
   app.listen(PORT, () => {
-    logger.info(`📡 Health/Metrics server running on port ${PORT}`);
+    logger.info(`Health/Metrics server running on port ${PORT}`);
   });
 
   try {
-    // 2. Wait for Infrastructure Dependencies (Shared Library)
-    // ═══════════════════════════════════════════════════════════════
     const kafkaBrokers = (process.env.KAFKA_BROKERS || 'localhost:9092').split(',');
     const kafkaTopic = process.env.KAFKA_TOPIC || 'raw-ticks';
     const redisUrl = process.env.REDIS_URL || 'redis://redis:6379';
     const timescaleUrl = process.env.TIMESCALE_URL || 'postgresql://user:pass@timescaledb:5432/db';
 
-    // Initialize metrics
     initHealthMetrics(register);
 
     const { redis: connectedRedis, timescale: connectedPgPool } = await waitForAll({
@@ -164,42 +185,51 @@ async function main() {
       },
     }, { logger });
 
-    // Use the connected clients (or reuse existing modules if they manage their own state)
-    // For this service, we already have modules managing singletons, so we just let them connect now that we know infra is ready.
-    // Ideally, we would inject these clients, but for minimal refactor, we let existing modules connect.
-
-    await connectDB(); // Might reuse the pool from waitForAll if refactored, but here we just wait.
+    await connectDB();
     await connectRedis();
 
-    // 4. Start Kafka Consumer
+    candleAggregator = new CandleAggregator({
+      intervalMs: 60000,
+      onCandleComplete,
+    });
+
     await startConsumer(handleMessage);
 
-    // 5. Start Metrics Loop
+    // Start option chain consumer
+    const redisUrl = process.env.REDIS_URL || 'redis://redis:6379';
+    const { createClient } = require('redis');
+    const redisClient = createClient({ url: redisUrl });
+    await redisClient.connect();
+    optionChainWriter = new OptionChainWriter({ pool, redisClient });
+    await startOptionChainConsumer(optionChainWriter);
+    logger.info('Option chain consumer started');
+
     setInterval(async () => {
       const mem = process.memoryUsage();
+      const aggStats = candleAggregator.getStats();
       await setMetrics({
-        candles_processed:
-          parseInt(
-            ((await client.register.getSingleMetricAsString('candles_processed_total')) || '0')
-              .split(' ')
-              .pop()
-          ) || 0,
+        candles_processed: aggStats.candles,
+        ticks_received: aggStats.ticks,
+        active_symbols: aggStats.activeSymbols,
         heap_used: (mem.heapUsed / 1024 / 1024).toFixed(2) + 'MB',
         timestamp: Date.now(),
       });
     }, 5000);
 
-    logger.info('✅ Layer 2 Processing Service is running.');
+    logger.info('Layer 2 Processing Service is running.');
   } catch (err) {
-    logger.error({ err }, '❌ Failed to start Layer 2');
-    // Don't exit - keep the container running so Prometheus can scrape it
+    logger.error({ err }, 'Failed to start Layer 2');
   }
 }
 
-// Graceful shutdown
 async function shutdown() {
-  logger.info('🛑 Shutting down gracefully...');
+  logger.info('Shutting down gracefully...');
+  if (candleAggregator) {
+    candleAggregator.flushAll();
+    candleAggregator.destroy();
+  }
   await stopConsumer();
+  await stopOptionChainConsumer();
   await disconnectRedis();
   await pool.end();
   process.exit(0);
@@ -208,5 +238,4 @@ async function shutdown() {
 process.on('SIGTERM', shutdown);
 process.on('SIGINT', shutdown);
 
-// Start the service
 main();

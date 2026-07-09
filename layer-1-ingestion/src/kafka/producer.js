@@ -23,6 +23,18 @@ class KafkaProducer {
     symbolConfig.nifty50.forEach((symbol, index) => {
       this.symbolPartitionMap[symbol.symbol] = index;
     });
+    // Map index symbols to partitions after stocks (50+)
+    if (symbolConfig.indices) {
+      symbolConfig.indices.forEach((symbol, index) => {
+        this.symbolPartitionMap[symbol.symbol] = 50 + index;
+      });
+    } else {
+      // Fallback: assign based on known index symbols
+      const indices = ['NIFTY', 'BANKNIFTY', 'INDIAVIX'];
+      indices.forEach((sym, i) => {
+        this.symbolPartitionMap[sym] = 50 + i;
+      });
+    }
 
     // Initialize Kafka client
     this.kafka = new Kafka({

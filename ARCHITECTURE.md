@@ -843,6 +843,42 @@ class OpenAIEngine(BaseEngine):
 
 ---
 
+### Momentum Options Module (L6 Signal + L10 Execution)
+
+A complete **automated momentum options trading module** is built on top of the 9-layer architecture.
+See [`docs/MOMENTUM_TRADING_ARCHITECTURE.md`](docs/MOMENTUM_TRADING_ARCHITECTURE.md) for the full design.
+
+**Key additions:**
+
+| Component | Location | Purpose |
+|-----------|----------|---------|
+| **Regime Engine** | `layer-6-signal/src/regime/` | Multi-TF classifier (5m/15m/1h/D) → trend/strength/volatility/phase. Publishes `RegimeState` to Kafka `market-regime` + Redis |
+| **Strategy Framework** | `layer-6-signal/src/strategies/` | Pluggable strategies with regime-affinity routing. `momentum-burst` (T1 scalp) + `trend-pullback` (T2/T3). Publishes to Kafka `trade-signals` |
+| **Execution Engine** | `layer-10-execution/` | FlatTrade-first OMS, risk manager, position manager, strike selector, trade journal. Modes: paper → shadow → live |
+| **Backtest Harness** | `scripts/backtest/` | Two-stage (signal + option-leg BS model), grid optimizer, decay monitor, human-gated promotion |
+| **Validation** | `scripts/validation/` | Checkpoint-based validation roadmap: backtest → paper (2wk) → shadow (1wk) → live 1-lot |
+
+**Data flow:**
+```
+L1 Ingestion → index ticks
+       ↓
+L2 CandleAggregator → 1m OHLC → TimescaleDB
+       ↓
+L5 Breadth (stock-level) → Redis market_view
+       ↓
+L6 Regime Engine → RegimeState → Kafka market-regime + Redis
+       ↓
+L6 Strategy Router → matches regime → evaluates plugins
+       ↓
+L6 Signal → Kafka trade-signals
+       ↓
+L10 Execution → FlatTrade OMS → Broker order
+       ↓
+Trade Journal → TimescaleDB trades/order_log/pnl_snapshots
+```
+
+---
+
 ## Data Models & Schemas
 
 ### Kafka Messages

@@ -15,7 +15,7 @@
 
 ## 📊 Executive Summary
 
-A comprehensive 7-layer microservices architecture for real-time Nifty 50 stock analysis and trading signals. Built for high throughput, low latency, and extensibility with planned AI/ML integration.
+A comprehensive 9-layer microservices architecture for real-time Nifty 50 stock analysis, trading signals, and automated options momentum trading. Built for high throughput, low latency, and extensibility with AI/ML integration via Layer 9.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -468,7 +468,8 @@ WS   /ws                         # Real-time updates
 | Parallel analysis (50 stocks) | ✅ Go worker pool                                 | ✅ Aligned |
 | Market breadth aggregation    | ✅ L5 with A/D ratio, sector analysis             | ✅ Aligned |
 | Rule-based signal engine      | ✅ Multiple strategies                            | ✅ Aligned |
-| AI/ML decision engine         | 🔄 Placeholders ready, implementation pending     | 🔄 Planned |
+| AI/ML decision engine         | ✅ Layer 9 AI service with multiple engines        | ✅ Built |
+| Momentum Options Trading      | ✅ Phases A-F built (Regime Engine, Strategy Framework, L10 Execution) | ✅ Built (see [`MOMENTUM_TRADING_ARCHITECTURE.md`](MOMENTUM_TRADING_ARCHITECTURE.md)) |
 | Observability                 | ✅ Prometheus + Grafana + Loki                    | ✅ Aligned |
 
 ---

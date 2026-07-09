@@ -1,6 +1,7 @@
 /**
  * Vendor Manager ("The Octopus")
  * Orchestrates multiple market data vendors concurrently.
+ * Reads provider list from CredentialStore (API/DB-driven, no env vars).
  */
 const { VendorFactory } = require('./factory');
 const { logger } = require('../utils/logger');
@@ -8,30 +9,50 @@ const { logger } = require('../utils/logger');
 class VendorManager {
   constructor(options) {
     this.options = options;
-    this.vendors = new Map(); // Name -> VendorInstance
-    this.onTick = options.onTick; // aggregated callback
+    this.vendors = new Map();
+    this.onTick = options.onTick;
+    this.credentialStore = options.credentialStore || null;
   }
 
   /**
-   * Initialize all enabled vendors
+   * Initialize all enabled vendors from CredentialStore (with env fallback)
    */
-  init() {
-    // 1. Determine Enabled Vendors
-    // Format: "kite,mstock" or fallback to single MARKET_DATA_PROVIDER
-    const enabledStr = process.env.ENABLED_VENDORS || process.env.MARKET_DATA_PROVIDER || 'kite';
-    const providerNames = enabledStr.split(',').map((s) => s.trim().toLowerCase());
+  async init() {
+    let providerNames;
 
-    // Deduplicate
-    const uniqueProviders = [...new Set(providerNames)];
+    if (this.credentialStore) {
+      await this.credentialStore.init();
+      providerNames = this.credentialStore.getEnabledProviderNames();
 
-    logger.info(`🐙 VendorManager: Initializing [${uniqueProviders.join(', ')}]...`);
+      this.credentialStore.onProvidersChange((providers) => {
+        logger.info('VendorManager: Provider list changed, rebuilding...');
+        this.rebuild(providers.map((p) => p.provider));
+      });
+    } else {
+      const enabledStr = process.env.ENABLED_VENDORS || process.env.MARKET_DATA_PROVIDER || 'kite';
+      providerNames = [...new Set(enabledStr.split(',').map((s) => s.trim().toLowerCase()))];
+    }
 
-    uniqueProviders.forEach((name) => {
+    if (providerNames.length === 0) {
+      logger.warn('VendorManager: No providers enabled. Ingestion will be idle.');
+      return;
+    }
+
+    logger.info(`VendorManager: Initializing [${providerNames.join(', ')}]...`);
+    this.initVendors(providerNames);
+  }
+
+  initVendors(providerNames) {
+    providerNames.forEach((name) => {
       try {
+        const token = this.credentialStore ? this.credentialStore.getToken(name) : null;
+
         const vendor = VendorFactory.createVendor(
           {
             ...this.options,
             onTick: (tick) => this.handleAggregatedTick(tick),
+            sessionToken: token,
+            credentialStore: this.credentialStore,
           },
           name
         );
@@ -40,78 +61,82 @@ class VendorManager {
           this.vendors.set(name, vendor);
         }
       } catch (e) {
-        logger.error(`❌ Failed to init vendor '${name}': ${e.message}`);
+        logger.error(`VendorManager: Failed to init vendor '${name}': ${e.message}`);
       }
     });
   }
 
   /**
-   * Connect all vendors in parallel
+   * Hot-reload: disconnect removed providers, connect new ones
    */
+  async rebuild(providerNames) {
+    const currentNames = new Set(this.vendors.keys());
+    const newNames = new Set(providerNames);
+
+    for (const name of currentNames) {
+      if (!newNames.has(name)) {
+        const v = this.vendors.get(name);
+        try { await v.disconnect(); } catch (_) {}
+        this.vendors.delete(name);
+        logger.info(`VendorManager: Removed ${name} (disabled)`);
+      }
+    }
+
+    for (const name of newNames) {
+      if (!currentNames.has(name)) {
+        try {
+          const token = this.credentialStore ? this.credentialStore.getToken(name) : null;
+          const vendor = VendorFactory.createVendor(
+            { ...this.options, onTick: (t) => this.handleAggregatedTick(t), sessionToken: token },
+            name
+          );
+          this.vendors.set(name, vendor);
+          logger.info(`VendorManager: Added ${name} (newly enabled)`);
+        } catch (e) {
+          logger.error(`VendorManager: Failed to add '${name}': ${e.message}`);
+        }
+      }
+    }
+  }
+
   async connect() {
     const promises = [];
     for (const [name, vendor] of this.vendors) {
-      logger.info(`🔌 Connecting ${name}...`);
+      logger.info(`VendorManager: Connecting ${name}...`);
       promises.push(
         vendor.connect().catch((e) => {
-          logger.error(`❌ ${name} Connection Failed: ${e.message}`);
-          // Don't fail entire batch, let others proceed
+          logger.error(`VendorManager: ${name} connection failed: ${e.message}`);
         })
       );
     }
     await Promise.all(promises);
-    logger.info(`✅ VendorManager: All connection attempts finished.`);
+    logger.info('VendorManager: All connection attempts finished.');
   }
 
-  /**
-   * Disconnect all vendors
-   */
   async disconnect() {
-    const promises = [];
     for (const [name, vendor] of this.vendors) {
-      promises.push(vendor.disconnect().catch((e) => logger.error(e)));
+      try { await vendor.disconnect(); } catch (e) { logger.error(e); }
     }
-    await Promise.all(promises);
   }
 
-  /**
-   * Centralized Tick Handler
-   * Fan-in from all vendors
-   */
   handleAggregatedTick(tick) {
-    if (!tick) return;
-
-    // Future: De-duplication or Source-Labeling logic here
-    // For now, pass through everything
-    if (this.onTick) {
-      this.onTick(tick);
-    }
+    if (!tick || !this.onTick) return;
+    this.onTick(tick);
   }
 
-  /**
-   * Get specific vendor instance
-   * @param {string} name
-   */
   getVendor(name) {
     return this.vendors.get(name.toLowerCase());
   }
 
-  /**
-   * Subscribe symbols to ALL active vendors
-   * @param {Array} symbols
-   */
   subscribe(symbols) {
     this.vendors.forEach((vendor, name) => {
-      try {
-        vendor.subscribe(symbols);
-      } catch (e) {
-        logger.warn(`Failed to subscribe ${name}: ${e.message}`);
+      try { vendor.subscribe(symbols); } catch (e) {
+        logger.warn(`VendorManager: Failed to subscribe ${name}: ${e.message}`);
       }
     });
   }
 
   isConnected() {
-    // Logic: Are ANY vendors connected?
     for (const v of this.vendors.values()) {
       if (v.isConnected()) return true;
     }

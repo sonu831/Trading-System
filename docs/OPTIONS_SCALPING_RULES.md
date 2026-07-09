@@ -1,7 +1,9 @@
 # Options Scalping System — Architecture Rules &amp; Design
 
-> **North-star design for the Layer 10 Execution Engine**
-> Read this before writing any code. These rules are the decision record — deviate only by updating this doc.
+> **North-star design for the Layer 10 Execution Engine (Hot Path)**
+> This doc specifies the optional **hot-path upgrade** (Phase G). The default Event Pipeline (candle-close, lag-acceptable)
+> is already built and operational. Build this hot path **only if** forward testing proves the Event Pipeline too slow.
+> See [`MOMENTUM_TRADING_ARCHITECTURE.md`](MOMENTUM_TRADING_ARCHITECTURE.md) §9 for the decision framework.
 
 ---
 
@@ -343,67 +345,34 @@ Controlled by a single env var `TRADE_MODE` with three values. No code changes b
 
 ---
 
-## 9. Implementation Phases
+## 9. Implementation Status — Hot Path (Phase G, Optional Upgrade)
+
+> **The default Event Pipeline is already built** (Phases A–E). This section specifies the **optional hot-path upgrade**
+> for T1 scalp. Build this only if forward testing shows the Event Pipeline is consistently late on the fastest 1m bursts.
+
+**Current build status of the default system** (see [`MOMENTUM_TRADING_ARCHITECTURE.md`](MOMENTUM_TRADING_ARCHITECTURE.md) §10):
+
+| Component | Build Status | Location |
+|-----------|-------------|----------|
+| L10 config (TRADE_MODE, broker, thresholds) | ✅ Built | `layer-10-execution/config/default.js` |
+| OMS (FlatTrade + MStock) | ✅ Built | `layer-10-execution/src/oms/` |
+| Risk manager + kill switch | ✅ Built | `layer-10-execution/src/risk/manager.js` |
+| Position manager (SL, trailing, time stop, square-off) | ✅ Built | `layer-10-execution/src/risk/position-manager.js` |
+| Strike selector + expiry rules | ✅ Built | `layer-10-execution/src/strike-selector.js` |
+| Trade journal (execution-events, trades, order_log, pnl_snapshots) | ✅ Built | `layer-10-execution/src/trade-journal.js` + migration 005 |
+| Paper/shadow/live modes | ✅ Built | `layer-10-execution/src/paper-executor.js` |
+| Regime consumer (from Kafka market-regime) | ✅ Built | `layer-6-signal/src/regime/` |
+
+**Hot-path additions needed** (only if Event Pipeline proves too slow):
 
 ```
-Phase 0: Foundation (Week 1)
-  ├── Create layer-10-execution/ directory scaffold
-  ├── Set up package.json, Dockerfile, config
-  ├── Implement config/index.js with TRADE_MODE, broker, all thresholds
-  ├── Implement OMS: base-executor interface + MStock executor (paper mode first)
-  ├── Implement utils/latency-timer.js, utils/retry.js
-  └── Write tests for OMS + config
-
-Phase 1: Paper Mode Core (Week 2)
-  ├── Implement scalper/kite-ws.js (direct Kite WS connection)
-  ├── Implement scalper/memory-state.js (in-process tick → candles, VWAP, EMAs)
-  ├── Implement scalper/strategy-engine.js (entry/exit rules with confluence)
-  ├── Implement strike-selector/ (strike resolution, expiry rules, liquidity gate)
-  ├── Implement risk/manager.js + kill-switch.js + position-sizing.js
-  ├── Implement strategy/scalping-rules.js
-  └── Run paper mode on historical replay + live ticks for validation
-
-Phase 2: Journaling & Safety (Week 3)
-  ├── Implement journal/kafka-producer.js (execution-events topic)
-  ├── Implement journal/timescale-writer.js (trades, order_log, pnl_snapshots)
-  ├── Implement journal/pnlsnap.js
-  ├── Add TimescaleDB migration 005: trades, order_log, pnl_snapshots hypertables
-  ├── Implement telegram/bot.js (notifications + /kill command handler)
-  ├── Implement broker/ws-client.js + reconcile-loop.js
-  └── Paper mode: verify journaling completeness
-
-Phase 3: Live Readiness (Week 4)
-  ├── Implement position-manager/ (full lifecycle: SL, trailing, time exit, 15:15)
-  ├── Implement strategy/trailing-sl.js (broker SL-M modify, not cancel-replace)
-  ├── Implement signal/regime-consumer.js (TradingView MCP regime Kafka consumer)
-  ├── Implement signal/webhook-handler.js (TV alert webhook)
-  ├── Implement signal/confluence-check.js
-  ├── Wire full hot path + cold path end-to-end
-  ├── Full paper-mode test: 2 weeks of live market data
-  └── Generate latency stage report from journaled hrtime timestamps
-
-Phase 4: Shadow Mode (Week 5)
-  ├── Flip to TRADE_MODE=shadow
-  ├── Run alongside live trading for 1-2 weeks
-  ├── Telegram alerts for every would-be trade
-  ├── Manual override: user fires or doesn't fire
-  ├── Compare shadow decisions vs outcomes
-  └── Tune parameters based on shadow data
-
-Phase 5: Live with 1 Lot (Week 6-7)
-  ├── Compliance check: SEBI algo registration, MStock rate limits confirmed
-  ├── Set TRADE_MODE=live
-  ├── Start with 1 lot, max 1 concurrent position
-  ├── Monitor: latency dashboard, P&L, slippage
-  ├── Add alerts for unusual conditions
-  └── After 20-30 trades: review and decide on size increase
-
-Phase 6: Polish (Ongoing)
-  ├── Grafana dashboard for latency stages
-  ├── Prometheus metrics for all modules
-  ├── P&L attribution (slippage vs strategy vs fees)
-  ├── A/B test parameter changes in paper mode
-  └── Telegram daily summary bot
+Phase G: Hot-Path Upgrade (T1 only)
+  ├── Direct Kite WS connection (bypass Kafka for ticks)
+  ├── In-process tick→1m candle builder (memory-state)
+  ├── In-process strategy evaluation (no Kafka latency)
+  ├── Broker-side resting SL-M from fill moment
+  ├── Dual feed failover (Zerodha + FlatTrade) per §11.1
+  └── Marketable limit + IOC entry for slippage control
 ```
 
 ### Infrastructure Changes
@@ -464,4 +433,4 @@ Phase 6: Polish (Ongoing)
 
 ---
 
-> **Next step:** Review this doc. Once you confirm the rules, I'll generate the full code scaffold for `layer-10-execution/` with paper mode first.
+> **Build status:** Layer 10 execution engine is **built** (Phase E). See `layer-10-execution/src/` and [`PROJECT_STATE.md`](../PROJECT_STATE.md). The hot path specified below is the **optional Phase G upgrade** — default is the Event Pipeline (lag acceptable, candle-close signals).

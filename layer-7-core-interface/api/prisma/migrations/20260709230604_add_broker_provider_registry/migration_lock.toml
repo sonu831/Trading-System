@@ -1,0 +1,16 @@
+# Please see the documentation for all configuration options:
+# https://www.prisma.io/docs/orm/reference/prisma-schema-reference
+
+[provider]
+datasource = "db"
+
+[provider_shadow_db]
+datasource = "db"
+
+[provider_shadow_db.env]
+DATABASE_URL = "postgresql://trading:trading123@timescaledb:5432/nifty50_shadow"
+
+[models]
+broker_credentials = { schema = "public", table = "broker_credentials" }
+broker_providers = { schema = "public", table = "broker_providers" }
+broker_sessions = { schema = "public", table = "broker_sessions" }

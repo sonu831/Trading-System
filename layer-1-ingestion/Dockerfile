@@ -2,9 +2,8 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-# Bypass SSL certificate verification (for corporate proxy/firewall)
+# Bypass SSL for npm at build time only (corporate proxy)
 RUN npm config set strict-ssl false
-ENV NODE_TLS_REJECT_UNAUTHORIZED=0
 
 # Install dependencies
 COPY package*.json ./
@@ -16,9 +15,9 @@ COPY . .
 # Create data directory and set permissions
 RUN mkdir -p data/historical && chown -R node:node /app
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:9101/health || exit 1
+# Health check (node-based, no GNU wget dependency)
+HEALTHCHECK --interval=30s --timeout=10s --start-period=90s --retries=5 \
+  CMD node -e "require('http').get('http://localhost:9101/health',r=>{process.exit(r.statusCode===200?0:1)})"
 
 # Run as non-root user
 USER node

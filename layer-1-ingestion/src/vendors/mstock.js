@@ -128,7 +128,7 @@ class MStockVendor extends BaseVendor {
           period: 30,
         });
         const code = totpGen.generate();
-        logger.info(`MStockVendor: Generated TOTP Code: ${code}`);
+        logger.info('MStockVendor: TOTP code generated (hidden for security)');
 
         const totpResponse = await this.client.verifyTOTP(tempToken, code);
 

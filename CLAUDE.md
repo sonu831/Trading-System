@@ -60,13 +60,44 @@ This project uses a hub-and-spoke AI configuration system. The canonical source 
 
 ### Active Knowledge State
 
-#### 2026-07-09 — AI workflow infrastructure initialized
-- **Tool/agent:** Claude Code (system-architect)
-- **Files touched:** `.ai/ai-manifest.json`, `.ai/CONTRACT.md`, `.ai/MEMORY.md`, `.ai/agents/*.md` (12 agents), `.ai/skills/*.md` (5 skills), `.claude/settings.json`, `CLAUDE.md`, `AGENTS.md`, `MEMORY.md`, `scripts/sync-ai.mjs`, `.ai/tools/opencode/opencode.json`, `.ai/tools/commandcode/settings.json`
-- **Why:** Established agentic AI workflow: graphify-first knowledge graph, 12 specialist agents, hub-and-spoke config sync, PreToolUse hooks, contract-driven governance
-- **Knowledge graph:** Built with 4436 nodes, 4258 edges, 1351 communities (indexed by graphify)
-- **Hand-offs surfaced:** None
-- **DO NOT REDO:** The AI workflow infrastructure is complete. Add new agents/skills to `.ai/` and run `npm run sync-ai`.
+#### 2026-07-09 — Broker Credential Vault & Provider Registry (DONE)
+- **Tool/agent:** Claude Code (system-architect + ingestion-specialist + api-gateway-engineer)
+- **Files touched:**
+  - `layer-7-core-interface/api/prisma/schema.prisma` — Added `broker_providers`, `broker_credentials`, `broker_sessions` models
+  - `layer-7-core-interface/api/src/utils/crypto.js` — AES-256-GCM encrypt/decrypt utility
+  - `layer-7-core-interface/api/src/modules/broker/` — Broker module: routes, controller, service, repository, schemas, session service
+  - `layer-7-core-interface/api/package.json` — Added MStock SDK, otpauth, ts-node, typescript
+  - `layer-7-core-interface/api/src/container.js` — Registered broker DI components + session service
+  - `layer-7-core-interface/api/src/index.js` — Registered broker routes + ts-node for MStock SDK
+  - `infrastructure/compose/docker-compose.app.yml` — Added CREDENTIAL_MASTER_KEY, DATABASE_URL, depends_on
+  - `.env.example` — Added CREDENTIAL_MASTER_KEY entry
+  - `docs/PROJECT_STATE.md` — Master completion tracker
+- **Why:** Control Plane foundation per TARGET_ARCHITECTURE.md. Users can add/edit/enable/disable broker providers from the dashboard API.
+- **API endpoints built:**
+  - `GET/POST /api/v1/providers` — List/create providers
+  - `GET/PATCH /api/v1/providers/:id` — Get/update provider
+  - `POST /api/v1/providers/:id/enable|disable` — Toggle provider
+  - `POST /api/v1/providers/:id/credentials` — Save encrypted credential
+  - `GET /api/v1/providers/:provider/status` — Live provider status
+  - `POST /api/v1/providers/:provider/test` — Test connection (MStock login + TOTP)
+- **Remaining:**
+  - Wire VendorManager to provider registry (replace MARKED_DATA_PROVIDER env var)
+  - Dashboard broker settings UI page (L8)
+  - MStockVendor simplification (remove self-auth, consume Redis token)
+  - TLS hardening
+- **DO NOT REDO:** The broker module + crypto + session service is implemented. Work remaining is wiring and UI.
+
+#### 2026-07-09 — Docker Compose & Makefile hardening
+- **Tool/agent:** Claude Code (devops-engineer)
+- **Files touched:** `Makefile`, `infrastructure/compose/docker-compose.app.yml`, `layer-7-core-interface/api/Dockerfile`, `infrastructure/compose/docker-compose.infra.yml`
+- **Why:** Fixed network `external: true` issues, version-check false positive, pgadmin crash on Windows, backend-api HEALTHCHECK incompatibility with Alpine
+- **Changes:**
+  - Makefile: `docker-compose` → `docker compose`, added `ensure_network` before app/ui/notify/observe/gateway
+  - version-check: handles empty version gracefully
+  - pgadmin entrypoint: removed `chown` (fails on Windows mounts)
+  - backend-api Dockerfile: HEALTHCHECK uses `node` instead of `wget`, start-period 5s→90s
+  - backend-api compose: added `DATABASE_URL`, `depends_on` with health conditions
+- **DO NOT REDO:** These fixes are in place. Any new services should follow the same patterns.
 
 ## Repo Layout
 

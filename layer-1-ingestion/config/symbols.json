@@ -49,7 +49,10 @@
     { "symbol": "TATACONSUM", "token": 878593, "exchange": "NSE", "sector": "FMCG" },
     { "symbol": "ADANIENT", "token": 6401, "exchange": "NSE", "sector": "Infrastructure" },
     { "symbol": "LTIM", "token": 4561409, "exchange": "NSE", "sector": "IT" },
-    { "symbol": "SHRIRAMFIN", "token": 1102337, "exchange": "NSE", "sector": "Finance" }
+    { "symbol": "SHRIRAMFIN", "token": 1102337, "exchange": "NSE", "sector": "Finance" },
+    { "symbol": "NIFTY", "token": 999900, "exchange": "NSE", "sector": "Index", "isIndex": true },
+    { "symbol": "BANKNIFTY", "token": 999901, "exchange": "NSE", "sector": "Index", "isIndex": true },
+    { "symbol": "INDIAVIX", "token": 999902, "exchange": "NSE", "sector": "Volatility", "isIndex": true }
   ],
   "sectors": {
     "Banking": ["HDFCBANK", "ICICIBANK", "SBIN", "KOTAKBANK", "AXISBANK", "INDUSINDBK"],

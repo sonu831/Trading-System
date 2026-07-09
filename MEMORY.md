@@ -6,7 +6,7 @@
 ## Current Focus
 
 - **AI workflow infrastructure** — hub-and-spoke config sync, 12 agents, 5 skills
-- **Graphify knowledge graph** -- active, 4436 nodes, 4258 edges, 1351 communities
+- **Graphify knowledge graph** -- active, 4998 nodes, 5132 edges, 1354 communities
 
 ## Quick Commands
 
@@ -21,7 +21,10 @@ graphify query "<concept>"  # Search codebase via knowledge graph
 
 | Date | What | Agent |
 |------|------|-------|
+| 2026-07-09 | Broker credential vault + provider registry implemented | system-architect |
+| 2026-07-09 | Docker compose fixes (network, version-check, healthcheck) | devops-engineer |
 | 2026-07-09 | AI workflow infrastructure initialized | system-architect |
+| 2026-07-09 | **Momentum Module — Phases A–F built**: Data foundation (A), Regime Engine (B), Strategy Framework (C), Backtest + Optimizer (D), L10 Execution (E), Validation Roadmap (F). See `PROJECT_STATE.md` and `docs/MOMENTUM_TRADING_ARCHITECTURE.md` | opencode |
 
 ## Active Gaps / Known Issues
 

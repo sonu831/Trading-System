@@ -268,15 +268,22 @@ async function initialize() {
     const { MarketHours } = require('./utils/market-hours');
     const marketHours = new MarketHours();
 
-    // Initialize Market Data Vendor via Factory
-    const { VendorManager } = require('./vendors/manager');
-    marketDataVendor = new VendorManager({
-      // apiKey: process.env.ZERODHA_API_KEY, // Passed via Env to factory
-      symbols: subscriptionList,
-      onTick: handleTick,
+    // Initialize CredentialStore (provider registry + Redis token cache)
+    const { CredentialStore } = require('./vendors/CredentialStore');
+    const credentialStore = new CredentialStore({
+      redis: redisClient,
+      backendApiUrl: process.env.BACKEND_API_URL,
     });
 
-    marketDataVendor.init();
+    // Initialize Market Data Vendors via Factory
+    const { VendorManager } = require('./vendors/manager');
+    marketDataVendor = new VendorManager({
+      symbols: subscriptionList,
+      onTick: handleTick,
+      credentialStore,
+    });
+
+    await marketDataVendor.init();
 
     // Only connect WebSocket if NOT in forced historical mode
     if (process.env.FORCE_HISTORICAL_MODE !== 'true') {
@@ -356,6 +363,27 @@ async function initialize() {
     } catch (alertErr) {
       logger.error('⚠️ Failed to send notification:', alertErr.message);
     }
+    // ═══════════════════════════════════════════════════════════════
+    // OPTION CHAIN POLLER (starts if FLATTRADE_API_KEY is set)
+    // ═══════════════════════════════════════════════════════════════
+    if (process.env.FLATTRADE_API_KEY && process.env.FLATTRADE_USER_ID) {
+      try {
+        const { OptionChainPoller } = require('./vendors/option-chain-poller');
+        const optionChainPoller = new OptionChainPoller({
+          redisClient,
+          kafkaProducer,
+          kafkaTopic: process.env.KAFKA_TOPIC_OPTION_CHAIN || 'option-chain',
+          pollIntervalMs: parseInt(process.env.OPTION_CHAIN_POLL_INTERVAL_MS || '3000', 10),
+        });
+        optionChainPoller.start();
+        logger.info('✅ OptionChainPoller started');
+      } catch (e) {
+        logger.warn(`⚠️ OptionChainPoller init failed: ${e.message}`);
+      }
+    } else {
+      logger.info('ℹ️ OptionChainPoller: FLATTRADE_API_KEY not set, skipping');
+    }
+
     // ═══════════════════════════════════════════════════════════════
     // PHASE 2.5: Scheduled Cron Job (Daily at 6:00 AM IST)
     // ═══════════════════════════════════════════════════════════════

@@ -33,6 +33,7 @@ Imagine you want to invest in the stock market but don't have time to watch pric
 | **Pluggable AI Engines**   | Switch between Heuristic, PyTorch, OpenAI, Claude, Ollama                        |
 | **Production Ready**       | Docker-based, fully monitored (Prometheus + Grafana), auto-healing               |
 | **Historical Backtesting** | TimescaleDB stores years of data for strategy validation                         |
+| **Momentum Options Trading** | Automated NIFTY/BANKNIFTY scalping + positional module with breadth-confirmed momentum; multi-TF regime engine, pluggable strategy framework, FlatTrade-first execution with paper/shadow/live modes |
 
 ---
 

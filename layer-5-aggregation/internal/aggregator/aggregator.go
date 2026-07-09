@@ -14,6 +14,13 @@ import (
 	"github.com/utkarsh-pandey/nifty50-trading-system/layer-5-aggregation/internal/sectors"
 )
 
+// Symbols that should not be included in breadth calculation
+var nonBreadthSymbols = map[string]bool{
+	"NIFTY":    true,
+	"BANKNIFTY": true,
+	"INDIAVIX": true,
+}
+
 // MarketView represents the aggregated market state
 type MarketView struct {
 	Timestamp         time.Time                `json:"timestamp"`
@@ -132,6 +139,9 @@ func (e *Engine) runAggregation() {
 	var mu sync.Mutex
 
 	for _, symbol := range symbols {
+		if nonBreadthSymbols[symbol] {
+			continue
+		}
 		wg.Add(1)
 		go func(sym string) {
 			defer wg.Done()

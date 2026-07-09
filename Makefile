@@ -14,7 +14,16 @@
 .PHONY: help up down infra wait-kafka app ui observe logs clean backup restore
 
 COMPOSE_DIR := infrastructure/compose
-DC := docker-compose --env-file .env
+DC := docker compose --project-name trading-system --env-file .env
+
+# Ensure shared network exists (cross-project)
+NETWORK_NAME := local-trading-network
+define ensure_network
+	@if ! docker network inspect $(NETWORK_NAME) >/dev/null 2>&1; then \
+		echo "🌐 Creating shared network: $(NETWORK_NAME)"; \
+		docker network create $(NETWORK_NAME); \
+	fi
+endef
 
 # ===========================================================
 # 1. HELP
@@ -131,16 +140,19 @@ stop-all:
 version-check:
 	@echo "🔍 Checking data version compatibility..."
 	@if [ -f data/.version ]; then \
-		EXPECTED_VERSION=$$(grep TIMESCALEDB_VERSION data/.version | cut -d= -f2); \
-		CONTAINER_VERSION=$$(docker run --rm timescale/timescaledb:2.24.0-pg15 psql --version 2>/dev/null | head -1 || echo "2.24.0"); \
-		echo "   Data expects: TimescaleDB $$EXPECTED_VERSION"; \
-		echo "   Container has: TimescaleDB 2.24.0"; \
-		if [ "$$EXPECTED_VERSION" != "2.24.0" ]; then \
-			echo "⚠️  VERSION MISMATCH! Data was created with $$EXPECTED_VERSION"; \
-			echo "   Options:"; \
-			echo "   1. Run 'make db-reset' to reset database (data loss!)"; \
-			echo "   2. Update docker-compose.infra.yml to use version $$EXPECTED_VERSION"; \
-			exit 1; \
+		EXPECTED_VERSION=$$(grep -s TIMESCALEDB_VERSION data/.version 2>/dev/null | cut -d= -f2); \
+		if [ -z "$$EXPECTED_VERSION" ]; then \
+			echo "   No version recorded (legacy data, treating as first run)"; \
+		else \
+			echo "   Data expects: TimescaleDB $$EXPECTED_VERSION"; \
+			echo "   Container has: TimescaleDB 2.24.0"; \
+			if [ "$$EXPECTED_VERSION" != "2.24.0" ]; then \
+				echo "⚠️  VERSION MISMATCH! Data was created with $$EXPECTED_VERSION"; \
+				echo "   Options:"; \
+				echo "   1. Run 'make db-reset' to reset database (data loss!)"; \
+				echo "   2. Update docker-compose.infra.yml to use version $$EXPECTED_VERSION"; \
+				exit 1; \
+			fi; \
 		fi; \
 	else \
 		echo "   No version file found (first run or legacy data)"; \
@@ -182,36 +194,43 @@ wait-kafka:
 	@echo "✅ Kafka is healthy!"
 
 app:
+	$(call ensure_network)
 	@echo "🚀 Starting Pipeline (L1-L6 + API)..."
 	$(DC) -f $(COMPOSE_DIR)/docker-compose.app.yml up -d --build
 	@echo "✅ Pipeline running."
 
 app-build:
+	$(call ensure_network)
 	@echo "🚀 Rebuilding Pipeline..."
 	$(DC) -f $(COMPOSE_DIR)/docker-compose.app.yml up -d --build
 	@echo "✅ Pipeline rebuilt."
 
 ui:
+	$(call ensure_network)
 	@echo "🖥️  Building Dashboard..."
 	$(DC) -f $(COMPOSE_DIR)/docker-compose.ui.yml up -d --build
 	@echo "✅ http://localhost:3000"
 
 notify:
+	$(call ensure_network)
 	@echo "� Starting Notifications..."
 	$(DC) -f $(COMPOSE_DIR)/docker-compose.notify.yml up -d --build
 	@echo "✅ Telegram Bot & Email Service running"
 
 notify-build:
+	$(call ensure_network)
 	@echo "🔔 Rebuilding Notifications..."
 	$(DC) -f $(COMPOSE_DIR)/docker-compose.notify.yml up -d --build
 	echo "✅ Rebuilt Telegram Bot & Email Service"
 
 observe:
+	$(call ensure_network)
 	@echo "📊 Starting Observability..."
 	$(DC) -f $(COMPOSE_DIR)/docker-compose.observe.yml up -d --build
 	@echo "✅ Prometheus: 9090 | Grafana: 3001"
 
 gateway:
+	$(call ensure_network)
 	@echo "🌐 Starting Gateway..."
 	$(DC) -f $(COMPOSE_DIR)/docker-compose.gateway.yml up -d --build
 	@echo "✅ Gateway: http://localhost:8088"

@@ -181,3 +181,39 @@ def analyze_market(request: MarketAnalysisRequest):
 
 # Instrument FastAPI for Prometheus
 Instrumentator().instrument(app).expose(app, endpoint="/metrics")
+
+# ─── Backtest Endpoint ────────────────────────────
+
+from app.core.backtest import BacktestEngine, BacktestResult
+
+backtest_engine = BacktestEngine()
+
+class BacktestRequest(BaseModel):
+    strategy_id: str
+    candles: List[dict]
+    initial_capital: float = 100000
+    position_size_pct: float = 0.02
+
+@app.post("/backtest")
+def run_backtest(request: BacktestRequest):
+    """Run a strategy against historical candle data"""
+    result = backtest_engine.run(
+        strategy_id=request.strategy_id,
+        candles=request.candles,
+        initial_capital=request.initial_capital,
+        position_size_pct=request.position_size_pct,
+    )
+    return result.to_dict()
+
+@app.get("/backtest/compare")
+def compare_strategies():
+    """Compare all backtested strategies"""
+    return backtest_engine.compare_strategies()
+
+@app.get("/backtest/best")
+def best_strategy():
+    """Get the best performing strategy"""
+    best = backtest_engine.get_best_strategy()
+    if not best:
+        raise HTTPException(status_code=404, detail="No backtests run yet")
+    return best

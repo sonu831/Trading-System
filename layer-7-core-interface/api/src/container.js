@@ -59,6 +59,14 @@ container.register({
   analysisRepository: asClass(require('./modules/analysis/AnalysisRepository')).singleton(),
   analysisService: asClass(require('./modules/analysis/AnalysisService')).singleton(),
   analysisController: asClass(require('./modules/analysis/AnalysisController')).singleton(),
+
+  // Broker (Provider Registry + Credential Vault)
+  brokerRepository: asClass(require('./modules/broker/BrokerRepository')).singleton(),
+  brokerService: asClass(require('./modules/broker/BrokerService')).singleton(),
+  brokerController: asClass(require('./modules/broker/BrokerController')).singleton(),
+  brokerSessionService: asClass(require('./modules/broker/BrokerSessionService')).singleton(),
+
+  // MStock Specific Endpoints
 });
 
 module.exports = container;

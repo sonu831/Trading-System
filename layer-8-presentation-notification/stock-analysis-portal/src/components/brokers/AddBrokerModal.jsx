@@ -17,14 +17,18 @@ const AddBrokerModal = ({ isOpen, onClose }) => {
   const [provider, setProvider] = useState('mstock');
   const [role, setRole] = useState('data');
   const [priority, setPriority] = useState(1);
+  const [error, setError] = useState(null);
 
   if (!isOpen) return null;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setError(null);
     const result = await dispatch(createBroker({ provider, role, priority }));
     if (result.meta.requestStatus === 'fulfilled') {
       onClose();
+    } else {
+      setError(result.error?.message || result.payload || 'Failed to create provider');
     }
   };
 
@@ -37,6 +41,9 @@ const AddBrokerModal = ({ isOpen, onClose }) => {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          {error && (
+            <div className="p-3 bg-red-900/50 border border-red-700 rounded text-red-300 text-sm">{error}</div>
+          )}
           <div>
             <label className="block text-sm font-medium mb-1 text-gray-300">Provider</label>
             <select value={provider} onChange={(e) => setProvider(e.target.value)} className="w-full p-2 rounded bg-gray-700 border border-gray-600 text-white">

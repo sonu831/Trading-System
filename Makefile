@@ -33,21 +33,25 @@ help:
 	@echo "🚀 Nifty 50 Trading System"
 	@echo ""
 	@echo "📦 LIFECYCLE (Docker)"
-	@echo "  make up             Start full stack"
+	@echo "  make up             Start core pipeline (backend + ingestion + dashboard)"
+	@echo "  make up-all         Start EVERYTHING (observer, notify, AI, execution)"
 	@echo "  make down           Stop everything (Auto-Backup)"
 	@echo "  make dev-nodb       Restart Apps (Keep DB/Kafka running)"
 	@echo "  make stop-all       Force Stop (Skip Backup)"
 	@echo ""
 	@echo "🧩 COMPONENTS"
 	@echo "  make infra          Start Data Layer (Kafka, Redis, DB)"
-	@echo "  make app            Start Pipeline (L1-L6 + API)"
+	@echo "  make app            Start Full Pipeline (L1-L6 + API + Execution)"
+	@echo "  make app-core       Start Core Pipeline (L1 Ingestion + L7 API)"
 	@echo "  make ui             Start Dashboard"
 	@echo "  make notify         Start Telegram Bot & Email"
 	@echo "  make observe        Start Monitoring (Grafana + Prom)"
+	@echo "  make ai             Start AI Stack (Inference + Ollama)"
 	@echo ""
 	@echo "📦 DATABASE & CACHE"
 	@echo "  make backup         Backup TimescaleDB to ./backups/"
 	@echo "  make restore        Restore from latest backup"
+	@echo "  make db-migrate     Apply broker tables migration"
 	@echo "  make check-restore  Verify database content"
 	@echo "  make check-version  Check TimescaleDB version compatibility"
 	@echo "  make db-reset       Full database reset (schema + data)"
@@ -72,7 +76,18 @@ help:
 deploy: app-build ui notify-build
 	@echo "✅ Deployment complete!"
 
-up: infra wait-kafka observe notify app ui check-restore
+up: infra wait-kafka app-core ui
+	@echo "🚀 Core pipeline running!"
+	@echo ""
+	@echo "🌐 Frontend:"
+	@echo "   - Dashboard:       http://localhost:3000"
+	@echo ""
+	@echo "🔌 APIs & Services:"
+	@echo "   - Backend API:     http://localhost:4000"
+	@echo "   - Ingestion:       http://localhost:9101"
+	@echo ""
+
+up-all: infra wait-kafka observe notify app ui ai check-restore
 	@echo "🚀 Full stack running!"
 	@echo ""
 	@echo "🌐 Frontend:"
@@ -195,9 +210,18 @@ wait-kafka:
 
 app:
 	$(call ensure_network)
-	@echo "🚀 Starting Pipeline (L1-L6 + API)..."
+	@echo "🚀 Starting Full Pipeline (L1-L6 + API + Execution)..."
 	$(DC) -f $(COMPOSE_DIR)/docker-compose.app.yml up -d --build
-	@echo "✅ Pipeline running."
+	@echo "✅ Full pipeline running."
+
+app-core:
+	$(call ensure_network)
+	@echo "🚀 Starting Core Pipeline (L1 Ingestion + L2 Processing + L7 API)..."
+	$(DC) -f $(COMPOSE_DIR)/docker-compose.app.yml up -d --build ingestion processing backend-api
+	@echo "✅ Core pipeline running."
+	@echo "   - Ingestion:  http://localhost:9101"
+	@echo "   - Processing: http://localhost:3002"
+	@echo "   - Backend API: http://localhost:4000"
 
 app-build:
 	$(call ensure_network)
@@ -342,6 +366,12 @@ db-reset:
 		done
 	@echo "📝 Creating version file..."
 	@echo "TIMESCALEDB_VERSION=2.24.0" > data/.version
+
+# Quick migration for broker tables (after DB container recreation)
+db-migrate:
+	@echo "📦 Running broker tables migration..."
+	@docker exec -i timescaledb psql -U trading -d nifty50 < layer-7-core-interface/api/prisma/migrations/20260709230604_add_broker_provider_registry/migration.sql 2>/dev/null
+	@echo "✅ Broker tables ready"
 	@echo "POSTGRESQL_VERSION=15" >> data/.version
 	@echo "SCHEMA_VERSION=004" >> data/.version
 	@echo "CREATED_AT=$$(date +%Y-%m-%d)" >> data/.version

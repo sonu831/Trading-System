@@ -120,10 +120,12 @@ class RegimeEngine {
     if (!this.pool) return null;
 
     const timeframes = [
-      { name: '5m', table: 'candles_5m', limit: 100 },
-      { name: '15m', table: 'candles_15m', limit: 80 },
-      { name: '1h', table: 'candles_1h', limit: 60 },
-      { name: 'D', table: 'candles_1d', limit: 40 },
+      { name: '5m',  table: 'candles_5m',  limit: 100 },
+      { name: '15m', table: 'candles_15m', limit: 80  },
+      { name: '1h',  table: 'candles_1h',  limit: 60  },
+      { name: '4h',  table: 'candles_4h',  limit: 50  },
+      { name: 'D',   table: 'candles_1d',  limit: 40  },
+      { name: 'W',   table: 'candles_weekly', limit: 20 },
     ];
 
     const result = {};

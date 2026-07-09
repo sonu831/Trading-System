@@ -1,0 +1,47 @@
+{
+  "$comment": "CANONICAL source of truth for the shared AI brain. Humans edit THIS file; scripts/sync-ai.mjs projects it into every per-tool spoke (AGENTS.md, .github/copilot-instructions.md, GEMINI.md, .ai/CONTRACT.md, opencode.json, ...). Never hand-edit the generated <!-- AI-SYNC --> blocks; run `npm run sync-ai`. Drift is caught by `npm run sync-ai-check` (CI gate).",
+  "project": "Trading-System",
+  "authority": "Claude is the authority. If any tool disagrees, re-read .ai/MEMORY.md and align.",
+  "stateFiles": {
+    "canonicalMemory": ".ai/MEMORY.md",
+    "workingState": "MEMORY.md",
+    "projectState": "CHANGELOG.md",
+    "universalContract": ".ai/CONTRACT.md",
+    "projectRules": "CLAUDE.md"
+  },
+  "knowledgeBase": {
+    "graph": "graphify-out/",
+    "graphReport": "graphify-out/GRAPH_REPORT.md",
+    "corpus": "docs/",
+    "metering": ".ai/tools/meter/"
+  },
+  "readOrder": [
+    "CLAUDE.md",
+    ".ai/MEMORY.md",
+    "MEMORY.md",
+    ".ai/CONTRACT.md",
+    ".ai/skills/<task-relevant>.md",
+    "graphify-out/ (knowledge graph)"
+  ],
+  "rules": [
+    { "id": 1, "rule": "Graphify-first (MANDATORY for every codebase scan)", "means": "Before ANY grep/find/glob/ripgrep, you MUST run graphify: `graphify query \"<concept>\"` (broad), `graphify explain \"<symbol>\"` (one node + neighbors), or `graphify path \"<A>\" \"<B>\"` (relationship). If the CLI is blocked, read graphify-out/GRAPH_REPORT.md directly. Grep/find are allowed ONLY as a one-shot verification AFTER graphify pointed you at a symbol -- never the primary scan. Run `graphify update .` after modifying code.", "enforcedBy": "PreToolUse hook" },
+    { "id": 2, "rule": "Token-optimized commands (RTK, MANDATORY)", "means": "Prefix EVERY shell command with `rtk` -- e.g. `rtk git status`, `rtk git diff`, `rtk cargo check`, `rtk npm run lint`, `rtk docker ps`. RTK filters verbose tool output (60-90% token reduction) and passes commands through unchanged when it has no filter, so it is ALWAYS safe. Use `rtk` even inside chains (`rtk git add . && rtk git commit ...`).", "enforcedBy": "contract + review" },
+    { "id": 3, "rule": "Shared-tier dedup", "means": "Any constant/enum/type/error-code/event-name/Kafka-topic used cross-layer MUST live in shared/. Search shared/ first; never re-declare layer-locally.", "enforcedBy": "code review" },
+    { "id": 4, "rule": "Event-driven contracts", "means": "Layers communicate ONLY via Kafka topics. No direct HTTP calls between layers. Every consumer must be idempotent. Every message must have a schema defined in shared/.", "enforcedBy": "architecture" },
+    { "id": 5, "rule": "Database access pattern (CQRS)", "means": "Redis for reads, TimescaleDB for writes. No direct DB access from layers 1-2. Layers 3+ use repository pattern. Always use ON CONFLICT DO NOTHING for idempotent inserts.", "enforcedBy": "code review + CI" },
+    { "id": 6, "rule": "No hardcoded secrets or credentials", "means": "All secrets (broker API keys, DB passwords, Kafka creds) come from environment variables. Never commit .env files. Use .env.example as template only.", "enforcedBy": "CI secret-scan gate" },
+    { "id": 7, "rule": "PR workflow (never push to main)", "means": "Feature branches -> PR into main. Do not push directly to main. Write conventional commit messages. Review checklist in .github/PULL_REQUEST_TEMPLATE.md.", "enforcedBy": "branch protection" },
+    { "id": 8, "rule": "Language-specific conventions", "means": "Node.js: ESLint + Prettier. Go: gofmt + golangci-lint. Python: Black + ruff. Each layer follows its language's idiomatic patterns. See CONTRIBUTING.md.", "enforcedBy": "lint-staged + husky" },
+    { "id": 9, "rule": "No git writes without owner instruction", "means": "Do not run git commit / push / branch or gh pr create unless explicitly asked. Leave work staged for review.", "enforcedBy": "honor-system" },
+    { "id": 10, "rule": "Hand-off on exit", "means": "Every report to the orchestrator ends with a ## Hand-off section listing what other agents/tools must pick up (write '- None.' if empty).", "enforcedBy": "next-agent-observable" }
+  ],
+  "tools": [
+    { "name": "Claude Code", "spoke": "CLAUDE.md", "format": "markdown-block", "note": "Primary. Reads full CLAUDE.md; shared block appended for parity." },
+    { "name": "OpenCode / Codex / generic AGENTS.md tools", "spoke": "AGENTS.md", "format": "markdown-block" },
+    { "name": "GitHub Copilot", "spoke": ".github/copilot-instructions.md", "format": "markdown-block" },
+    { "name": "Gemini CLI", "spoke": "GEMINI.md", "format": "markdown-block" },
+    { "name": "OpenCode (config)", "spoke": ".ai/tools/opencode/opencode.json", "format": "json" },
+    { "name": "codeCommand (config)", "spoke": ".ai/tools/commandcode/settings.json", "format": "json" }
+  ],
+  "syncMarkers": { "start": "<!-- AI-SYNC:START -->", "end": "<!-- AI-SYNC:END -->" }
+}

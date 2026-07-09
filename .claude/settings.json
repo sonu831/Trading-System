@@ -1,0 +1,54 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash",
+      "Edit",
+      "Write",
+      "Read",
+      "Grep",
+      "Glob",
+      "PowerShell(graphify query *)",
+      "PowerShell(graphify explain *)"
+    ],
+    "deny": [],
+    "ask": [],
+    "defaultMode": "bypassPermissions"
+  },
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo '{\"hookSpecificOutput\":{\"hookEventName\":\"UserPromptSubmit\",\"additionalContext\":\"[Trading-System -- active rules] READ ORDER: 1) CLAUDE.md (entry) 2) .ai/MEMORY.md (canonical memory) 3) MEMORY.md (working state). NON-NEGOTIABLE RULES: S1 graphify (not grep) S2 shared-tier dedup S3 event-driven contracts S4 CQRS DB access S5 no hardcoded secrets. Agents: .ai/agents/*.md | Skills: .ai/skills/*.md\"}}'",
+            "shell": "bash"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Grep|Glob",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"additionalContext\":\"STOP -- search via graphify, not Grep/Glob. Required first attempt: `graphify query \\\"<concept>\\\"` (broad), `graphify explain \\\"<symbol>\\\"` (single node + neighbors), or `graphify path \\\"<A>\\\" \\\"<B>\\\"` (relationship). Run those via Bash. Grep/Glob are allowed ONLY as a one-shot verification AFTER graphify pointed you at a symbol -- never as the primary scan. If the graph is missing/stale, `graphify update .` first. CLAUDE.md S1.\"}}'",
+            "shell": "bash"
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if grep -qE '\"file_path\":[[:space:]]*\"(.*[\\\\/])?shared[\\\\/]'; then echo '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"additionalContext\":\"Touching shared/ -- any constant/enum/type/Kafka-topic here is visible to ALL layers. Make sure this is truly cross-layer before adding. Review .ai/MEMORY.md for existing conventions.\"}}'; fi",
+            "shell": "bash"
+          }
+        ]
+      }
+    ]
+  },
+  "skipDangerousModePermissionPrompt": true,
+  "skipAutoPermissionPrompt": true
+}

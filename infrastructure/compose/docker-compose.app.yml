@@ -32,8 +32,10 @@ services:
       - SKIP_HISTORICAL_SYNC=false
       - SWARM_CONCURRENCY=${SWARM_CONCURRENCY:-12}
       - FORCE_HISTORICAL_MODE=${FORCE_HISTORICAL_MODE:-false}
+      - KAFKA_TOPIC_OPTION_CHAIN=option-chain
+      - OPTION_CHAIN_POLL_INTERVAL_MS=${OPTION_CHAIN_POLL_INTERVAL_MS:-3000}
+      - OPTION_UNDERLYING=${OPTION_UNDERLYING:-NIFTY}
     volumes:
-      - ../../vendor:/app/vendor:ro
       - ../../shared:/app/shared:ro
     networks:
       - trading-network
@@ -149,6 +151,9 @@ services:
     environment:
       - REDIS_URL=redis://redis:6379
       - TIMESCALE_URL=postgresql://${POSTGRES_USER:-trading}:${POSTGRES_PASSWORD:-trading123}@timescaledb:5432/${POSTGRES_DB:-nifty50}
+      - KAFKA_BROKERS=kafka:29092
+      - REGIME_POLL_INTERVAL_MS=${REGIME_POLL_INTERVAL_MS:-60000}
+      - REGIME_SYMBOL=${REGIME_SYMBOL:-NIFTY}
     volumes:
       - ../../shared:/app/shared:ro
     networks:
@@ -175,6 +180,12 @@ services:
     environment:
       - REDIS_URL=redis://redis:6379
       - TIMESCALE_URL=postgresql://${POSTGRES_USER:-trading}:${POSTGRES_PASSWORD:-trading123}@timescaledb:5432/${POSTGRES_DB:-nifty50}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-trading}:${POSTGRES_PASSWORD:-trading123}@timescaledb:5432/${POSTGRES_DB:-nifty50}
+      - CREDENTIAL_MASTER_KEY=${CREDENTIAL_MASTER_KEY}
+      # Layer 10 execution engine (positions, risk, kill switch). Port must match the
+      # `execution` service's PORT (8095). No depends_on: the API must start even when
+      # the engine is down and report it as offline.
+      - EXECUTION_URL=http://execution:8095
     volumes:
       - ../../layer-7-core-interface/api/src:/app/src
       - ../../shared:/app/shared:ro
@@ -221,6 +232,44 @@ services:
     networks:
       - trading-network
     restart: unless-stopped
+
+  # Layer 10: Execution Engine
+  execution:
+    build:
+      context: ../../layer-10-execution
+      dockerfile: Dockerfile
+    container_name: execution
+    ports:
+      - '8095:8095'
+    environment:
+      - PORT=8095
+      - TRADE_MODE=${TRADE_MODE:-paper}
+      - EXECUTION_BROKER=${EXECUTION_BROKER:-flattrade}
+      - KAFKA_BROKERS=kafka:29092
+      - KAFKA_TOPIC_TRADE_SIGNALS=trade-signals
+      - REDIS_URL=redis://redis:6379
+      - TIMESCALE_URL=postgresql://${POSTGRES_USER:-trading}:${POSTGRES_PASSWORD:-trading123}@timescaledb:5432/${POSTGRES_DB:-nifty50}
+      - UNDERLYING=${UNDERLYING:-NIFTY}
+      - MSTOCK_API_KEY=${MSTOCK_API_KEY}
+      - MSTOCK_ACCESS_TOKEN=${MSTOCK_ACCESS_TOKEN}
+      - MSTOCK_CLIENT_CODE=${MSTOCK_CLIENT_CODE}
+      - FLATTRADE_USER_ID=${FLATTRADE_USER_ID}
+      - FLATTRADE_API_KEY=${FLATTRADE_API_KEY}
+      - FLATTRADE_ACTID=${FLATTRADE_ACTID}
+      - MAX_LOTS=${MAX_LOTS:-1}
+      - MAX_CONCURRENT_POSITIONS=1
+      - MAX_TRADES_PER_DAY=5
+      - MAX_DAILY_LOSS=2500
+    networks:
+      - trading-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          memory: 256M
 
   # Layer 8: API Gateway
   gateway:

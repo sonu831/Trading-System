@@ -14,7 +14,16 @@
 .PHONY: help up down infra wait-kafka app ui observe logs clean backup restore
 
 COMPOSE_DIR := infrastructure/compose
-DC := docker-compose --env-file .env
+DC := docker compose --project-name trading-system --env-file .env
+
+# Ensure shared network exists (cross-project)
+NETWORK_NAME := local-trading-network
+define ensure_network
+	@if ! docker network inspect $(NETWORK_NAME) >/dev/null 2>&1; then \
+		echo "🌐 Creating shared network: $(NETWORK_NAME)"; \
+		docker network create $(NETWORK_NAME); \
+	fi
+endef
 
 # ===========================================================
 # 1. HELP
@@ -24,21 +33,25 @@ help:
 	@echo "🚀 Nifty 50 Trading System"
 	@echo ""
 	@echo "📦 LIFECYCLE (Docker)"
-	@echo "  make up             Start full stack"
+	@echo "  make up             Start core pipeline (backend + ingestion + dashboard)"
+	@echo "  make up-all         Start EVERYTHING (observer, notify, AI, execution)"
 	@echo "  make down           Stop everything (Auto-Backup)"
 	@echo "  make dev-nodb       Restart Apps (Keep DB/Kafka running)"
 	@echo "  make stop-all       Force Stop (Skip Backup)"
 	@echo ""
 	@echo "🧩 COMPONENTS"
 	@echo "  make infra          Start Data Layer (Kafka, Redis, DB)"
-	@echo "  make app            Start Pipeline (L1-L6 + API)"
+	@echo "  make app            Start Full Pipeline (L1-L6 + API + Execution)"
+	@echo "  make app-core       Start Core Pipeline (L1 Ingestion + L7 API)"
 	@echo "  make ui             Start Dashboard"
 	@echo "  make notify         Start Telegram Bot & Email"
 	@echo "  make observe        Start Monitoring (Grafana + Prom)"
+	@echo "  make ai             Start AI Stack (Inference + Ollama)"
 	@echo ""
 	@echo "📦 DATABASE & CACHE"
 	@echo "  make backup         Backup TimescaleDB to ./backups/"
 	@echo "  make restore        Restore from latest backup"
+	@echo "  make db-migrate     Apply broker tables migration"
 	@echo "  make check-restore  Verify database content"
 	@echo "  make check-version  Check TimescaleDB version compatibility"
 	@echo "  make db-reset       Full database reset (schema + data)"
@@ -46,10 +59,24 @@ help:
 	@echo "  make redis-clear    Flush all Redis cache"
 	@echo ""
 	@echo "💻 LOCAL DEV"
-	@echo "  make layer[1-7]     Run specific layer locally (npm/go)"
+	@echo "  make layer1         Run L1 Ingestion locally (Node.js)"
+	@echo "  make layer2         Run L2 Processing locally (Node.js)"
+	@echo "  make layer4         Run L4 Analysis locally (Go)"
+	@echo "  make layer5         Run L5 Aggregation locally (Go)"
+	@echo "  make layer6         Run L6 Signal locally (Node.js)"
+	@echo "  make layer7         Run L7 API locally (Fastify)"
+	@echo "  make layer8         Run L8 Dashboard locally (Next.js)"
 	@echo "  make dev            Start infrastructure for local dev"
 	@echo ""
+	@echo "🐳 DOCKER (single services)"
+	@echo "  make docker-ingestion   Start L1 Ingestion in Docker"
+	@echo "  make docker-processing   Start L2 Processing in Docker"
+	@echo "  make docker-api         Start L7 Backend API in Docker"
+	@echo "  make docker-dashboard   Start L8 Dashboard in Docker"
+	@echo "  make docker-execution   Start L10 Execution in Docker"
+	@echo ""
 	@echo "🧹 MAINTENANCE"
+	@echo "  make setup          Install node_modules for ALL layers"
 	@echo "  make logs           Tail logs"
 	@echo "  make clean          Remove build artifacts"
 	@echo "  make fix-kafka      Fix Kafka Cluster ID issues"
@@ -63,7 +90,43 @@ help:
 deploy: app-build ui notify-build
 	@echo "✅ Deployment complete!"
 
-up: infra wait-kafka observe notify app ui check-restore
+# ═══════════════════════════════════════════════════════════
+# setup: Install node_modules for ALL layers (fresh install)
+# ═══════════════════════════════════════════════════════════
+LAYERS := layer-1-ingestion \
+          layer-1-tradingview \
+          layer-2-processing \
+          layer-6-signal \
+          layer-7-core-interface/api \
+          layer-8-presentation-notification/stock-analysis-portal \
+          layer-8-presentation-notification/email-service \
+          layer-8-presentation-notification/telegram-bot \
+          layer-10-execution
+
+setup:
+	@echo "📦 Installing node_modules for all layers..."
+	@for dir in $(LAYERS); do \
+		echo ""; \
+		echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; \
+		echo "📂 $$dir"; \
+		echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; \
+		cd $$dir && npm install --legacy-peer-deps; \
+	done
+	@echo ""
+	@echo "✅ All layers installed!"
+
+up: infra wait-kafka app-core ui
+	@echo "🚀 Core pipeline running!"
+	@echo ""
+	@echo "🌐 Frontend:"
+	@echo "   - Dashboard:       http://localhost:3000"
+	@echo ""
+	@echo "🔌 APIs & Services:"
+	@echo "   - Backend API:     http://localhost:4000"
+	@echo "   - Ingestion:       http://localhost:9101"
+	@echo ""
+
+up-all: infra wait-kafka observe notify app ui ai check-restore
 	@echo "🚀 Full stack running!"
 	@echo ""
 	@echo "🌐 Frontend:"
@@ -131,16 +194,19 @@ stop-all:
 version-check:
 	@echo "🔍 Checking data version compatibility..."
 	@if [ -f data/.version ]; then \
-		EXPECTED_VERSION=$$(grep TIMESCALEDB_VERSION data/.version | cut -d= -f2); \
-		CONTAINER_VERSION=$$(docker run --rm timescale/timescaledb:2.24.0-pg15 psql --version 2>/dev/null | head -1 || echo "2.24.0"); \
-		echo "   Data expects: TimescaleDB $$EXPECTED_VERSION"; \
-		echo "   Container has: TimescaleDB 2.24.0"; \
-		if [ "$$EXPECTED_VERSION" != "2.24.0" ]; then \
-			echo "⚠️  VERSION MISMATCH! Data was created with $$EXPECTED_VERSION"; \
-			echo "   Options:"; \
-			echo "   1. Run 'make db-reset' to reset database (data loss!)"; \
-			echo "   2. Update docker-compose.infra.yml to use version $$EXPECTED_VERSION"; \
-			exit 1; \
+		EXPECTED_VERSION=$$(grep -s TIMESCALEDB_VERSION data/.version 2>/dev/null | cut -d= -f2); \
+		if [ -z "$$EXPECTED_VERSION" ]; then \
+			echo "   No version recorded (legacy data, treating as first run)"; \
+		else \
+			echo "   Data expects: TimescaleDB $$EXPECTED_VERSION"; \
+			echo "   Container has: TimescaleDB 2.24.0"; \
+			if [ "$$EXPECTED_VERSION" != "2.24.0" ]; then \
+				echo "⚠️  VERSION MISMATCH! Data was created with $$EXPECTED_VERSION"; \
+				echo "   Options:"; \
+				echo "   1. Run 'make db-reset' to reset database (data loss!)"; \
+				echo "   2. Update docker-compose.infra.yml to use version $$EXPECTED_VERSION"; \
+				exit 1; \
+			fi; \
 		fi; \
 	else \
 		echo "   No version file found (first run or legacy data)"; \
@@ -182,36 +248,52 @@ wait-kafka:
 	@echo "✅ Kafka is healthy!"
 
 app:
-	@echo "🚀 Starting Pipeline (L1-L6 + API)..."
+	$(call ensure_network)
+	@echo "🚀 Starting Full Pipeline (L1-L6 + API + Execution)..."
 	$(DC) -f $(COMPOSE_DIR)/docker-compose.app.yml up -d --build
-	@echo "✅ Pipeline running."
+	@echo "✅ Full pipeline running."
+
+app-core:
+	$(call ensure_network)
+	@echo "🚀 Starting Core Pipeline (L1 Ingestion + L2 Processing + L7 API)..."
+	$(DC) -f $(COMPOSE_DIR)/docker-compose.app.yml up -d --build ingestion processing backend-api
+	@echo "✅ Core pipeline running."
+	@echo "   - Ingestion:  http://localhost:9101"
+	@echo "   - Processing: http://localhost:3002"
+	@echo "   - Backend API: http://localhost:4000"
 
 app-build:
+	$(call ensure_network)
 	@echo "🚀 Rebuilding Pipeline..."
 	$(DC) -f $(COMPOSE_DIR)/docker-compose.app.yml up -d --build
 	@echo "✅ Pipeline rebuilt."
 
 ui:
+	$(call ensure_network)
 	@echo "🖥️  Building Dashboard..."
 	$(DC) -f $(COMPOSE_DIR)/docker-compose.ui.yml up -d --build
 	@echo "✅ http://localhost:3000"
 
 notify:
+	$(call ensure_network)
 	@echo "� Starting Notifications..."
 	$(DC) -f $(COMPOSE_DIR)/docker-compose.notify.yml up -d --build
 	@echo "✅ Telegram Bot & Email Service running"
 
 notify-build:
+	$(call ensure_network)
 	@echo "🔔 Rebuilding Notifications..."
 	$(DC) -f $(COMPOSE_DIR)/docker-compose.notify.yml up -d --build
 	echo "✅ Rebuilt Telegram Bot & Email Service"
 
 observe:
+	$(call ensure_network)
 	@echo "📊 Starting Observability..."
 	$(DC) -f $(COMPOSE_DIR)/docker-compose.observe.yml up -d --build
 	@echo "✅ Prometheus: 9090 | Grafana: 3001"
 
 gateway:
+	$(call ensure_network)
 	@echo "🌐 Starting Gateway..."
 	$(DC) -f $(COMPOSE_DIR)/docker-compose.gateway.yml up -d --build
 	@echo "✅ Gateway: http://localhost:8088"
@@ -323,6 +405,12 @@ db-reset:
 		done
 	@echo "📝 Creating version file..."
 	@echo "TIMESCALEDB_VERSION=2.24.0" > data/.version
+
+# Quick migration for broker tables (after DB container recreation)
+db-migrate:
+	@echo "📦 Running broker tables migration..."
+	@docker exec -i timescaledb psql -U trading -d nifty50 < layer-7-core-interface/api/prisma/migrations/20260709230604_add_broker_provider_registry/migration.sql 2>/dev/null
+	@echo "✅ Broker tables ready"
 	@echo "POSTGRESQL_VERSION=15" >> data/.version
 	@echo "SCHEMA_VERSION=004" >> data/.version
 	@echo "CREATED_AT=$$(date +%Y-%m-%d)" >> data/.version
@@ -458,20 +546,51 @@ layer6:
 	@export $$(cat .env | grep -v '^#' | xargs) && cd layer-6-signal && npm run dev
 
 layer7-api:
-	@echo "🚀 Starting Layer 7 API (Presentation)..."
-	@export $$(cat .env | grep -v '^#' | xargs) && cd layer-7-presentation-notification/api && npm run dev
+	@echo "🚀 Starting Layer 7 API (Fastify)..."
+	@export $$(cat .env | grep -v '^#' | xargs) && cd layer-7-core-interface/api && npm run dev
 
 layer7-dashboard:
-	@echo "🚀 Starting Layer 7 Dashboard..."
-	@export $$(cat .env | grep -v '^#' | xargs) && cd layer-7-presentation-notification/stock-analysis-portal && npm run dev
+	@echo "🚀 Starting Layer 8 Dashboard (Next.js)..."
+	@export $$(cat .env | grep -v '^#' | xargs) && cd layer-8-presentation-notification/stock-analysis-portal && npm run dev
 
-layer-1-ingestion:
-	@echo "🚀 Starting Layer 1 (Ingestion)..."
-	@export $$(cat .env | grep -v '^#' | xargs) && cd layer-1-ingestion && npm run dev
+# ─── Short aliases ───
+layer7: layer7-api
+layer8: layer7-dashboard
+layer3:
+	@echo "Layer 3 is infrastructure (TimescaleDB + Redis) -- run: make infra"
 
-layer-7-backend-api:
-	@echo "🚀 Starting Backend API (Layer 7 Core Interface)..."
-	@export $$(cat .env | grep -v '^#' | xargs) && cd layer-7-core-interface/api && npm run dev
+layer9:
+	@echo "🚀 Starting Layer 9 (AI Service)..."
+	@export $$(cat .env | grep -v '^#' | xargs) && cd layer-9-ai-service && uvicorn app.main:app --reload --port 8000
+
+layer10:
+	@echo "🚀 Starting Layer 10 (Execution)..."
+	@export $$(cat .env | grep -v '^#' | xargs) && cd layer-10-execution && npm run dev
+
+# ─── Docker single-service targets ───
+docker-ingestion:
+	$(call ensure_network)
+	$(DC) -f $(COMPOSE_DIR)/docker-compose.app.yml up -d --build ingestion
+
+docker-processing:
+	$(call ensure_network)
+	$(DC) -f $(COMPOSE_DIR)/docker-compose.app.yml up -d --build processing
+
+docker-api:
+	$(call ensure_network)
+	$(DC) -f $(COMPOSE_DIR)/docker-compose.app.yml up -d --build backend-api
+
+docker-dashboard:
+	$(call ensure_network)
+	$(DC) -f $(COMPOSE_DIR)/docker-compose.ui.yml up -d --build dashboard
+
+docker-execution:
+	$(call ensure_network)
+	$(DC) -f $(COMPOSE_DIR)/docker-compose.app.yml up -d --build execution
+
+layer-1-ingestion: layer1
+
+layer-7-backend-api: layer7-api
 
 # ===========================================================
 # 7. OBSERVABILITY & LOGS

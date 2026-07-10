@@ -14,7 +14,9 @@ const bool = (v, d) => (v !== undefined && v !== '' ? v === 'true' : d);
 
 module.exports = {
   service: {
-    port: num(process.env.PORT, 8090),
+    // 8095 everywhere: Dockerfile EXPOSE/HEALTHCHECK, compose `PORT`, and the
+    // L7 proxy's EXECUTION_URL default all agree. Changing this breaks all three.
+    port: num(process.env.PORT, 8095),
   },
 
   tradeMode: process.env.TRADE_MODE || 'paper', // paper | shadow | live
@@ -118,7 +120,10 @@ module.exports = {
     userId: process.env.FLATTRADE_USER_ID || '',
     accountId: process.env.FLATTRADE_ACTID || '',
     apiKey: process.env.FLATTRADE_API_KEY || '',
+    // jKey from the login flow (auth.flattrade.in -> request_code -> /trade/apitoken).
+    // NOT the api_key. In the target design this is read from the central session (Redis).
     token: process.env.FLATTRADE_TOKEN || '',
-    baseUrl: process.env.FLATTRADE_BASE_URL || 'https://piconnect.flattrade.in/PiConnectTP',
+    // Official Pi Connect base URL. `/PiConnectTP` and `/REST/` paths are wrong.
+    baseUrl: process.env.FLATTRADE_BASE_URL || 'https://piconnect.flattrade.in/PiConnectAPI',
   },
 };

@@ -284,6 +284,49 @@ model system_config {
   updated_by  String?
 }
 
+model broker_providers {
+  id             Int                 @id @default(autoincrement())
+  provider       String              @unique // "mstock" | "flattrade" | "kite" | "indianapi"
+  enabled        Boolean             @default(false)
+  role           String              @default("data") // "data" | "execution" | "both"
+  priority       Int                 @default(1)
+  status         String?             @default("DISCONNECTED") // CONNECTED | DISCONNECTED | ERROR | DISABLED
+  last_tested_at DateTime?           @db.Timestamptz(6)
+  created_at     DateTime?           @default(now()) @db.Timestamptz(6)
+  updated_at     DateTime?           @default(now()) @db.Timestamptz(6)
+  credentials    broker_credentials[]
+
+  @@index([role], map: "idx_broker_providers_role")
+  @@index([enabled], map: "idx_broker_providers_enabled")
+}
+
+model broker_credentials {
+  id              Int              @id @default(autoincrement())
+  provider_id     Int
+  field_name      String           // "api_key" | "client_code" | "password" | "totp_secret" | "access_token"
+  ciphertext      String           // AES-256-GCM encrypted, base64
+  iv              String           // initialization vector, base64
+  tag             String           // auth tag, base64
+  is_active       Boolean          @default(true)
+  created_at      DateTime?        @default(now()) @db.Timestamptz(6)
+  updated_at      DateTime?        @default(now()) @db.Timestamptz(6)
+  provider        broker_providers @relation(fields: [provider_id], references: [id], onDelete: Cascade)
+
+  @@unique([provider_id, field_name])
+}
+
+model broker_sessions {
+  id            Int       @id @default(autoincrement())
+  provider      String    @unique // "mstock" | "flattrade" | "kite"
+  token_hash    String?   // sha256 of active token (for audit, never the raw token)
+  status        String?   @default("DISCONNECTED") // CONNECTED | ERROR | DISCONNECTED
+  expires_at    DateTime? @db.Timestamptz(6)
+  last_login_at DateTime? @db.Timestamptz(6)
+  last_error    String?
+  created_at    DateTime? @default(now()) @db.Timestamptz(6)
+  updated_at    DateTime? @default(now()) @db.Timestamptz(6)
+}
+
 /// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
 model technical_indicators {
   time             DateTime @db.Timestamptz(6)

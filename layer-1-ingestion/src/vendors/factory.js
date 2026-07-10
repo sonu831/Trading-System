@@ -7,13 +7,18 @@ const { IndianApiVendor } = require('./indianapi');
 const { MStockVendor } = require('./mstock');
 const { FlatTradeVendor } = require('./flattrade');
 const { CompositeVendor } = require('./composite');
+const { OptionChainPoller } = require('./option-chain-poller');
 const { logger } = require('../utils/logger');
 
 class VendorFactory {
   static createVendor(options, explicitProvider = null) {
     const provider = explicitProvider || process.env.MARKET_DATA_PROVIDER || 'kite';
 
-    logger.info(`🏭 Initializing Market Data Provider: ${provider.toUpperCase()}`);
+    if (provider.toLowerCase() === 'optionchain') {
+      return new OptionChainPoller(options);
+    }
+
+    logger.info(`Initializing Market Data Provider: ${provider.toUpperCase()}`);
 
     switch (provider.toLowerCase()) {
       case 'kite':
@@ -33,7 +38,7 @@ class VendorFactory {
         return new CompositeVendor(options);
 
       default:
-        logger.warn(`⚠️ Unknown provider '${provider}', falling back to Kite`);
+        logger.warn(`Unknown provider '${provider}', falling back to Kite`);
         return new KiteVendor(options);
     }
   }

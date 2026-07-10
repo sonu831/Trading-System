@@ -262,3 +262,181 @@ func StdDev(data []float64, period int) float64 {
 
 	return math.Sqrt(sum / float64(period))
 }
+
+// ──────────────────────────────────────────────
+// ADX (Average Directional Index)
+// ──────────────────────────────────────────────
+
+type ADXResult struct {
+	ADX float64
+	PDI float64 // +DI
+	NDI float64 // -DI
+}
+
+// ADX computes Wilder's ADX, +DI, and -DI
+func ADX(highs, lows, closes []float64, period int) ADXResult {
+	if len(highs) < period+1 || len(lows) < period+1 || len(closes) < period+1 {
+		return ADXResult{ADX: 0, PDI: 0, NDI: 0}
+	}
+
+	n := len(highs)
+	tr := make([]float64, n-1)
+	pdm := make([]float64, n-1)
+	ndm := make([]float64, n-1)
+
+	for i := 1; i < n; i++ {
+		high := highs[i]
+		low := lows[i]
+		prevClose := closes[i-1]
+
+		tr[i-1] = max3(high-low, math.Abs(high-prevClose), math.Abs(low-prevClose))
+
+		upMove := high - highs[i-1]
+		downMove := lows[i-1] - low
+
+		if upMove > downMove && upMove > 0 {
+			pdm[i-1] = upMove
+		} else {
+			pdm[i-1] = 0
+		}
+
+		if downMove > upMove && downMove > 0 {
+			ndm[i-1] = downMove
+		} else {
+			ndm[i-1] = 0
+		}
+	}
+
+	// Wilder's smoothing for ATR, +DM, -DM
+	atrSmooth := wilderSmooth(tr, period)
+	pdiSmooth := wilderSmooth(pdm, period)
+	ndiSmooth := wilderSmooth(ndm, period)
+
+	m := len(atrSmooth)
+	dx := make([]float64, m)
+	for i := 0; i < m; i++ {
+		if atrSmooth[i] == 0 {
+			dx[i] = 0
+		} else {
+			pdi := (pdiSmooth[i] / atrSmooth[i]) * 100
+			ndi := (ndiSmooth[i] / atrSmooth[i]) * 100
+			dx[i] = (math.Abs(pdi-ndi) / (pdi + ndi)) * 100
+		}
+	}
+
+	adxVal := 0.0
+	pdiVal := 0.0
+	ndiVal := 0.0
+	if len(dx) > 0 {
+		adxVal = avgLast(dx, period)
+	}
+	if m > 0 {
+		pdiVal = (pdiSmooth[m-1] / atrSmooth[m-1]) * 100
+		ndiVal = (ndiSmooth[m-1] / atrSmooth[m-1]) * 100
+	}
+
+	return ADXResult{ADX: adxVal, PDI: pdiVal, NDI: ndiVal}
+}
+
+func wilderSmooth(data []float64, period int) []float64 {
+	result := make([]float64, 0, len(data))
+	sum := 0.0
+	for i := 0; i < len(data); i++ {
+		if i < period {
+			sum += data[i]
+			if i == period-1 {
+				result = append(result, sum/float64(period))
+			}
+		} else {
+			prev := result[len(result)-1]
+			val := prev + (data[i]-prev)/float64(period)
+			result = append(result, val)
+		}
+	}
+	return result
+}
+
+func max3(a, b, c float64) float64 {
+	if a >= b && a >= c {
+		return a
+	}
+	if b >= a && b >= c {
+		return b
+	}
+	return c
+}
+
+func avgLast(data []float64, period int) float64 {
+	if len(data) == 0 {
+		return 0
+	}
+	count := period
+	if count > len(data) {
+		count = len(data)
+	}
+	sum := 0.0
+	for i := len(data) - count; i < len(data); i++ {
+		sum += data[i]
+	}
+	return sum / float64(count)
+}
+
+// ──────────────────────────────────────────────
+// Ichimoku Cloud
+// ──────────────────────────────────────────────
+
+type IchimokuResult struct {
+	Tenkan  float64 // Conversion line (9)
+	Kijun   float64 // Base line (26)
+	SenkouA float64 // Leading span A
+	SenkouB float64 // Leading span B
+	Chikou  float64 // Lagging span (close shifted -26)
+}
+
+func Ichimoku(highs, lows, closes []float64) IchimokuResult {
+	if len(closes) < 52 {
+		return IchimokuResult{}
+	}
+
+	tenkanPeriod := 9
+	kijunPeriod := 26
+	senkouBPeriod := 52
+
+	tenkan := (maxN(highs, tenkanPeriod) + minN(lows, tenkanPeriod)) / 2
+	kijun := (maxN(highs, kijunPeriod) + minN(lows, kijunPeriod)) / 2
+	senkouA := (tenkan + kijun) / 2
+	senkouB := (maxN(highs, senkouBPeriod) + minN(lows, senkouBPeriod)) / 2
+	chikou := closes[len(closes)-26]
+
+	return IchimokuResult{
+		Tenkan: tenkan, Kijun: kijun,
+		SenkouA: senkouA, SenkouB: senkouB,
+		Chikou: chikou,
+	}
+}
+
+func maxN(data []float64, n int) float64 {
+	if len(data) < n {
+		n = len(data)
+	}
+	maxVal := data[len(data)-n]
+	for i := len(data) - n; i < len(data); i++ {
+		if data[i] > maxVal {
+			maxVal = data[i]
+		}
+	}
+	return maxVal
+}
+
+func minN(data []float64, n int) float64 {
+	if len(data) < n {
+		n = len(data)
+	}
+	minVal := data[len(data)-n]
+	for i := len(data) - n; i < len(data); i++ {
+		if data[i] < minVal {
+			minVal = data[i]
+		}
+	}
+	return minVal
+}

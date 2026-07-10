@@ -2,7 +2,7 @@
 
 **Name:** Trend-Pullback Continuation (15m filter / 10m trigger)
 **Instruments:** NSE:NIFTY, NSE:BANKNIFTY (signals on index spot; execution via ATM weekly options on a separate broker portal, manually)
-**Status:** PLAN — not yet validated. Do not trade this until Phase 1 & 2 below pass.
+**Status:** IMPLEMENTED as strategy plugin — see `layer-6-signal/src/strategies/plugins/trend-pullback.js`. Not yet validated (see validation roadmap in [`PROJECT_STATE.md`](../../PROJECT_STATE.md)).
 **Created:** 2026-07-04
 
 ---

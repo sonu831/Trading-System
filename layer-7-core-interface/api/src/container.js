@@ -59,6 +59,22 @@ container.register({
   analysisRepository: asClass(require('./modules/analysis/AnalysisRepository')).singleton(),
   analysisService: asClass(require('./modules/analysis/AnalysisService')).singleton(),
   analysisController: asClass(require('./modules/analysis/AnalysisController')).singleton(),
+
+  // Broker (Provider Registry + Credential Vault)
+  brokerRepository: asClass(require('./modules/broker/BrokerRepository')).singleton(),
+  brokerService: asClass(require('./modules/broker/BrokerService')).singleton(),
+  brokerController: asClass(require('./modules/broker/BrokerController')).singleton(),
+  brokerSessionService: asClass(require('./modules/broker/BrokerSessionService')).singleton(),
+
+  // Execution (proxy onto Layer 10: positions, risk, kill switch)
+  executionService: asClass(require('./modules/execution/ExecutionService')).singleton(),
+  executionController: asClass(require('./modules/execution/ExecutionController')).singleton(),
+
+  // Regime (multi-TF market regime from L6 + breadth from L5, read via Redis)
+  regimeService: asClass(require('./modules/regime/RegimeService')).singleton(),
+  regimeController: asClass(require('./modules/regime/RegimeController')).singleton(),
+
+  // MStock Specific Endpoints
 });
 
 module.exports = container;

@@ -448,5 +448,35 @@
       "kite": "1102337",
       "mstock": "18096"
     }
+  },
+  {
+    "symbol": "NIFTY",
+    "exchange": "NSE",
+    "sector": "Index",
+    "isIndex": true,
+    "tokens": {
+      "kite": "256265",
+      "mstock": "TODO_VERIFY_FROM_MSTOCK_UI"
+    }
+  },
+  {
+    "symbol": "BANKNIFTY",
+    "exchange": "NSE",
+    "sector": "Index",
+    "isIndex": true,
+    "tokens": {
+      "kite": "260105",
+      "mstock": "TODO_VERIFY_FROM_MSTOCK_UI"
+    }
+  },
+  {
+    "symbol": "INDIAVIX",
+    "exchange": "NSE",
+    "sector": "Volatility",
+    "isIndex": true,
+    "tokens": {
+      "kite": "260093",
+      "mstock": "TODO_VERIFY_FROM_MSTOCK_UI"
+    }
   }
 ]

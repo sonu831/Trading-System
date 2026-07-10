@@ -1,0 +1,33 @@
+{
+  "strategies": [
+    {
+      "id": "momentum-burst",
+      "enabled": true,
+      "regimeAffinity": ["TREND_UP", "TREND_DOWN"],
+      "params": {
+        "atrMultiplier": 1.5,
+        "minVolumeRatio": 1.2,
+        "rsiEntryMin": 55,
+        "rsiEntryMax": 75,
+        "stopLossPct": 18,
+        "targetPct": 30,
+        "trailingTriggerPct": 12,
+        "trailingStepPct": 6,
+        "timeStopMinutes": 10
+      }
+    },
+    {
+      "id": "trend-pullback",
+      "enabled": true,
+      "regimeAffinity": ["TREND_UP", "TREND_DOWN"],
+      "params": {
+        "rsiOversold": 40,
+        "rsiOverbought": 60,
+        "stopLossPct": 25,
+        "targetR": 2.5,
+        "trailingTriggerPct": 15,
+        "minTfAlignment": 0.3
+      }
+    }
+  ]
+}

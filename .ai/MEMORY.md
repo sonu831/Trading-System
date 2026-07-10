@@ -35,8 +35,11 @@
 | `market_candles` | Layer 2 (Processing) | Layer 3 (Storage), Layer 4 (Analysis) | OHLCV candles |
 | `analysis_updates` | Layer 4 (Analysis) | Layer 5 (Aggregation), Layer 6 (Signal) | Indicator values |
 | `sentiment_scores` | Layer 5 (Aggregation) | Layer 6 (Signal), Layer 7 (API) | Market-wide sentiment |
-| `trade_signals` | Layer 6 (Signal) | Layer 7 (API), Layer 8 (Presentation) | Buy/sell signals |
+| `trade_signals` | Layer 6 (Signal) | Layer 7 (API), L8, **Layer 10** | Buy/sell signals (extended: tier, strategyId, regime, reasons) |
 | `notifications` | Layer 7 (API), Layer 6 (Signal) | Layer 8 (Presentation) | User notifications |
+| `option-chain` | **Layer 1 (OptionChainPoller)** | L4, L6, L10 | ATM±N option chain snapshot |
+| `market-regime` | **Layer 6 (Regime Engine)** | L6 Router, L8, L10 | RegimeState (trend/strength/vol/phase/alignment) |
+| `execution-events` | **Layer 10 (Execution)** | L7, L8, Storage | Order fills, rejects, exits, P&L |
 
 ## Database Architecture (CQRS)
 
@@ -56,10 +59,11 @@
 | L3 | `layer-3-storage/` | TimescaleDB + Redis | Historical + real-time storage |
 | L4 | `layer-4-analysis/` | Go | Technical indicators (RSI, MACD, EMAs) |
 | L5 | `layer-5-aggregation/` | Go | Market-wide sentiment aggregation |
-| L6 | `layer-6-signal/` | Node.js | Buy/sell signal generation |
+| L6 | `layer-6-signal/` | Node.js | Signal generation + **Regime Engine** + **Strategy Framework** (pluggable strategies) |
 | L7 | `layer-7-core-interface/` | Node.js | Fastify REST API + Socket.io |
 | L8 | `layer-8-presentation-notification/` | Node.js/React | Telegram bot, dashboard, email |
 | L9 | `layer-9-ai-service/` | Python | ML inference |
+| **L10** | **`layer-10-execution/`** | **Node.js** | **Options execution engine (OMS, risk mgr, position mgr, journal)** |
 | Infra | `infrastructure/` | Docker | Kafka, Prometheus, Grafana, Loki |
 | Shared | `shared/` | -- | Schemas, constants, types |
 
@@ -79,6 +83,12 @@ All secrets must be set in `.env` (git-ignored). Template: `.env.example`. Key g
 - `TIMESCALEDB_*` / `POSTGRES_*` -- Database connection
 - `REDIS_*` -- Redis connection
 - `SWARM_CONCURRENCY` -- Layer 1 worker pool size
+- `TRADE_MODE` -- Execution mode: paper | shadow | live
+- `EXECUTION_BROKER` -- flattrade | mstock
+- `REGIME_*` -- Regime engine settings (poll interval, symbol)
+- `OPTION_*` -- Option chain poller settings (poll interval, underlying)
+- `SEBI_REGISTERED` -- Validation: SEBI algo registration confirmed
+- `BROKER_RATE_LIMITS_CONFIRMED` -- Validation: broker rate limits checked
 
 ## Build & Test Commands
 
@@ -114,4 +124,4 @@ All secrets must be set in `.env` (git-ignored). Template: `.env.example`. Key g
 - **Deployment guide:** `DEPLOYMENT.md`
 - **Contributing guide:** `CONTRIBUTING.md`
 
-> _Last updated: 2026-07-09_
+> _Last updated: 2026-07-09 (Phases A–F built)_

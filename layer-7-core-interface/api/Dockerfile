@@ -23,8 +23,8 @@ EXPOSE 4000
 # Run as non-root user
 USER node
 
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD wget --no-verbose --tries=1 --spider http://localhost:4000/health || exit 1
+HEALTHCHECK --interval=30s --timeout=10s --start-period=90s --retries=5 \
+    CMD node -e "require('http').get('http://localhost:4000/health',r=>{process.exit(r.statusCode===200?0:1)})"
 
 # Run with PM2 in production for clustering and zero-downtime reloads
 CMD ["pm2-runtime", "ecosystem.config.js"]

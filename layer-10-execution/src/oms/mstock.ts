@@ -53,6 +53,8 @@ export class MStockOMS extends BaseOMS {
 
   setAccessToken(token: string): void { this.accessToken = token; }
 
+  getAccessToken(): string { return this.accessToken; }
+
   /**
    * LiveExecutor requires a broker-side resting stop (SL-M) and fill confirmation.
    * Returns false deliberately — fail closed. Flip to true only after Orders API verified.

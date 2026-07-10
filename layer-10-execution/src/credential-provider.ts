@@ -179,11 +179,12 @@ class CredentialProvider {
   getMStockConfig(): MStockCredentials {
     const provider = 'mstock';
     const creds = this.credentialCache.get(provider) || {};
-    const token = this.tokens.get(provider) || '';
+    // DB-stored access_token is durable; Redis session token is fallback
+    const accessToken = creds.access_token || this.tokens.get(provider) || '';
     const staticCfg = this.staticConfig.mstock;
     return {
       apiKey: creds.api_key || '',
-      accessToken: token,
+      accessToken,
       clientCode: creds.client_code || '',
       baseUrl: staticCfg.baseUrl,
       endpoints: staticCfg.endpoints,
@@ -193,11 +194,12 @@ class CredentialProvider {
   getFlatTradeConfig(): FlatTradeCredentials {
     const provider = 'flattrade';
     const creds = this.credentialCache.get(provider) || {};
-    const token = this.tokens.get(provider) || '';
+    // DB-stored access_token (jKey) is durable; Redis session token is fallback
+    const token = creds.access_token || this.tokens.get(provider) || '';
     const staticCfg = this.staticConfig.flattrade;
     return {
-      userId: creds.api_key ? creds.api_key.split('_')[0] || creds.user_id || '' : creds.user_id || '',
-      accountId: creds.api_key ? creds.api_key.split('_')[0] || creds.user_id || '' : creds.user_id || '',
+      userId: creds.user_id || '',
+      accountId: creds.user_id || '',
       apiKey: creds.api_key || '',
       token,
       baseUrl: staticCfg.baseUrl,

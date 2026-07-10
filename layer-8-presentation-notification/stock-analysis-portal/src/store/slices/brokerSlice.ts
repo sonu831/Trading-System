@@ -66,6 +66,16 @@ export const saveCredential = createAsyncThunk('brokers/saveCredential', async (
   return { field_name };
 });
 
+export const saveCredentialsBulk = createAsyncThunk('brokers/saveCredentialsBulk', async ({ providerId, credentials }) => {
+  const res = await fetch(`/api/v1/providers/${providerId}/credentials/bulk`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ credentials }),
+  });
+  const data = await res.json();
+  if (!data.success) throw new Error(data.message || 'Failed to save credentials');
+  return { providerId, credentials };
+});
+
 const initialState = {
   list: [],
   selected: null,
@@ -126,6 +136,21 @@ const brokerSlice = createSlice({
         if (idx < 0) return;
         const broker = state.list[idx];
         broker.credentials = (broker.credentials || []).filter((c) => c.field_name !== action.payload.fieldName);
+        if (state.selected?.id === action.payload.providerId) state.selected = broker;
+      })
+      .addCase(saveCredentialsBulk.fulfilled, (state, action) => {
+        const idx = state.list.findIndex((b) => b.id === action.payload.providerId);
+        if (idx < 0) return;
+        const broker = state.list[idx];
+        const newCreds = (action.payload.credentials || []).map((c) => ({
+          field_name: c.field_name,
+          value: c.field_value ? '••••••••' : '',
+          is_active: !!c.field_value,
+        }));
+        const existingMap = {};
+        (broker.credentials || []).forEach((c) => { existingMap[c.field_name] = c; });
+        newCreds.forEach((c) => { existingMap[c.field_name] = c; });
+        broker.credentials = Object.values(existingMap);
         if (state.selected?.id === action.payload.providerId) state.selected = broker;
       });
   },

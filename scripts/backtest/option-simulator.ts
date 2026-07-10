@@ -1,3 +1,20 @@
+/**
+ * OptionSimulator — SYNTHETIC option pricing for backtests. NOT real market data.
+ *
+ * ⚠️ Every premium here is a Black-Scholes MODEL OUTPUT, priced at a CONSTANT implied
+ * volatility (`ivBaseline`, default 15%) with a crude expiry-day crush. There is no
+ * volatility smile, no term structure, and no real bid/ask — because the `options_chain`
+ * table has 30-day retention, so no historical option prices exist to test against.
+ *
+ * Consequences a reader must internalise before trusting a number from this file:
+ *   - Backtested options P&L is an ESTIMATE, not a measurement. A strategy that only works
+ *     at flat 15% IV will look profitable here and lose money live.
+ *   - Real weekly-option theta and IV crush around events are far more violent than this
+ *     model. Treat results as a RANKING of strategies, not an absolute P&L forecast.
+ *
+ * Rule 13: every result object is stamped `synthetic: true` / `source: 'synthetic'` so a
+ * dashboard or report can never present these as real fills. Do not strip those flags.
+ */
 function cdf(x) {
   const a1 = 0.254829592;
   const a2 = -0.284496736;

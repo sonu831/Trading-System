@@ -51,6 +51,7 @@ interface BrokerService {
   getSessionToken(provider: string): Promise<string | null>;
   saveSessionToken(provider: string, token: string, ttl: number): Promise<void>;
   clearSessionToken(provider: string): Promise<void>;
+  saveAccessToken(provider: string, token: string): Promise<void>;
   setJson(key: string, value: unknown, ttl: number): Promise<void>;
   getJson(key: string): Promise<unknown>;
   delKey(key: string): Promise<void>;
@@ -160,6 +161,8 @@ class BrokerSessionService {
     let token_length: number | undefined;
     if (result.token) {
       await this.saveToken(provider, result.token, result.ttlSeconds || 21000);
+      // Persist to DB so L1/L10 read it from encrypted storage — survives Redis restarts.
+      await this.brokerService.saveAccessToken(provider, result.token);
       token_length = String(result.token).length;
     }
     const { token, ttlSeconds, ...safe } = result as any;

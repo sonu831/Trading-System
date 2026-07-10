@@ -61,6 +61,31 @@ async function brokerRoutes(fastify, options) {
     handler: brokerController.saveCredential,
   });
 
+  fastify.post('/api/v1/providers/:id/credentials/bulk', {
+    schema: {
+      description: 'Bulk save/delete credentials in one request',
+      tags: ['Providers'],
+      body: {
+        type: 'object',
+        required: ['credentials'],
+        properties: {
+          credentials: {
+            type: 'array',
+            items: {
+              type: 'object',
+              required: ['field_name', 'field_value'],
+              properties: {
+                field_name: { type: 'string', enum: ['api_key', 'api_secret', 'client_code', 'password', 'totp_secret', 'access_token'] },
+                field_value: { type: 'string' },
+              },
+            },
+          },
+        },
+      },
+    },
+    handler: brokerController.saveCredentials,
+  });
+
   fastify.delete('/api/v1/providers/:id/credentials', {
     schema: {
       description: 'Delete a single credential field from a provider',
@@ -163,13 +188,32 @@ async function brokerRoutes(fastify, options) {
     },
   });
 
-  /** Lets the dashboard render the right credential form + interactive prompts per broker. */
+  /** Lets the dashboard render the right credential form + interactive prompts per broker.
+   *  Also returns shared enums so the UI always stays in sync with backend. */
   fastify.get('/api/v1/broker-strategies', {
     schema: {
-      description: 'Supported brokers with their required fields, interactive inputs and capabilities',
+      description: 'Supported brokers, form fields, capabilities, shared constants',
       tags: ['Providers'],
     },
-    handler: async () => ({ success: true, data: brokerSessionService.listStrategies() }),
+    handler: async () => {
+      const strategies = brokerSessionService.listStrategies();
+      const shared = require('../../../../shared/constants');
+      return {
+        success: true,
+        data: strategies,
+        meta: {
+          providers: shared.BROKER_PROVIDERS || [
+            { value: 'mstock', label: 'mStock (Mirae Asset)' },
+            { value: 'flattrade', label: 'FlatTrade' },
+            { value: 'kite', label: 'Zerodha Kite' },
+            { value: 'indianapi', label: 'IndianAPI' },
+          ],
+          roles: ['data', 'execution', 'both'],
+          credentialFields: shared.BROKER_CREDENTIAL_FIELDS || ['api_key', 'api_secret', 'client_code', 'password', 'totp_secret', 'access_token'],
+          formFields: shared.BROKER_FORM_FIELDS || {},
+        },
+      };
+    },
   });
 }
 

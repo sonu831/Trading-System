@@ -121,50 +121,37 @@ const { KAFKA_TOPICS, PORTS, REDIS_KEYS } = require('/app/shared');
 
 ## 📚 Documentation Hub
 
-### Canonical (Read First)
+### Canonical (read first — these two win over everything else)
 
 | Doc | Content |
 |-----|---------|
-| [`docs/VISION.md`](docs/VISION.md) | **Vision** — what, why, 3 planes, safety invariants, roadmap |
-| [`ARCHITECTURE.md`](ARCHITECTURE.md) | **Architecture** — 3 planes, layers, extensibility, security |
+| [`VISION.md`](VISION.md) | **What the system is for** — the two jobs, k-NN research, what's real today |
+| [`ARCHITECTURE.md`](ARCHITECTURE.md) | **How it's built** — Control / Data / Research planes, extensibility, toolchain |
 
-### Tracking & Audits
+> On 2026-07-10 fourteen overlapping/stale planning & status docs (~7,900 lines) were consolidated
+> into these two and deleted — they contradicted each other and the code. Git history preserves them.
+> **Running state** now lives in [`.ai/handoffs/`](.ai/handoffs/), not a status file.
 
-| Doc | Content |
-|-----|---------|
-| [`docs/PROJECT_STATE.md`](docs/PROJECT_STATE.md) | Master completion tracker — all phases, session log |
-| [`docs/ENGINEERING_STANDARDS_AUDIT.md`](docs/ENGINEERING_STANDARDS_AUDIT.md) | 12-section compliance audit (82%) |
-| [`docs/RESTRUCTURE_PLAN.md`](docs/RESTRUCTURE_PLAN.md) | 67-finding production audit + 6-week remediation |
-
-### Trading & Strategy
+### Trading & Strategy (reference)
 
 | Doc | Content |
 |-----|---------|
-| [`docs/TARGET_ARCHITECTURE.md`](docs/TARGET_ARCHITECTURE.md) | North star — Control vs Data Plane, provider-agnostic adapters |
-| [`docs/MOMENTUM_TRADING_ARCHITECTURE.md`](docs/MOMENTUM_TRADING_ARCHITECTURE.md) | Strategy + adaptive framework, timeframe tiers |
+| [`docs/MOMENTUM_TRADING_ARCHITECTURE.md`](docs/MOMENTUM_TRADING_ARCHITECTURE.md) | Momentum strategy mechanics, timeframe tiers |
 | [`docs/OPTIONS_SCALPING_RULES.md`](docs/OPTIONS_SCALPING_RULES.md) | Execution invariants, scalping rules |
-| [`docs/SIMPLE_ROBUST_ARCHITECTURE_PLAN.md`](docs/SIMPLE_ROBUST_ARCHITECTURE_PLAN.md) | Provider registry, credential vault, session service |
 
-### Dashboard & Frontend
-
-| Doc | Content |
-|-----|---------|
-| [`docs/DASHBOARD_ENHANCEMENT_PLAN.md`](docs/DASHBOARD_ENHANCEMENT_PLAN.md) | Atomic design + scalp cockpit (ALL PHASES COMPLETE) |
-| [`docs/DASHBOARD_PLAN.md`](docs/DASHBOARD_PLAN.md) | Original dashboard architecture plan |
-
-### Research & Future
+### Research (forward design)
 
 | Doc | Content |
 |-----|---------|
-| [`docs/RESEARCH_PLANE_PLAN.md`](docs/RESEARCH_PLANE_PLAN.md) | k-NN analog matching engine (PLAN) |
-| [`docs/TYPESCRIPT_MIGRATION_PLAN.md`](docs/TYPESCRIPT_MIGRATION_PLAN.md) | TS migration — 72 files typed, pattern docs |
+| [`docs/RESEARCH_PLANE_PLAN.md`](docs/RESEARCH_PLANE_PLAN.md) | k-NN analog matching engine — detailed spec (PLAN, unbuilt) |
 
-### Infrastructure
+### Infrastructure & Schema
 
 | Doc | Content |
 |-----|---------|
+| [`docs/DATABASE_SCHEMA.md`](docs/DATABASE_SCHEMA.md) | Hypertables, continuous aggregates, retention, `index_membership` |
 | [`docs/BROKER_LOGIN_FLOWS.md`](docs/BROKER_LOGIN_FLOWS.md) | MStock, FlatTrade, Kite, IndianAPI auth flows |
-| [`docs/DATABASE_SCHEMA.md`](docs/DATABASE_SCHEMA.md) | TimescaleDB hypertables, continuous aggregates |
+| [`docs/broker-credential-ui.md`](docs/broker-credential-ui.md) | Broker settings UI reference |
 | [`docs/Dockerfile.hardened.template`](docs/Dockerfile.hardened.template) | Reference Dockerfile for new services |
 | [`.ai/skills/`](.ai/skills/) | AI coding skills (graphify, kafka, db, docker, engineering) |
 

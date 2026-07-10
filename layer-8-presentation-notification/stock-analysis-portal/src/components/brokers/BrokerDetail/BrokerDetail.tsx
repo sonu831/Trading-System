@@ -2,8 +2,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import { useSelector, useDispatch } from 'react-redux';
-import BrokerConfig from './BrokerConfig';
-import CredentialForm from './CredentialForm';
+import BrokerForm from './BrokerForm';
 import BrokerAuthTest from './MStockAuthFlow';
 import BrokerStatusBadge from '@/components/brokers/BrokerList/BrokerStatusBadge';
 import { fetchBrokers, enableBroker, disableBroker, selectBrokers } from '@/store/slices/brokerSlice';
@@ -45,8 +44,7 @@ const BrokerDetail = ({ id }) => {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="space-y-6">
-          <BrokerConfig broker={broker} />
-          <CredentialForm broker={broker} />
+          <BrokerForm broker={broker} />
         </div>
         <div className="space-y-6">
           <BrokerAuthTest broker={broker} />

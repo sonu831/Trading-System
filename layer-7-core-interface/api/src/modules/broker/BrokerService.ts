@@ -39,6 +39,26 @@ class BrokerService extends BaseService {
     await this.brokerRepository.deleteCredential(providerId, fieldName);
   }
 
+  async saveAccessToken(provider: string, token: string): Promise<void> {
+    const p = await this.brokerRepository.findProviderByName(provider);
+    if (!p) { const e: any = new Error('Provider not found'); e.statusCode = 404; throw e; }
+    const { ciphertext, iv, tag } = encrypt(token);
+    await this.brokerRepository.upsertCredential(p.id, 'access_token', ciphertext, iv, tag);
+  }
+
+  async saveCredentials(providerId: number, fields: Array<{ field_name: string; field_value: string }>): Promise<any> {
+    const p = await this.brokerRepository.findProviderById(providerId);
+    if (!p) { const e: any = new Error('Provider not found'); e.statusCode = 404; throw e; }
+    for (const f of fields) {
+      if (!f.field_value) {
+        await this.brokerRepository.deleteCredential(providerId, f.field_name);
+      } else {
+        const { ciphertext, iv, tag } = encrypt(f.field_value);
+        await this.brokerRepository.upsertCredential(providerId, f.field_name, ciphertext, iv, tag);
+      }
+    }
+  }
+
   async enableProvider(id: number): Promise<any> { await this.brokerRepository.updateProvider(id, { enabled: true, updated_at: new Date() }); const p = await this.brokerRepository.findProviderById(id); await this.brokerRepository.publishConfigChange(p!.provider); return { enabled: true, provider: p!.provider }; }
   async disableProvider(id: number): Promise<any> { await this.brokerRepository.updateProvider(id, { enabled: false, status: 'DISABLED', updated_at: new Date() }); const p = await this.brokerRepository.findProviderById(id); await this.brokerRepository.publishConfigChange(p!.provider); return { enabled: false, provider: p!.provider }; }
 

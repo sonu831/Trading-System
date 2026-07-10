@@ -94,6 +94,33 @@ const PROVIDER_ROLE = {
   BOTH: 'both',
 };
 
+// ── Broker credential fields (single source of truth — rule 3/14) ────
+
+const BROKER_CREDENTIAL_FIELDS = ['api_key', 'api_secret', 'client_code', 'password', 'totp_secret', 'access_token'];
+
+// Map provider → which fields are REQUIRED for auth to succeed
+const BROKER_REQUIRED_FIELDS = {
+  mstock:       ['api_key', 'client_code', 'password'],
+  flattrade:    ['api_key', 'api_secret'],
+  kite:         ['api_key', 'api_secret'],
+  indianapi:    ['api_key'],
+};
+
+// Map provider → which fields the dashboard should present in order
+const BROKER_FORM_FIELDS = {
+  mstock:       ['api_key', 'client_code', 'password', 'totp_secret'],
+  flattrade:    ['api_key', 'api_secret', 'access_token'],
+  kite:         ['api_key', 'api_secret', 'access_token'],
+  indianapi:    ['api_key'],
+};
+
+const BROKER_PROVIDERS = [
+  { value: 'mstock',    label: 'mStock (Mirae Asset)' },
+  { value: 'flattrade', label: 'FlatTrade' },
+  { value: 'kite',      label: 'Zerodha Kite' },
+  { value: 'indianapi', label: 'IndianAPI' },
+];
+
 // ── Broker URLs (single source of truth — rule 3/14) ────
 //
 // A single source of truth that is WRONG is worse than none: every importer inherits the
@@ -196,5 +223,6 @@ module.exports = {
   REGIME_TREND, REGIME_SENTIMENT, REGIME_VOLATILITY, REGIME_PHASE,
   SIGNAL_DIRECTION, SIGNAL_ACTION, SIGNAL_TIER, OPTION_TYPE,
   SECTOR_MOMENTUM, TRADE_MODE, PROVIDER_ROLE,
+  BROKER_CREDENTIAL_FIELDS, BROKER_REQUIRED_FIELDS, BROKER_FORM_FIELDS, BROKER_PROVIDERS,
   BROKER_BASE_URLS, EXPIRY_WEEKDAY_ISO, REDIS_KEYS, PORTS, KAFKA_TOPICS, KAFKA_GROUPS,
 };

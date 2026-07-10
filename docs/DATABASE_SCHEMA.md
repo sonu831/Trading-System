@@ -199,14 +199,24 @@ CREATE TABLE data_availability (
 
 ### 1. Market Data (6 entities)
 
-| Table           | Type                 | Purpose             | Retention                       |
-| --------------- | -------------------- | ------------------- | ------------------------------- |
-| `candles_1m`    | Hypertable           | Base 1-minute OHLCV | 1 year hot, 10 years compressed |
-| `candles_5m`    | Continuous Aggregate | Auto-rolled from 1m | Same as 1m                      |
-| `candles_15m`   | Continuous Aggregate | Auto-rolled from 1m | Same as 1m                      |
-| `candles_1h`    | Continuous Aggregate | Auto-rolled from 1m | Same as 1m                      |
-| `candles_1d`    | Continuous Aggregate | Auto-rolled from 1m | Forever                         |
-| `options_chain` | Hypertable           | Options Greeks/OI   | 30 days                         |
+| Table           | Type                 | Purpose             | Retention                                     |
+| --------------- | -------------------- | ------------------- | --------------------------------------------- |
+| `candles_1m`    | Hypertable           | Base 1-minute OHLCV | **5 years** (compressed after 7 days) — mig 007 |
+| `candles_5m`    | Continuous Aggregate | Auto-rolled from 1m | Uncapped (no retention policy)                |
+| `candles_15m`   | Continuous Aggregate | Auto-rolled from 1m | Uncapped                                      |
+| `candles_1h`    | Continuous Aggregate | Auto-rolled from 1m | Uncapped                                      |
+| `candles_1d`    | Continuous Aggregate | Auto-rolled from 1m | Forever (backtest spine)                      |
+| `options_chain` | Hypertable           | Options Greeks/OI   | 30 days                                       |
+
+> **Retention history:** `001_init_schema.sql` originally set `candles_1m` to **30 days**,
+> which quietly deleted everything the 5-year pattern engine depends on. `007` raises it to
+> 5 years. The aggregate views carry no retention policy, so they persist on their own.
+>
+> **Point-in-time index membership (`index_membership`, mig 007):** historical
+> stock-vs-index backtests MUST resolve constituents through `index_members_asof(index, date)`,
+> never through `instruments.is_nifty50` (a current-state flag). Using today's 50 names for
+> all of history is survivorship bias — it silently manufactures alpha. The table ships empty;
+> a loader must populate it from a real NSE historical-constituents source.
 
 ### 2. Reference Data (3 entities)
 

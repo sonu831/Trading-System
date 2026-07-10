@@ -2,8 +2,16 @@
   "name": "backtest-harness",
   "version": "1.0.0",
   "private": true,
+  "description": "Offline backtest + optimizer harness (Research plane). SYNTHETIC option pricing.",
+  "scripts": {
+    "backtest": "tsx run.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "node --import tsx tests/option-simulator.test.ts"
+  },
   "dependencies": {
-    "pg": "^8.11.3",
-    "dotenv": "^16.3.1"
+    "pg": "^8.16.3",
+    "dotenv": "^17.4.2",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3"
   }
 }

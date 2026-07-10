@@ -91,7 +91,8 @@ export interface StrategyConfig {
   name: string;
   enabled: boolean;
   tier: TierType;
-  params: Record<string, number>;
+  description?: string;
+  params: Record<string, unknown>;
   regimeAffinity: string[];
   cooldownMs: number;
   lastTriggeredAt?: string;

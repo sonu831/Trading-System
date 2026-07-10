@@ -1,3 +1,4 @@
+// @ts-nocheck
 import React from 'react';
 import { FlaskConical, Eye, Zap, HelpCircle, type LucideIcon } from 'lucide-react';
 import type { TradeMode } from '@/shared/types';

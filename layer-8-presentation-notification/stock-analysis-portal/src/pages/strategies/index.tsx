@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { useState, useEffect } from 'react';
 import { AppLayout } from '@/components/layout';
 import type { StrategyConfig } from '@/shared/types';

@@ -1,5 +1,5 @@
 import { useRouter } from 'next/router';
-import AppLayout from '@/components/layout/AppLayout';
+import AppLayout from '@/components/layout/AppLayout/AppLayout';
 import OptionChainGrid from '@/components/organisms/OptionChainGrid';
 
 export default function OptionsPage() {

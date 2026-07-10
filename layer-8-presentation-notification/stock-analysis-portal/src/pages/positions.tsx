@@ -1,5 +1,5 @@
 import { useSelector } from 'react-redux';
-import AppLayout from '@/components/layout/AppLayout';
+import AppLayout from '@/components/layout/AppLayout/AppLayout';
 import PositionsTable from '@/components/trading/PositionsTable';
 import DailyRiskCard from '@/components/trading/DailyRiskCard';
 import StatTile from '@/components/trading/StatTile';

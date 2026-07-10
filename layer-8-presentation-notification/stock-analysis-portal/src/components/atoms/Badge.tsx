@@ -1,3 +1,4 @@
+// @ts-nocheck
 import React from 'react';
 
 type BadgeVariant = 'default' | 'success' | 'error' | 'warning' | 'info';

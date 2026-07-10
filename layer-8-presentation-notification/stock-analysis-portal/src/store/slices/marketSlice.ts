@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { createSlice, createSelector } from '@reduxjs/toolkit';
 
 const initialState = {

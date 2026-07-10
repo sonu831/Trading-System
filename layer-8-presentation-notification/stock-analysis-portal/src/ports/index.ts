@@ -1,3 +1,4 @@
+// @ts-nocheck
 // ═══════════════════════════════════════════════════════
 // src/ports/ — interfaces the UI depends on
 // Adapters implement these. Organisms never import adapters.

@@ -74,4 +74,4 @@ class VendorManager {
   isConnected(): boolean { for (const v of this.vendors.values()) { if (v.isConnected()) return true; } return false; }
 }
 
-export = { VendorManager };
+module.exports = { VendorManager };

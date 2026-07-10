@@ -10,7 +10,7 @@
  * - Polls every 5 minutes (lower cadence than market data)
  */
 const { AltDataAdapter } = require('./AltDataAdapter');
-const { logger } = require('../utils/logger');
+const logger = require('../utils/logger');
 
 class FIIDIIScraper extends AltDataAdapter {
   constructor(options = {}) {

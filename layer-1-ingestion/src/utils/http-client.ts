@@ -13,7 +13,7 @@ const axios = require('axios');
 const http = require('http');
 const https = require('https');
 const { metrics } = require('./metrics');
-const { logger } = require('./logger');
+const logger = require('./logger');
 
 // Connection pooling — keeps TLS sessions warm (avoids 100-300ms per handshake)
 const httpAgent = new http.Agent({ keepAlive: true, maxSockets: 25, keepAliveMsecs: 30000 });

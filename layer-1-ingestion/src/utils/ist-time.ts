@@ -63,4 +63,4 @@ function nextWeeklyExpiryIST(
   return new Date(expiry.getTime() - istOffsetMinutes() * 60 * 1000);
 }
 
-export = { istOffsetMinutes, nowIST, tradingDateIST, nextWeeklyExpiryIST, isoToJsDay };
+module.exports = { istOffsetMinutes, nowIST, tradingDateIST, nextWeeklyExpiryIST, isoToJsDay };

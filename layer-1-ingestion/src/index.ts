@@ -24,7 +24,7 @@ const axios = require('axios');
 const { VendorFactory } = require('./vendors/factory');
 const { KafkaProducer } = require('./kafka/producer');
 const { Normalizer } = require('./normalizer');
-const { logger } = require('./utils/logger');
+const logger = require('./utils/logger');
 const { metrics, register } = require('./utils/metrics');
 const client = require('prom-client');
 const redis = require('redis');
@@ -460,7 +460,8 @@ async function initialize() {
        logger.info('☀️ Market is OPEN - Live Stream Active');
     }
   } catch (error) {
-    logger.error('❌ Initialization failed:', error);
+    logger.error({ err: error }, '❌ Initialization failed');
+    console.error(error);
     process.exit(1);
   }
 }

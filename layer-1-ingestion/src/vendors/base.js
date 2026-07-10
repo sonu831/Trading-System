@@ -5,7 +5,7 @@ const { HistoricalChunker } = require('../utils/historical-chunker');
 const { ResponseBuilder } = require('../utils/response-builder');
 const { RequestUtils } = require('../utils/request-utils');
 const { DateTime } = require('luxon');
-const { logger } = require('../utils/logger');
+const logger = require('../utils/logger');
 
 class BaseVendor {
   constructor(options) {

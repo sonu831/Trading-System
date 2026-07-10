@@ -36,5 +36,5 @@ class BaseRepository {
   }
 }
 
-export = BaseRepository;
+module.exports = BaseRepository;
 export type { PrismaClient, RedisClient };

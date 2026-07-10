@@ -1,5 +1,5 @@
 const { DateTime } = require('luxon');
-const { logger } = require('./logger');
+const logger = require('./logger');
 
 class TimeSlicer {
   /**

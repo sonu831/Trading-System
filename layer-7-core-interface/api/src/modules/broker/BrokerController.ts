@@ -15,4 +15,4 @@ class BrokerController extends BaseController {
   deleteProvider = async (req: any, reply: any) => { try { await this.brokerService.deleteProvider(parseInt(req.params.id)); return this.sendSuccess(reply, null, 'Provider deleted'); } catch (e: any) { return this.sendError(reply, e, e.statusCode || 500); } };
 }
 
-export = { BrokerController };
+module.exports = BrokerController;

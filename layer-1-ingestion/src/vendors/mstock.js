@@ -1,6 +1,6 @@
 const { BaseVendor } = require('./base');
 const { MStockMapper } = require('../mappers/mstock');
-const { logger } = require('../utils/logger');
+const logger = require('../utils/logger');
 const { metrics } = require('../utils/metrics');
 const { MConnect, MTicker } = require('@mstock-mirae-asset/nodetradingapi-typeb');
 

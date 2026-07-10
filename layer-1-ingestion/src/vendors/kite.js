@@ -5,7 +5,7 @@ const WebSocket = require('ws');
 const KiteConnect = require('kiteconnect').KiteConnect;
 const { BaseVendor } = require('./base');
 const { KiteMapper } = require('../mappers/kite');
-const { logger } = require('../utils/logger');
+const logger = require('../utils/logger');
 const { metrics } = require('../utils/metrics');
 
 class KiteVendor extends BaseVendor {

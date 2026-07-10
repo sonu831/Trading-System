@@ -1,7 +1,7 @@
 const axios = require('axios');
 const { BaseVendor } = require('./base');
 const { FlatTradeMapper } = require('../mappers/flattrade');
-const { logger } = require('../utils/logger');
+const logger = require('../utils/logger');
 const { metrics } = require('../utils/metrics');
 const { FLATTRADE_BASE_URL, norenBody, isNorenOk, norenError } = require('../utils/flattrade');
 

@@ -6,7 +6,7 @@
  */
 
 const { SymbolRegistry } = require('../utils/symbol-registry');
-const { logger } = require('../utils/logger');
+const logger = require('../utils/logger');
 
 const INDEX_SYMBOLS = new Set(['NIFTY', 'BANKNIFTY', 'INDIAVIX']);
 

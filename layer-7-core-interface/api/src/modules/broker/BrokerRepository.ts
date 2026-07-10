@@ -17,4 +17,4 @@ class BrokerRepository extends BaseRepository {
   async publishConfigChange(provider: string): Promise<void> { await this.redis.publisher?.publish('providers-changed', JSON.stringify({ provider, timestamp: Date.now() })); }
 }
 
-export = { BrokerRepository };
+module.exports = BrokerRepository;

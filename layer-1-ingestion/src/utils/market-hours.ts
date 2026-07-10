@@ -28,4 +28,4 @@ class MarketHours {
   }
 }
 
-export = { MarketHours };
+module.exports = { MarketHours };

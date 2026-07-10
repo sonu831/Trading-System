@@ -1,7 +1,7 @@
 const Piscina = require('piscina');
 const path = require('path');
 const axios = require('axios');
-const pLimit = require('p-limit');
+const pLimit = require('p-limit').default;
 const {
   SMA, EMA, RSI, MACD, BollingerBands, Stochastic, ATR, ADX, OBV,
   bullish, bearish,

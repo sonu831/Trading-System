@@ -2,7 +2,7 @@
  * CredentialStore — reads enabled providers from L7 API, cache tokens from Redis.
  * Subscribes to `providers-changed` for hot-reload without restart.
  */
-const { logger } = require('../utils/logger');
+const logger = require('../utils/logger');
 
 interface Provider {
   provider: string;
@@ -120,5 +120,5 @@ class CredentialStore {
   onProvidersChange(callback: OnChangeCallback): void { this.onChange = callback; }
 }
 
-export = { CredentialStore };
+module.exports = { CredentialStore };
 export type { Provider, OnChangeCallback, RedisClient };

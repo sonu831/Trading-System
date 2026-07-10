@@ -10,7 +10,7 @@ const { KiteVendor } = require('./kite');
 const { IndianApiVendor } = require('./indianapi');
 const { MStockVendor } = require('./mstock');
 const { FlatTradeVendor } = require('./flattrade');
-const { logger } = require('../utils/logger');
+const logger = require('../utils/logger');
 
 class CompositeVendor extends BaseVendor {
   constructor(options) {

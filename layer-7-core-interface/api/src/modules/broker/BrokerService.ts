@@ -74,4 +74,4 @@ class BrokerService extends BaseService {
   }
 }
 
-export = { BrokerService };
+module.exports = BrokerService;

@@ -11,4 +11,4 @@ class BaseController {
   }
 }
 
-export = BaseController;
+module.exports = BaseController;

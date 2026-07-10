@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node src/index.js",
     "dev": "nodemon src/index.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node tests/candle-aggregator.test.js"
   },
   "dependencies": {
     "dotenv": "^16.3.1",

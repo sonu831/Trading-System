@@ -6,28 +6,25 @@ const { MConnect, MTicker } = require('@mstock-mirae-asset/nodetradingapi-typeb'
 
 const util = require('util');
 
-if (!global.isConsolePatched) {
-  const originalConsoleError = console.error;
-  const originalConsoleLog = console.log;
+const noopLog = new Set([
+  'Unexpected server response: 502',
+  'Max reconnection attempts reached',
+  'WebSocket was closed before the connection was established',
+  'WebSocket connection closed',
+]);
 
-  console.error = (...args) => {
-    const msg = util.format(...args);
-    if (
-      msg.includes('Unexpected server response: 502') ||
-      msg.includes('Max reconnection attempts reached') ||
-      msg.includes('WebSocket was closed before the connection was established')
-    ) return;
-    originalConsoleError.apply(console, args);
-  };
-
-  console.log = (...args) => {
-    const msg = util.format(...args);
-    if (msg.includes('WebSocket connection closed')) return;
-    originalConsoleLog.apply(console, args);
-  };
-
-  global.isConsolePatched = true;
+/** Filter noisy SDK log messages without globally mutating console. */
+function filterConsoleLog(logFn, ...args) {
+  const msg = util.format(...args);
+  for (const pattern of noopLog) { if (msg.includes(pattern)) return; }
+  logFn(...args);
 }
+
+// Wire SDK's log output through our filtered logger, NOT global console monkey-patch.
+const originalConsoleError = console.error.bind(console);
+const originalConsoleLog = console.log.bind(console);
+console.error = (...args) => filterConsoleLog(originalConsoleError, ...args);
+console.log = (...args) => filterConsoleLog(originalConsoleLog, ...args);
 
 class MStockVendor extends BaseVendor {
   constructor(options = {}) {

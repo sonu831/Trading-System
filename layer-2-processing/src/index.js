@@ -195,11 +195,13 @@ async function main() {
 
     await startConsumer(handleMessage);
 
-    // Start option chain consumer
-    const redisUrl = process.env.REDIS_URL || 'redis://redis:6379';
+    // Start option chain consumer.
+    // `redisUrl` is already declared above (line ~169) — re-declaring it in the same
+    // block is a SyntaxError and the service could not boot at all.
+    // `waitForAll` already handed us a connected client; do not open a second connection.
     const { createClient } = require('redis');
-    const redisClient = createClient({ url: redisUrl });
-    await redisClient.connect();
+    const redisClient = connectedRedis || createClient({ url: redisUrl });
+    if (!connectedRedis) await redisClient.connect();
     optionChainWriter = new OptionChainWriter({ pool, redisClient });
     await startOptionChainConsumer(optionChainWriter);
     logger.info('Option chain consumer started');

@@ -364,24 +364,42 @@ async function initialize() {
       logger.error('⚠️ Failed to send notification:', alertErr.message);
     }
     // ═══════════════════════════════════════════════════════════════
-    // OPTION CHAIN POLLER (starts if FLATTRADE_API_KEY is set)
+    // OPTION CHAIN POLLER (requires the jKey session token, NOT the api_key)
+    //
+    // The poller now FAILS CLOSED: it refuses to run without a session token and a
+    // `resolveToken` port (GetQuotes needs a numeric contract token, not a symbol).
+    // `start()` is async — a bare call would reject OUTSIDE this try/catch and take the
+    // whole ingestion process down with an unhandled rejection. Ticks must keep flowing
+    // even when the option chain cannot.
     // ═══════════════════════════════════════════════════════════════
-    if (process.env.FLATTRADE_API_KEY && process.env.FLATTRADE_USER_ID) {
-      try {
-        const { OptionChainPoller } = require('./vendors/option-chain-poller');
-        const optionChainPoller = new OptionChainPoller({
-          redisClient,
-          kafkaProducer,
-          kafkaTopic: process.env.KAFKA_TOPIC_OPTION_CHAIN || 'option-chain',
-          pollIntervalMs: parseInt(process.env.OPTION_CHAIN_POLL_INTERVAL_MS || '3000', 10),
-        });
-        optionChainPoller.start();
-        logger.info('✅ OptionChainPoller started');
-      } catch (e) {
-        logger.warn(`⚠️ OptionChainPoller init failed: ${e.message}`);
-      }
+    if (process.env.FLATTRADE_TOKEN && process.env.FLATTRADE_USER_ID) {
+      const { OptionChainPoller } = require('./vendors/option-chain-poller');
+      const optionChainPoller = new OptionChainPoller({
+        redisClient,
+        kafkaProducer,
+        kafkaTopic: process.env.KAFKA_TOPIC_OPTION_CHAIN || 'option-chain',
+        pollIntervalMs: parseInt(process.env.OPTION_CHAIN_POLL_INTERVAL_MS || '3000', 10),
+        sessionToken: process.env.FLATTRADE_TOKEN,
+        userId: process.env.FLATTRADE_USER_ID,
+        // TODO(option-chain): supply a `tsym -> numeric contract token` resolver
+        // (FlatTrade SearchScrips / scrip master). Until then the poller refuses to run
+        // rather than posting a trading symbol where a token belongs.
+        resolveToken: null,
+      });
+
+      optionChainPoller.start().then(
+        () => logger.info('OptionChainPoller started'),
+        (err) =>
+          logger.error(
+            { reason: err.message },
+            'OptionChainPoller DISABLED — the option chain will produce no data. Tick ingestion is unaffected.'
+          )
+      );
     } else {
-      logger.info('ℹ️ OptionChainPoller: FLATTRADE_API_KEY not set, skipping');
+      logger.warn(
+        'OptionChainPoller disabled: FLATTRADE_TOKEN (jKey) + FLATTRADE_USER_ID required. ' +
+          'Note the api_key is NOT the jKey — it comes from the login flow.'
+      );
     }
 
     // ═══════════════════════════════════════════════════════════════

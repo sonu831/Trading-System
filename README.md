@@ -1,12 +1,39 @@
 # Nifty 50 Algorithmic Trading System 📈
 
-> **A production-grade, AI-powered trading platform** that analyzes 50 stocks in real-time, generates trading signals, and delivers insights through Telegram, REST API, and WebSocket streams.
+> An AI-assisted, event-driven trading platform that analyzes 50 stocks in real-time, generates trading
+> signals, and delivers insights through Telegram, REST API, and WebSocket streams.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Docker](https://img.shields.io/badge/Docker-Ready-blue.svg)](https://www.docker.com/)
 [![Go](https://img.shields.io/badge/Go-1.23-00ADD8.svg)](https://golang.org/)
 [![Node.js](https://img.shields.io/badge/Node.js-20-339933.svg)](https://nodejs.org/)
 [![Python](https://img.shields.io/badge/Python-3.11-3776AB.svg)](https://www.python.org/)
+
+---
+
+## ⚠️ Current State — read before running anything
+
+**This system does not trade live, and it is not ready to.** Status is tracked honestly in
+[`PROJECT_STATE.md`](PROJECT_STATE.md); the defect backlog is [`docs/LAYER_REMEDIATION_PLAN.md`](docs/LAYER_REMEDIATION_PLAN.md).
+
+| | |
+|---|---|
+| ✅ **Verified by tests** | Execution engine (L10, 91 assertions) · Broker auth + API proxy (L7, 117) · Ingestion URLs (L1, 48) · Docker hygiene gate |
+| ⚪ **Zero tests** | L2 processing · L3 storage · L4 analysis · L5 aggregation · **L6 signal (the brain)** · L9 AI |
+| ❌ **Not working** | **Option chain produces no data** (needs a `tsym → contract token` resolver) |
+| 🚫 **Never armed** | `LIVE_TRADING_ARMED` must stay unset. `LiveExecutor` has never placed a real order. |
+
+```bash
+# Run the whole verification estate (288 assertions)
+node scripts/verify-docker-hygiene.mjs                 # image hygiene gate
+node layer-1-ingestion/tests/verify-flattrade-urls.js  # 48
+cd layer-10-execution     && npm run verify            # 91
+cd layer-7-core-interface/api && npm run verify        # 117
+```
+
+**Safety invariants** are enforced in code and asserted by tests — never sell to open, entry+stop are atomic,
+the broker is the source of truth, the kill switch is persisted. See
+[`.ai/skills/engineering-standards.md`](.ai/skills/engineering-standards.md).
 
 ---
 

@@ -1,22 +1,19 @@
-FROM node:20-alpine
-
+# ── Builder ──────────────────────────────────────────
+FROM node:20-alpine AS builder
 WORKDIR /app
-
-# Bypass SSL certificate verification (for corporate proxy/firewall)
 RUN npm config set strict-ssl false
-
-# Install dependencies
 COPY package*.json ./
 RUN npm ci --omit=dev
-
-# Copy source code
 COPY . .
 
-# Run as non-root user
-USER node
+# ── Runtime ─────────────────────────────────────────
+FROM node:20-alpine AS runtime
+RUN apk add --no-cache tini && addgroup -S app && adduser -S app -G app
+WORKDIR /app
+COPY --from=builder --chown=app:app /app /app
+USER app
 EXPOSE 3002
-
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD node -e "require('http').get('http://localhost:3002/health',r=>{process.exit(r.statusCode===200?0:1)})"
-
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=5 \
+    CMD node -e "require('http').get('http://localhost:3002/health',r=>{process.exit(r.statusCode===200?0:1)}).on('error',()=>process.exit(1))"
+ENTRYPOINT ["/sbin/tini", "--"]
 CMD ["node", "src/index.js"]

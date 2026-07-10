@@ -1,15 +1,15 @@
 // ── Market Data ──────────────────────────────────────
 export interface IndexQuote {
-  symbol: string;
+  symbol?: string;
   ltp: number;
-  change: number;
-  changePct: number;
-  open: number;
-  high: number;
-  low: number;
-  prevClose: number;
-  volume: number;
-  timestamp: string;
+  change?: number;
+  changePct?: number;
+  open?: number;
+  high?: number;
+  low?: number;
+  prevClose?: number;
+  volume?: number;
+  timestamp?: string;
 }
 
 export interface CandleData {

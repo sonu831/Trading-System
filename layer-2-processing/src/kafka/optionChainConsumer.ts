@@ -3,7 +3,7 @@ const logger = require('../utils/logger');
 
 const KAFKA_BROKERS = (process.env.KAFKA_BROKERS || 'localhost:9092').split(',');
 const GROUP_ID = 'layer-2-option-chain-group-v1';
-const TOPIC = process.env.KAFKA_TOPIC_OPTION_CHAIN || 'option-chain';
+const TOPIC = process.env.KAFKA_TOPIC_OPTION_CHAIN || require('/app/shared/constants').KAFKA_TOPICS.OPTION_CHAIN;
 
 const kafka = new Kafka({
   clientId: 'layer-2-option-chain',

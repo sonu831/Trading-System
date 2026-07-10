@@ -152,7 +152,7 @@ class StrategyOrchestrator {
     if (this.kafkaProducer) {
       try {
         await this.kafkaProducer.send({
-          topic: 'trade-signals',
+          topic: process.env.KAFKA_TOPIC_TRADE_SIGNALS || 'trade-signals',
           messages: [{
             key: `${signal.strategyId}:${signal.direction}:${Date.now()}`,
             value: JSON.stringify(signal),

@@ -282,7 +282,7 @@ class RegimeEngine {
     if (this.kafkaProducer) {
       try {
         await this.kafkaProducer.send({
-          topic: 'market-regime',
+          topic: process.env.KAFKA_TOPIC_MARKET_REGIME || 'market-regime',
           messages: [{
             key: this.symbol,
             value: JSON.stringify(regime),

@@ -1,13 +1,11 @@
-FROM node:24-alpine AS builder
-
-RUN npm install -g pnpm
-
+FROM node:20-alpine AS builder
 WORKDIR /app
-COPY package*.json pnpm-lock.yaml* ./
-RUN pnpm install --frozen-lockfile --prod
+RUN npm config set strict-ssl false
+COPY package*.json ./
+RUN npm install --legacy-peer-deps --omit=dev
 COPY . .
 
-FROM node:24-alpine AS runtime
+FROM node:20-alpine AS runtime
 RUN apk add --no-cache tini && addgroup -S app && adduser -S app -G app
 WORKDIR /app
 COPY --from=builder --chown=app:app /app /app
@@ -16,4 +14,4 @@ EXPOSE 3002
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=5 \
     CMD node -e "require('http').get('http://localhost:3002/health',r=>{process.exit(r.statusCode===200?0:1)}).on('error',()=>process.exit(1))"
 ENTRYPOINT ["/sbin/tini", "--"]
-CMD ["node", "-r", "ts-node/register", "src/index.ts"]
+CMD ["npx", "tsx", "src/index.ts"]

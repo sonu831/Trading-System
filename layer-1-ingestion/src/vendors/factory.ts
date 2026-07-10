@@ -37,5 +37,5 @@ class VendorFactory {
   }
 }
 
-export = { VendorFactory };
+module.exports = { VendorFactory };
 export type { ProviderName };

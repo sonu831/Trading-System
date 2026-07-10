@@ -7,12 +7,6 @@
  * @author Yogendra Singh
  */
 
-// Register ts-node to handle TypeScript files in node_modules regarding the SDK
-require('ts-node').register({
-  transpileOnly: true,
-  ignore: [/node_modules\/(?!@mstock-mirae-asset)/],
-});
-
 require('dotenv').config(); // Load local .env if exists
 require('dotenv').config({ path: '../.env' }); // Also load root .env for local development
 

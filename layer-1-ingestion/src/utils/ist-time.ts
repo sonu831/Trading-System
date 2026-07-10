@@ -7,7 +7,7 @@
  * confidently wrong, and the wrong one was the one that ran. The twin is gone;
  * `shared/tests/no-ts-js-twins.test.js` fails if any reappears.
  */
-const { EXPIRY_WEEKDAY_ISO } = require('../../../shared/constants');
+const { EXPIRY_WEEKDAY_ISO } = require('../../shared/constants');
 
 /** Minutes east of UTC for IST (+05:30). */
 function istOffsetMinutes(): number { return Number(process.env.IST_OFFSET_MINUTES) || 330; }

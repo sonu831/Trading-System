@@ -33,7 +33,7 @@ help:
 	@echo "🚀 Nifty 50 Trading System"
 	@echo ""
 	@echo "📦 LIFECYCLE (Docker)"
-	@echo "  make up             Start core pipeline (backend + ingestion + dashboard)"
+	@echo "  make up             Purge cache + start core pipeline"
 	@echo "  make up-all         Start EVERYTHING (observer, notify, AI, execution)"
 	@echo "  make down           Stop everything (Auto-Backup)"
 	@echo "  make dev-nodb       Restart Apps (Keep DB/Kafka running)"
@@ -129,7 +129,15 @@ build:
 	done
 	@echo "✅ All layers verified!"
 
-up: infra wait-kafka app-core ui
+purge:
+	@echo "🧹 Purging all Docker build cache..."
+	@docker builder prune -a -f 2>/dev/null || true
+	@echo "🧹 Removing old containers..."
+	@-$(DC) -f $(COMPOSE_DIR)/docker-compose.app.yml down 2>/dev/null || true
+	@-$(DC) -f $(COMPOSE_DIR)/docker-compose.ui.yml down 2>/dev/null || true
+	@echo "✅ Docker cache cleared"
+
+up: purge infra wait-kafka app-core ui
 	@echo "🚀 Core pipeline running!"
 	@echo ""
 	@echo "🌐 Frontend:"

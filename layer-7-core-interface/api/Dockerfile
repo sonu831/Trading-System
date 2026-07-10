@@ -1,19 +1,20 @@
-FROM node:24-alpine
-
-RUN npm install -g pnpm
+FROM node:20-alpine
 
 WORKDIR /app
 
-COPY package*.json pnpm-lock.yaml* ./
+RUN npm config set strict-ssl false
+
+COPY package*.json ./
 COPY prisma ./prisma/
 
-RUN pnpm install --frozen-lockfile && pnpm add fastify@5 && npm install -g pm2
+RUN npm install --legacy-peer-deps && npm install fastify@5 --save-exact && npm install pm2 -g
 
-RUN NODE_TLS_REJECT_UNAUTHORIZED=0 pnpm exec prisma generate
+RUN NODE_TLS_REJECT_UNAUTHORIZED=0 npx prisma generate
 
 COPY . .
 
 EXPOSE 4000
+
 USER node
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=90s --retries=5 \

@@ -13,5 +13,15 @@
     "declaration": false
   },
   "include": ["src/**/*.ts"],
-  "exclude": ["node_modules", "dist", "tests"]
+  "exclude": ["node_modules", "dist", "tests"],
+
+  "//": [
+    "transpileOnly: the .js->.ts rename was never compiled, so `npm run typecheck`",
+    "still reports errors. Types are stripped at runtime so the execution invariant",
+    "tests can run. Do NOT relax `strict` to make typecheck green."
+  ],
+  "ts-node": {
+    "transpileOnly": true,
+    "files": true
+  }
 }

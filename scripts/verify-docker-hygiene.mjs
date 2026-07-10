@@ -8,7 +8,7 @@
  *   I-2  .dockerignore includes `node_modules` (prevents host node_modules clobbering)
  *   I-3  No image runs as root (must have a USER directive)
  *   I-4  Every image has a HEALTHCHECK
- *   I-5  No `npm install --only=production` (use npm ci --omit=dev)
+ *   I-5  No `npm install --only=production` (use pnpm install --frozen-lockfile --prod)
  *
  * Usage:  node scripts/verify-docker-hygiene.mjs [--fix]
  *         --fix only reports; actual fixes must be manual.

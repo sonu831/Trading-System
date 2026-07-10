@@ -81,8 +81,15 @@ test('Returns 0 active symbols when no ticks received', () => {
   assert.strictEqual(stats.ticks, 0);
 });
 
-// 4. Idempotency — same tick does not double-count
-test('Duplicate ticks do not double-count volume', () => {
+// 4. Duplicate ticks — pins ACTUAL behaviour, which is NOT idempotent.
+//
+// This test was previously named "Duplicate ticks do not double-count volume" and
+// asserted `volume >= 200`, which passes whether or not the duplicate is counted.
+// It is: the real volume is 300. CandleAggregator has no tick identity and cannot
+// deduplicate. Idempotency (contract rule 4) belongs in the Kafka consumer, which
+// owns offsets and message keys -- not here. Pinned so a future dedup change is a
+// deliberate, visible edit rather than an accident.
+test('Duplicate ticks ARE double-counted (dedup belongs in the consumer)', () => {
   const candles = [];
   const agg = new CandleAggregator({
     intervalMs: 60000,
@@ -92,13 +99,51 @@ test('Duplicate ticks do not double-count volume', () => {
   const now = Date.now();
   const t = tick('NIFTY', 25000, 100, now);
   agg.processTick(t);
-  agg.processTick(t); // duplicate
+  agg.processTick(t); // duplicate delivery
   agg.processTick(tick('NIFTY', 25100, 100, now + 1000));
 
   agg.flushAll();
   assert.strictEqual(candles.length, 1);
-  // Volume should be 200 (100 + 100), not 300
-  assert.ok(candles[0].volume >= 200, 'volume should not triple-count the duplicate');
+  assert.strictEqual(candles[0].volume, 300, 'aggregator sums every tick it is given');
+  agg.destroy();
+});
+
+// 5. Regression: checkBoundaries() had an EMPTY body.
+//
+// A candle only closed when the next tick for that symbol arrived, so an illiquid
+// symbol -- or the last candle of the session -- was never emitted. The 1-second
+// timer called a function that did nothing, and no test covered it.
+test('checkBoundaries flushes an elapsed candle with no further ticks', () => {
+  const candles = [];
+  const agg = new CandleAggregator({
+    intervalMs: 60000,
+    onCandleComplete: (c) => candles.push(c),
+  });
+
+  // A tick two minutes in the past: its bucket has long since closed.
+  agg.processTick(tick('NIFTY', 25000, 100, Date.now() - 120000));
+  assert.strictEqual(candles.length, 0, 'not yet flushed');
+
+  agg.checkBoundaries(); // no new tick arrives -- wall clock alone must close it
+
+  assert.strictEqual(candles.length, 1, 'elapsed candle must be emitted by the timer');
+  assert.strictEqual(candles[0].close, 25000);
+  agg.destroy();
+});
+
+// 6. checkBoundaries must NOT flush the candle still in progress.
+test('checkBoundaries leaves the in-progress candle open', () => {
+  const candles = [];
+  const agg = new CandleAggregator({
+    intervalMs: 60000,
+    onCandleComplete: (c) => candles.push(c),
+  });
+
+  agg.processTick(tick('NIFTY', 25000, 100, Date.now()));
+  agg.checkBoundaries();
+
+  assert.strictEqual(candles.length, 0, 'current bucket is not yet closed');
+  agg.destroy();
 });
 
 // ── Results ───────────────────────────────────────

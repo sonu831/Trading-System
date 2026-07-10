@@ -92,3 +92,10 @@ type IndicatorValue struct {
 - [ ] Test with empty candles, single candle, missing data
 - [ ] Benchmark performance (go test -bench=.)
 - [ ] Test concurrency (go test -race)
+
+## Shared Module
+
+Always import constants, types, and enums from \shared/\ — never hardcode strings:
+\\\js
+const { KAFKA_TOPICS, PORTS, REDIS_KEYS } = require('/app/shared');
+\\\`nSee \shared/README.md\ for the full reference.

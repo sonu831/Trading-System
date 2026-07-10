@@ -90,3 +90,10 @@ docs/strategies/
 - Adding strategies without clear risk-reward justification
 - "Gut feel" entries not expressed as automatable rules
 - Chasing recent performance (recency bias)
+
+## Shared Module
+
+Always import constants, types, and enums from \shared/\ — never hardcode strings:
+\\\js
+const { KAFKA_TOPICS, PORTS, REDIS_KEYS } = require('/app/shared');
+\\\`nSee \shared/README.md\ for the full reference.

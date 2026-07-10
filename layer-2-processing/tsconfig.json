@@ -11,5 +11,16 @@
     "declaration": true
   },
   "include": ["src/**/*.ts"],
-  "exclude": ["node_modules", "dist"]
+  "exclude": ["node_modules", "dist"],
+
+  "//": [
+    "transpileOnly: the .js->.ts migration renamed files without ever running tsc,",
+    "so `npm run typecheck` currently fails. Stripping types at runtime keeps the",
+    "service and its tests executable while that debt is paid down. Do NOT relax",
+    "`strict` to make typecheck green -- that hides the debt instead of clearing it."
+  ],
+  "ts-node": {
+    "transpileOnly": true,
+    "files": true
+  }
 }

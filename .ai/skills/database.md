@@ -3,6 +3,16 @@
 > **For schema changes, queries, and CQRS read/write paths.** Covers both
 > TimescaleDB (write/history) and Redis (read/realtime).
 
+## ⚠️ Use shared/ REDIS_KEYS — Never Hardcode Key Names
+
+```js
+const { REDIS_KEYS } = require('/app/shared/constants');
+const key = REDIS_KEYS.LTP('NIFTY'); // 'ltp:NIFTY'
+const sessionKey = REDIS_KEYS.BROKER_SESSION('mstock'); // 'broker:session:mstock'
+```
+
+All Redis key patterns are defined once in `shared/constants.js`. See `shared/README.md`.
+
 ## CQRS Rule (non-negotiable)
 
 ```

@@ -1,13 +1,12 @@
-FROM node:20-alpine
+FROM node:24-alpine
+
+RUN npm install -g pnpm
 
 WORKDIR /app
 
-# Bypass SSL for npm at build time only (corporate proxy)
-RUN npm config set strict-ssl false
-
 # Install dependencies
 COPY package*.json ./
-RUN npm ci --omit=dev
+RUN pnpm install --frozen-lockfile --prod
 
 # Copy source code
 COPY . .
@@ -24,4 +23,4 @@ USER node
 
 EXPOSE 3001
 
-CMD ["node", "src/index.js"]
+CMD ["node", "-r", "ts-node/register", "src/index.ts"]

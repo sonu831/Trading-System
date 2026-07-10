@@ -3,6 +3,16 @@
 > **For adding or modifying Kafka producers and consumers.** Every layer that
 > touches Kafka must follow these patterns.
 
+## ⚠️ Use shared/ Constants — Never Hardcode
+
+```js
+const { KAFKA_TOPICS, KAFKA_GROUPS } = require('/app/shared/constants');
+const TOPIC = KAFKA_TOPICS.TRADE_SIGNALS; // not 'trade-signals'
+const GROUP_ID = KAFKA_GROUPS.L2_PROCESSING; // not 'layer-2-processing-group-v4'
+```
+
+All 11 Kafka topics and 7 consumer groups are defined once in `shared/constants.js`. See `shared/README.md`.
+
 ## Producer Pattern
 
 ```typescript

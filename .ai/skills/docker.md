@@ -2,6 +2,15 @@
 
 > **For infrastructure changes, adding services, or modifying deployment config.**
 
+## ⚠️ Use shared/ PORTS — Never Hardcode
+
+```js
+const { PORTS } = require('/app/shared/constants');
+// Use PORTS.EXECUTION (8095), not 8090 (which is Kafka UI)
+```
+
+All 19 port numbers are defined once in `shared/constants.js`. See `shared/README.md`.
+
 ## Architecture
 
 ```

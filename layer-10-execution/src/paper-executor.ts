@@ -44,22 +44,42 @@ class PaperExecutor {
     const lots = this.risk.calculateLots(ask, signal);
     if (lots <= 0) return null;
 
-    const entryPremium = ask;
-    const slPremium = entryPremium * 0.82;
-    const targetPremium = entryPremium * 1.25;
-    const pnl = (targetPremium - entryPremium) * lots * instrument.lotSize;
-
-    const position = this.positions.openPosition(signal, lots, entryPremium, instrument);
-    if (this.tradeMode !== 'shadow') {
-      this.risk.recordEntry();
-      this.positions.closePosition(position.id, targetPremium, 'TARGET');
-      this.risk.recordTrade({ id: position.id, pnl });
-    }
+    const position = this.positions.openPosition(signal, lots, ask, instrument);
+    if (this.tradeMode !== 'shadow') this.risk.recordEntry();
     await this.journal.recordTrade(position);
     return position;
   }
 
-  async checkExits(): Promise<void> { /* synthetic — no real exits to check */ }
+  /**
+   * Mark open positions to the live option premium and exit on the SAME rules live uses.
+   *
+   * This body used to be empty, and `executeSignal` closed every position at entry with
+   * a synthetic `entry * 1.25`, recording that as realised P&L. Every paper trade was a
+   * guaranteed +25% winner, so paper mode validated nothing before live. Paper must lose
+   * money when the strategy loses money, or it is not a gate.
+   */
+  async checkExits(): Promise<void> {
+    for (const pos of this.positions.getOpenPositions()) {
+      const quote = this.quotes.getQuote(pos.nfoSymbol);
+      const ltp = Number(quote?.ltp);
+      if (!(ltp > 0)) {
+        // A missing quote is not a price of zero. Hold the position and say so.
+        logger.warn({ id: pos.id, symbol: pos.nfoSymbol }, 'no quote — cannot evaluate exits');
+        continue;
+      }
+
+      this.positions.updatePrice(pos.id, ltp);
+      const decision = this.positions.checkExits(pos);
+      if (!decision) continue;
+
+      const closed = this.positions.closePosition(pos.id, ltp, decision.reason);
+      if (!closed) continue;
+      if (this.tradeMode !== 'shadow') this.risk.recordTrade(closed);
+      this.quotes.releaseSymbol(pos.nfoSymbol);
+      await this.journal.recordTrade(closed);
+      logger.info({ id: closed.id, pnl: closed.pnl, reason: decision.reason }, 'paper position closed');
+    }
+  }
   async squareOffAll(reason: string): Promise<void> {
     for (const pos of this.positions.getOpenPositions()) { this.positions.closePosition(pos.id, pos.currentPrice, reason); }
   }

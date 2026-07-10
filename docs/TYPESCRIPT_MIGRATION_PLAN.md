@@ -5,7 +5,7 @@
 > **Status:** PLAN | **Audited:** 2026-07-10 (file counts + grep evidence, not estimates)
 >
 > Standards: [`.ai/skills/engineering-standards.md`](../.ai/skills/engineering-standards.md) · rules 11–14.
-> Related: [`LAYER_REMEDIATION_PLAN.md`](LAYER_REMEDIATION_PLAN.md) · [`DASHBOARD_ENHANCEMENT_PLAN.md`](DASHBOARD_ENHANCEMENT_PLAN.md)
+> Related: [`RESTRUCTURE_PLAN.md`](RESTRUCTURE_PLAN.md) · [`DASHBOARD_ENHANCEMENT_PLAN.md`](DASHBOARD_ENHANCEMENT_PLAN.md)
 
 ---
 

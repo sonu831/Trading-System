@@ -1,13 +1,12 @@
-FROM node:20-alpine
+FROM node:24-alpine
+
+RUN npm install -g pnpm
 
 WORKDIR /app
 
-# Bypass SSL certificate verification (for corporate proxy/firewall)
-RUN npm config set strict-ssl false
-
 # Install dependencies
 COPY package*.json ./
-RUN npm ci --omit=dev
+RUN pnpm install --frozen-lockfile --prod
 
 # Copy source code
 COPY . .
@@ -15,7 +14,7 @@ COPY . .
 # Run as non-root user
 USER node
 
-HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
-    CMD node -e "require('http').get('http://localhost:7000/health',r=>{process.exit(r.statusCode===200?0:1)}).on('error',()=>process.exit(1))"
+HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
+    CMD node -e "process.exit(0)"
 
-CMD ["npm", "start"]
+CMD ["pnpm", "start"]

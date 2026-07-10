@@ -14,12 +14,14 @@ jobs:
         layer: [layer-1-ingestion, layer-2-processing, layer-6-signal, layer-10-execution]
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 'latest' }
       - uses: actions/setup-node@v4
-        with: { node-version: '20' }
+        with: { node-version: '24', cache: 'pnpm', cache-dependency-path: ${{ matrix.layer }}/pnpm-lock.yaml }
       - name: Install
-        run: cd ${{ matrix.layer }} && npm ci --legacy-peer-deps || npm install --legacy-peer-deps
+        run: cd ${{ matrix.layer }} && pnpm install --frozen-lockfile
       - name: Test
-        run: cd ${{ matrix.layer }} && npm test || node tests/*.test.js || echo "No tests found"
+        run: cd ${{ matrix.layer }} && pnpm test
 
   test-go:
     runs-on: ubuntu-latest
@@ -37,7 +39,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 'latest' }
       - uses: actions/setup-node@v4
-        with: { node-version: '20' }
-      - run: npm ci || npm install
-      - run: npx eslint . --ext .js,.ts,.tsx || echo "Lint warnings — non-blocking"
+        with: { node-version: '24', cache: 'pnpm' }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec eslint . --ext .js,.ts,.tsx || echo "Lint warnings — non-blocking"

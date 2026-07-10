@@ -106,7 +106,7 @@ This project uses a hub-and-spoke AI configuration system. The canonical source 
 
 #### 2026-07-10 — P0 Layer Remediation (DONE)
 - **Tool/agent:** OpenCode (system-architect)
-- **Source:** `docs/LAYER_REMEDIATION_PLAN.md` — audited defects across all layers
+- **Source:** `docs/RESTRUCTURE_PLAN.md` — production audit, 67 findings, 6-week remediation
 - **Files touched (P0 items 1–3 complete):**
   - `layer-1-ingestion/src/utils/flattrade.js` — NEW: FLATTRADE_BASE_URL, norenBody, isNorenOk, norenError utilities
   - `layer-1-ingestion/src/utils/ist-time.js` — NEW: IST-aware nextWeeklyExpiryIST, nowIST helpers
@@ -121,7 +121,7 @@ This project uses a hub-and-spoke AI configuration system. The canonical source 
 - **Verification results:**
   - `node layer-1-ingestion/tests/verify-flattrade-urls.js` → **32/32 passing**
   - `node scripts/verify-docker-hygiene.mjs` → **CLEAN — 0 violations**
-- **Remaining (P1–P3, see LAYER_REMEDIATION_PLAN.md §13):**
+- **Remaining (P1–P3, see RESTRUCTURE_PLAN.md):**
   - P1: L6 regime/strategy tests, L2 CandleAggregator tests
   - P2: L4 indicator fixture tests, L5 breadth tests, L7 regime-key contract test
   - P3: L8 light theme/layering/sockets, L9 backtest verification

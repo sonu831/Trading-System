@@ -101,4 +101,4 @@ export class MStockOMS extends BaseOMS {
   }
 }
 
-export = { MStockOMS };
+// MStockOMS is exported at its declaration; an `export =` alongside it is invalid TS.

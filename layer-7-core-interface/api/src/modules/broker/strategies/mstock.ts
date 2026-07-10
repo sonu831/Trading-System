@@ -39,6 +39,33 @@ const strategy: BrokerAuthStrategy = {
     const { api_key, client_code, password, totp_secret } = creds;
     const { http } = deps;
 
+    const otp = (ctx?.input as any)?.otp;
+    const parkedRequestToken = (ctx?.pending as any)?.requestToken;
+
+    // Interactive resume. Reuse the request token parked at step 1 and NEVER log in again:
+    // a second /connect/login sends the user a second OTP and invalidates the first, so a
+    // single mistyped digit would strand them in a loop of fresh codes.
+    if (otp && parkedRequestToken) {
+      let tokenResp: any;
+      try {
+        tokenResp = await http.post(`${BASE}/session/token`, { refreshToken: parkedRequestToken, otp }, { headers: jsonHeaders(api_key), timeout: 15000 });
+      } catch (err: any) {
+        // retryPending: keep the parked login so the user can re-enter the SAME code.
+        return { success: false, error: err.response?.data?.message || err.message, stage: 'otp_verify', retryPending: true };
+      }
+
+      const body = tokenResp?.data;
+      const tradingToken = body?.data?.jwtToken;
+      if (!isOk(body) || !tradingToken) {
+        return { success: false, error: errorOf(body, 'OTP verification failed'), stage: 'otp_verify', retryPending: true };
+      }
+      if (tradingToken === parkedRequestToken) {
+        return { success: false, error: 'broker echoed the request token instead of a trading token', stage: 'otp_verify' };
+      }
+
+      return { success: true, status: 'connected', token: tradingToken, ttlSeconds: strategy.ttlSeconds(deps.now || new Date()), provider: 'mstock', auth_type: 'otp', stage: 'connected' };
+    }
+
     // Step 1 — login
     let loginResp: any;
     try {
@@ -47,9 +74,14 @@ const strategy: BrokerAuthStrategy = {
       return { success: false, error: err.response?.data?.message || err.message, stage: 'login' };
     }
 
-    const requestToken = loginResp?.data?.jwtToken;
-    if (!isOk(loginResp) || !requestToken) {
-      return { success: false, error: errorOf(loginResp, 'login failed'), stage: 'login' };
+    // `http.post` resolves to an AXIOS RESPONSE. The API envelope is `resp.data`
+    // ({status, message, data}); the payload is `resp.data.data`. Reading
+    // `resp.data.jwtToken` is one level too shallow (undefined), and `isOk(resp)` inspects
+    // the response object rather than the body. Always narrow to the body first.
+    const loginBody = loginResp?.data;
+    const requestToken = loginBody?.data?.jwtToken;
+    if (!isOk(loginBody) || !requestToken) {
+      return { success: false, error: errorOf(loginBody, 'login failed'), stage: 'login' };
     }
 
     // Step 2 — verify TOTP (unattended) or needs OTP (interactive)
@@ -62,9 +94,17 @@ const strategy: BrokerAuthStrategy = {
         return { success: false, error: err.response?.data?.message || err.message, stage: 'totp_verify' };
       }
 
-      const tradingToken = verifyResp?.data?.jwtToken;
-      if (!isOk(verifyResp) || !tradingToken) {
-        return { success: false, error: errorOf(verifyResp, 'TOTP verification failed'), stage: 'totp_verify' };
+      // Same envelope. The TRADING token comes from step 2 — caching step 1's request
+      // token here is the bug that shipped twice.
+      const verifyBody = verifyResp?.data;
+      const tradingToken = verifyBody?.data?.jwtToken;
+      if (!isOk(verifyBody) || !tradingToken) {
+        return { success: false, error: errorOf(verifyBody, 'TOTP verification failed'), stage: 'totp_verify' };
+      }
+      // If the broker echoes step 1's request token back, it is NOT a trading session.
+      // Caching it yields a token that authenticates nothing — this shipped twice.
+      if (tradingToken === requestToken) {
+        return { success: false, error: 'broker echoed the request token instead of a trading token', stage: 'totp_verify' };
       }
 
       return { success: true, status: 'connected', token: tradingToken, ttlSeconds: strategy.ttlSeconds(deps.now || new Date()), provider: 'mstock', auth_type: 'totp', stage: 'connected' };

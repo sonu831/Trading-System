@@ -100,6 +100,24 @@ test('computeTFAlignment penalizes divergence', () => {
   assert(score < 0.5, `Divergent alignment should have low score, got ${score}`);
 });
 
+// Regression: the old formula was `max(up,down) / (total - range)`, dividing by the
+// TRENDING timeframes only. One timeframe up among three ranging scored 1/1.001 ≈ 0.999 --
+// a near-perfect "alignment" on no consensus at all, enough to authorise a positional trade.
+test('computeTFAlignment: one lone trend among ranges is NOT alignment', () => {
+  const score = computeTFAlignment({ '5m': 'TREND_UP', '15m': 'RANGE', '1h': 'RANGE', 'D': 'RANGE' });
+  assert(score <= 0.25, `one-of-four trending must score low, got ${score}`);
+});
+
+test('computeTFAlignment: perfectly opposed timeframes cancel to 0', () => {
+  const score = computeTFAlignment({ '5m': 'TREND_UP', '15m': 'TREND_DOWN' });
+  assert(score === 0, `opposed timeframes must cancel, got ${score}`);
+});
+
+test('computeTFAlignment: all ranging scores 0 (nothing to confirm)', () => {
+  const score = computeTFAlignment({ '5m': 'RANGE', '15m': 'RANGE' });
+  assert(score === 0, `no trend means no alignment, got ${score}`);
+});
+
 // ── Results ───────────────────────────────────────
 console.log(`\nL6 Regime Indicators: ${pass} passed, ${fail} failed, ${pass + fail} total`);
 process.exit(fail > 0 ? 1 : 0);

@@ -78,3 +78,10 @@ ON CONFLICT (symbol, timeframe, timestamp) DO NOTHING;
 - [ ] Verify idempotent insert behavior (duplicate = no error)
 - [ ] Test Redis key expiry and eviction
 - [ ] Benchmark read query performance (< 10ms for cached reads)
+
+## Shared Module
+
+Always import constants, types, and enums from \shared/\ — never hardcode strings:
+\\\js
+const { KAFKA_TOPICS, PORTS, REDIS_KEYS } = require('/app/shared');
+\\\`nSee \shared/README.md\ for the full reference.

@@ -95,29 +95,40 @@ deploy: app-build ui notify-build
 # ═══════════════════════════════════════════════════════════
 LAYERS := layer-1-ingestion \
           layer-2-processing \
+          layer-4-analysis \
+          layer-5-aggregation \
           layer-6-signal \
           layer-7-core-interface/api \
           layer-8-presentation-notification/stock-analysis-portal \
           layer-8-presentation-notification/email-service \
           layer-8-presentation-notification/telegram-bot \
+          layer-9-ai-service \
           layer-10-execution
 
 setup:
-	@echo "📦 Installing node_modules for all layers..."
-	@for dir in $(LAYERS); do \
-		echo ""; echo "━━━━ $${dir} ━━━━"; \
-		(cd "$${dir}" && npm install --legacy-peer-deps) || echo "  ⚠️  $${dir} skipped"; \
+	@echo "📦 Installing ALL dependencies (Node.js + Go + Python)..."
+	@for layer in $(LAYERS); do \
+		echo ""; echo "━━━━ $${layer} ━━━━"; \
+		if [ -f "$${layer}/package.json" ]; then \
+			(cd "$${layer}" && rm -rf node_modules package-lock.json && npm install --legacy-peer-deps) || echo "  ⚠️  $${layer} npm failed"; \
+		elif [ -f "$${layer}/go.mod" ]; then \
+			(cd "$${layer}" && go mod download) || echo "  ⚠️  $${layer} go mod failed"; \
+		elif [ -f "$${layer}/requirements.txt" ]; then \
+			(cd "$${layer}" && pip install -r requirements.txt) || echo "  ⚠️  $${layer} pip failed"; \
+		else \
+			echo "  ⚠️  $${layer}: no package.json/go.mod/requirements.txt found"; \
+		fi; \
 	done
-	@echo ""
+	@echo ""; @echo "✅ All layers installed!"
 	@echo "✅ All layers installed!"
 
 build:
 	@echo "🔍 TypeScript check..."
-	@for dir in $(LAYERS); do \
-		if [ -f "$$dir/tsconfig.json" ] && [ -f "$$dir/node_modules/typescript/bin/tsc" ]; then \
-			echo "  $$dir..."; (cd "$$dir" && node_modules/.bin/tsc --noEmit 2>&1 | head -5) || echo "  ⚠️  $$dir: type warnings"; \
+	@for layer in $(LAYERS); do \
+		if [ -f "$$layer/tsconfig.json" ] && [ -f "$$layer/node_modules/typescript/bin/tsc" ]; then \
+			echo "  $$layer..."; (cd "$$layer" && node_modules/.bin/tsc --noEmit 2>&1 | head -5) || echo "  ⚠️  $$layer: type warnings"; \
 		else \
-			echo "  $$dir... (tsc not installed — run 'make setup' first)"; \
+			echo "  $$layer... (tsc not installed)"; \
 		fi; \
 	done
 	@echo "🔍 Go vet (if Go installed)..."
@@ -520,17 +531,17 @@ backfill-status:
 
 
 test:
-	cd layer-1-ingestion && npm test
-	cd layer-2-processing && npm test
+	cd layer-1-ingestion && pnpm test
+	cd layer-2-processing && pnpm test
 	cd layer-4-analysis && go test ./... -v -count=1
 	cd layer-5-aggregation && go test ./... -v -count=1
-	cd layer-6-signal && npm test
+	cd layer-6-signal && pnpm test
 
 test-layer1:
-	cd layer-1-ingestion && npm test
+	cd layer-1-ingestion && pnpm test
 
 test-layer2:
-	cd layer-2-processing && npm test
+	cd layer-2-processing && pnpm test
 
 test-layer4:
 	cd layer-4-analysis && go test ./... -v -count=1
@@ -539,7 +550,7 @@ test-layer5:
 	cd layer-5-aggregation && go test ./... -v -count=1
 
 test-layer6:
-	cd layer-6-signal && npm test
+	cd layer-6-signal && pnpm test
 
 test-go:
 	cd layer-4-analysis && go test ./... -v -count=1
@@ -557,11 +568,11 @@ dev: infra
 
 layer1:
 	@echo "🚀 Starting Layer 1 (Ingestion)..."
-	@export $$(cat .env | grep -v '^#' | xargs) && cd layer-1-ingestion && npm run dev
+	@export $$(cat .env | grep -v '^#' | xargs) && cd layer-1-ingestion && pnpm run dev
 
 layer2:
 	@echo "🚀 Starting Layer 2 (Processing)..."
-	@export $$(cat .env | grep -v '^#' | xargs) && cd layer-2-processing && npm run dev
+	@export $$(cat .env | grep -v '^#' | xargs) && cd layer-2-processing && pnpm run dev
 
 layer4:
 	@echo "🚀 Starting Layer 4 (Analysis)..."
@@ -573,15 +584,15 @@ layer5:
 
 layer6:
 	@echo "🚀 Starting Layer 6 (Signal)..."
-	@export $$(cat .env | grep -v '^#' | xargs) && cd layer-6-signal && npm run dev
+	@export $$(cat .env | grep -v '^#' | xargs) && cd layer-6-signal && pnpm run dev
 
 layer7-api:
 	@echo "🚀 Starting Layer 7 API (Fastify)..."
-	@export $$(cat .env | grep -v '^#' | xargs) && cd layer-7-core-interface/api && npm run dev
+	@export $$(cat .env | grep -v '^#' | xargs) && cd layer-7-core-interface/api && pnpm run dev
 
 layer7-dashboard:
 	@echo "🚀 Starting Layer 8 Dashboard (Next.js)..."
-	@export $$(cat .env | grep -v '^#' | xargs) && cd layer-8-presentation-notification/stock-analysis-portal && npm run dev
+	@export $$(cat .env | grep -v '^#' | xargs) && cd layer-8-presentation-notification/stock-analysis-portal && pnpm run dev
 
 # ─── Short aliases ───
 layer7: layer7-api
@@ -595,7 +606,7 @@ layer9:
 
 layer10:
 	@echo "🚀 Starting Layer 10 (Execution)..."
-	@export $$(cat .env | grep -v '^#' | xargs) && cd layer-10-execution && npm run dev
+	@export $$(cat .env | grep -v '^#' | xargs) && cd layer-10-execution && pnpm run dev
 
 # ─── Docker single-service targets ───
 docker-ingestion:

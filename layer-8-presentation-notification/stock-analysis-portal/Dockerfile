@@ -1,27 +1,20 @@
-FROM node:20-alpine AS base
+FROM node:24-alpine AS base
+RUN npm install -g pnpm
 
-# Install dependencies only when needed
 FROM base AS deps
 WORKDIR /app
 
-# Bypass SSL certificate verification (for corporate proxy/firewall)
-RUN npm config set strict-ssl false
+COPY package.json pnpm-lock.yaml* ./
+RUN pnpm install --frozen-lockfile
 
-COPY package.json package-lock.json ./
-RUN npm install --frozen-lockfile || npm install
-
-# Rebuild the source code only when needed
 FROM base AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-RUN npm run build
+RUN pnpm run build
 
-# --- ADD THIS LINE HERE ---
-# Ensure public folder exists (even if empty) so the next stage doesn't crash
 RUN mkdir -p public
 
-# Production image, copy all the files and run next
 FROM base AS runner
 WORKDIR /app
 ENV NODE_ENV production

@@ -1,2 +1,17 @@
 {
-  "$schema": "https://opencode.ai/config.json",}
+  "$schema": "https://opencode.ai/config.json",
+  "instructions": [
+    "CLAUDE.md",
+    ".ai/CONTRACT.md",
+    ".ai/MEMORY.md",
+    "MEMORY.md",
+    ".ai/skills/*.md"
+  ],
+  "mcp": {
+    "tradingview": {
+      "type": "local",
+      "command": ["node", "layer-1-tradingview/src/server.js"],
+      "enabled": true
+    }
+  }
+}

@@ -1,14 +1,14 @@
 {
   "api_endpoints": {
-    "login": "https://piconnect.flattrade.in/PiConnectTP/REST/Login",
-    "get_quotes": "https://piconnect.flattrade.in/PiConnectTP/REST/GetQuotes",
-    "order_book": "https://piconnect.flattrade.in/PiConnectTP/REST/OrderBook",
-    "trade_book": "https://piconnect.flattrade.in/PiConnectTP/REST/TradeBook",
-    "holdings": "https://piconnect.flattrade.in/PiConnectTP/REST/Holdings",
-    "positions": "https://piconnect.flattrade.in/PiConnectTP/REST/PositionBook"
+    "login": "https://piconnect.flattrade.in/PiConnectAPI/Login",
+    "get_quotes": "https://piconnect.flattrade.in/PiConnectAPI/GetQuotes",
+    "order_book": "https://piconnect.flattrade.in/PiConnectAPI/OrderBook",
+    "trade_book": "https://piconnect.flattrade.in/PiConnectAPI/TradeBook",
+    "holdings": "https://piconnect.flattrade.in/PiConnectAPI/Holdings",
+    "positions": "https://piconnect.flattrade.in/PiConnectAPI/PositionBook"
   },
   "config": {
-    "version": "v2",
+    "version": "v3",
     "content_type": "application/json"
   }
 }

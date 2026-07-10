@@ -94,6 +94,29 @@ const PROVIDER_ROLE = {
   BOTH: 'both',
 };
 
+// ── Broker URLs (single source of truth — rule 3/14) ────
+
+const BROKER_BASE_URLS = {
+  FLATTRADE: 'https://piconnect.flattrade.in/PiConnectAPI',
+  FLATTRADE_WS: 'wss://piconnect.flattrade.in/PiConnectWSAPI',
+  MSTOCK: 'https://api.mstock.in',
+};
+
+// ── Redis Key Names ─────────────────────────────────
+
+const REDIS_KEYS = {
+  LTP: (symbol) => `ltp:${symbol}`,
+  CANDLE_LATEST: (symbol, tf) => `candle:${symbol}:${tf}:latest`,
+  INDICATOR: (symbol, indicator) => `indicator:${symbol}:${indicator}`,
+  SENTIMENT: 'sentiment:market',
+  SIGNAL_LATEST: (symbol) => `signal:${symbol}:latest`,
+  MARKET_REGIME_LATEST: 'market-regime:latest',
+  MARKET_VIEW: 'market_view',
+  BROKER_SESSION: (provider) => `broker:session:${provider}`,
+  EXECUTION_PREFIX: 'execution:',
+  OPTION_CHAIN: (underlying) => `option-chain:${underlying}`,
+};
+
 module.exports = {
   REGIME_TREND,
   REGIME_SENTIMENT,
@@ -106,4 +129,6 @@ module.exports = {
   SECTOR_MOMENTUM,
   TRADE_MODE,
   PROVIDER_ROLE,
+  BROKER_BASE_URLS,
+  REDIS_KEYS,
 };

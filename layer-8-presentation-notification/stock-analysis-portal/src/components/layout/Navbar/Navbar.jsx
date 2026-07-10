@@ -81,6 +81,15 @@ const Navbar = ({ viewMode, setViewMode, systemStatus = 'ONLINE' }) => {
           </Link>
 
           <Link
+            href="/scalp"
+            className="relative group overflow-hidden px-5 py-2 rounded-lg font-bold text-sm transition-all duration-300 shadow-md transform hover:-translate-y-0.5 bg-gradient-to-r from-amber-600 to-amber-500 text-white hover:shadow-amber-500/25 border border-amber-400/20"
+            title="Scalp Cockpit"
+          >
+            <div className="relative z-10 flex items-center gap-2"><span className="text-lg">⚡</span><span>Scalp</span></div>
+            <div className="absolute inset-0 bg-gradient-to-r from-amber-400/0 via-white/20 to-amber-400/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700 ease-in-out"></div>
+          </Link>
+
+          <Link
             href="/brokers"
             className={`
               relative group overflow-hidden px-5 py-2 rounded-lg font-bold text-sm transition-all duration-300 shadow-md transform hover:-translate-y-0.5

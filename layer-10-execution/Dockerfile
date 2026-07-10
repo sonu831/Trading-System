@@ -2,7 +2,7 @@ FROM node:20-alpine
 WORKDIR /app
 RUN npm config set strict-ssl false
 COPY package*.json ./
-RUN npm install --only=production
+RUN npm ci --omit=dev
 COPY . .
 USER node
 EXPOSE 8095

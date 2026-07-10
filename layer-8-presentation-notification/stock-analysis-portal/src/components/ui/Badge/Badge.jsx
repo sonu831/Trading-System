@@ -1,93 +1,19 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 
-/**
- * Badge Component
- * A small status indicator or label
- */
-export default function Badge({
-  variant = 'default',
-  size = 'md',
-  children,
-  className = '',
-  ...props
-}) {
-  const baseClasses = 'badge';
+export default function Badge({ variant = 'default', size = 'md', children, className = '', ...props }) {
+  const sizeClasses = { sm: 'px-2 py-0.5 text-[11px]', md: 'px-3 py-1 text-xs', lg: 'px-4 py-1.5 text-sm' };
   const variantClasses = {
-    default: 'badge-default',
-    success: 'badge-success',
-    error: 'badge-error',
-    warning: 'badge-warning',
-    info: 'badge-info',
-  };
-  const sizeClasses = {
-    sm: 'badge-sm',
-    md: 'badge-md',
-    lg: 'badge-lg',
+    default: 'bg-border text-text-tertiary',
+    success: 'bg-success/20 text-success',
+    error: 'bg-error/20 text-error',
+    warning: 'bg-warning/20 text-warning',
+    info: 'bg-info/20 text-info',
   };
 
-  const classes = [baseClasses, variantClasses[variant], sizeClasses[size], className]
-    .filter(Boolean)
-    .join(' ');
+  const classes = `inline-flex items-center justify-center rounded-xl font-semibold whitespace-nowrap ${sizeClasses[size] || sizeClasses.md} ${variantClasses[variant] || variantClasses.default} ${className}`;
 
-  return (
-    <>
-      <span className={classes} {...props}>
-        {children}
-      </span>
-
-      <style jsx>{`
-        .badge {
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          border-radius: 12px;
-          font-weight: 600;
-          white-space: nowrap;
-        }
-
-        /* Sizes */
-        .badge-sm {
-          padding: 2px 8px;
-          font-size: 11px;
-        }
-        .badge-md {
-          padding: 4px 12px;
-          font-size: 12px;
-        }
-        .badge-lg {
-          padding: 6px 16px;
-          font-size: 14px;
-        }
-
-        /* Variants */
-        .badge-default {
-          background: #2a2a3e;
-          color: #aaa;
-        }
-
-        .badge-success {
-          background: #10b981;
-          color: white;
-        }
-
-        .badge-error {
-          background: #ef4444;
-          color: white;
-        }
-
-        .badge-warning {
-          background: #f59e0b;
-          color: white;
-        }
-
-        .badge-info {
-          background: #3b82f6;
-          color: white;
-        }
-      `}</style>
-    </>
-  );
+  return <span className={classes} {...props}>{children}</span>;
 }
 
 Badge.propTypes = {

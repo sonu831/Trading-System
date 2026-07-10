@@ -2,14 +2,15 @@
   "name": "layer-7-api",
   "version": "0.2.4",
   "description": "REST API for Nifty 50 Trading System",
-  "main": "src/index.js",
+  "main": "src/index.ts",
   "scripts": {
     "start": "pm2-runtime ecosystem.config.js",
-    "dev": "npx nodemon src/index.js",
-    "test": "npm run verify",
-    "verify": "npm run verify:broker-auth && npm run verify:execution-proxy",
-    "verify:broker-auth": "node tests/verify-broker-auth.js",
-    "verify:execution-proxy": "node tests/verify-execution-proxy.js"
+    "dev": "tsx watch src/index.ts",
+    "test": "pnpm run verify",
+    "verify": "pnpm run verify:broker-auth && pnpm run verify:execution-proxy",
+    "verify:broker-auth": "node -r ts-node/register tests/verify-broker-auth.js",
+    "verify:execution-proxy": "node -r ts-node/register tests/verify-execution-proxy.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
     "@fastify/cors": "^10.0.1",
@@ -37,8 +38,8 @@
     "redis": "^4.7.1",
     "socket.io": "^4.8.3",
     "technicalindicators": "^3.1.0",
-    "ts-node": "^10.9.2",
-    "typescript": "^5.6.0"
+    "typescript": "^5.6.0",
+    "tsx": "^4.20.6"
   },
   "devDependencies": {
     "nodemon": "^3.0.1",

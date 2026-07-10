@@ -95,29 +95,40 @@ deploy: app-build ui notify-build
 # ═══════════════════════════════════════════════════════════
 LAYERS := layer-1-ingestion \
           layer-2-processing \
+          layer-4-analysis \
+          layer-5-aggregation \
           layer-6-signal \
           layer-7-core-interface/api \
           layer-8-presentation-notification/stock-analysis-portal \
           layer-8-presentation-notification/email-service \
           layer-8-presentation-notification/telegram-bot \
+          layer-9-ai-service \
           layer-10-execution
 
 setup:
-	@echo "📦 Installing node_modules for all layers..."
-	@for dir in $(LAYERS); do \
-		echo ""; echo "━━━━ $${dir} ━━━━"; \
-		(cd "$${dir}" && pnpm install) || echo "  ⚠️  $${dir} skipped"; \
+	@echo "📦 Installing ALL dependencies (Node.js + Go + Python)..."
+	@for layer in $(LAYERS); do \
+		echo ""; echo "━━━━ $${layer} ━━━━"; \
+		if [ -f "$${layer}/package.json" ]; then \
+			(cd "$${layer}" && rm -rf node_modules package-lock.json && npm install --legacy-peer-deps) || echo "  ⚠️  $${layer} npm failed"; \
+		elif [ -f "$${layer}/go.mod" ]; then \
+			(cd "$${layer}" && go mod download) || echo "  ⚠️  $${layer} go mod failed"; \
+		elif [ -f "$${layer}/requirements.txt" ]; then \
+			(cd "$${layer}" && pip install -r requirements.txt) || echo "  ⚠️  $${layer} pip failed"; \
+		else \
+			echo "  ⚠️  $${layer}: no package.json/go.mod/requirements.txt found"; \
+		fi; \
 	done
-	@echo ""
+	@echo ""; @echo "✅ All layers installed!"
 	@echo "✅ All layers installed!"
 
 build:
 	@echo "🔍 TypeScript check..."
-	@for dir in $(LAYERS); do \
-		if [ -f "$$dir/tsconfig.json" ] && [ -f "$$dir/node_modules/typescript/bin/tsc" ]; then \
-			echo "  $$dir..."; (cd "$$dir" && node_modules/.bin/tsc --noEmit 2>&1 | head -5) || echo "  ⚠️  $$dir: type warnings"; \
+	@for layer in $(LAYERS); do \
+		if [ -f "$$layer/tsconfig.json" ] && [ -f "$$layer/node_modules/typescript/bin/tsc" ]; then \
+			echo "  $$layer..."; (cd "$$layer" && node_modules/.bin/tsc --noEmit 2>&1 | head -5) || echo "  ⚠️  $$layer: type warnings"; \
 		else \
-			echo "  $$dir... (tsc not installed — run 'make setup' first)"; \
+			echo "  $$layer... (tsc not installed)"; \
 		fi; \
 	done
 	@echo "🔍 Go vet (if Go installed)..."

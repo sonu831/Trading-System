@@ -48,5 +48,7 @@ export abstract class BaseOMS {
   getOrderStatus?(orderId: string): Promise<OrderStatus | null>;
 }
 
-export = { BaseOMS };
-export type { OrderRequest, OrderModification };
+// No `export =` here. TypeScript forbids an export assignment alongside other exported
+// elements, and esbuild (via tsx) emits a broken `base_module` reference for it. BaseOMS,
+// OrderRequest and OrderModification are already exported at their declarations, which
+// compiles to CommonJS named exports -- so `require('./base').BaseOMS` still works.

@@ -101,3 +101,10 @@ docker-compose build  # All services build
 3. **Flaky tests are bugs** -- fix them, don't skip them
 4. **Review depth scales with risk** -- signal layer gets deeper review than presentation
 5. **Reject unversioned changes** -- everything in CHANGELOG.md
+
+## Shared Module
+
+Always import constants, types, and enums from \shared/\ — never hardcode strings:
+\\\js
+const { KAFKA_TOPICS, PORTS, REDIS_KEYS } = require('/app/shared');
+\\\`nSee \shared/README.md\ for the full reference.

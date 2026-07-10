@@ -151,14 +151,24 @@ export function detectPhase(closes: number[]): string {
   return 'TRENDING';
 }
 
+/**
+ * Net directional consensus across timeframes, in [0, 1].
+ *
+ * 1.0 = every timeframe trends the same way. 0.0 = perfectly opposed, or nothing trends.
+ * Opposing timeframes cancel; RANGE timeframes dilute (a flat timeframe confirms nothing).
+ *
+ * The previous formula was `max(up, down) / (total - range)`, which divided by the
+ * TRENDING timeframes only. One timeframe up with three ranging scored 1/1.001 ≈ 0.999 —
+ * near-perfect "alignment" from a single timeframe, enough to green-light a positional
+ * trade on no consensus whatsoever.
+ */
 export function computeTFAlignment(tfVectors: TFAlignmentInput): number {
   const values = Object.values(tfVectors);
   if (values.length === 0) return 0;
   const up = values.filter(v => v === 'TREND_UP').length;
   const down = values.filter(v => v === 'TREND_DOWN').length;
-  const range = values.filter(v => v === 'RANGE').length;
-  const agree = Math.max(up, down) / (values.length - range + 0.001);
-  return Math.min(1, Math.max(0, agree));
+  const net = Math.abs(up - down) / values.length;
+  return Math.min(1, Math.max(0, net));
 }
 
 export default { SMA, EMA, ATR, ADX, detectTrend, detectVolatility, detectPhase, computeTFAlignment };

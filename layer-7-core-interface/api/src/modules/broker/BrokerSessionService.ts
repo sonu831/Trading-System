@@ -106,9 +106,10 @@ class BrokerSessionService {
     }
     const creds = await this.getCredentials(provider);
     if (!creds) return { success: false, error: `No credentials configured for ${provider}` };
+    // Fail before any network call: a missing api_key must not reach the broker.
     const missing = (strategy.requiredFields as string[]).filter((f: string) => !creds[f]);
     if (missing.length) {
-      return { success: false, stage: 'credentials', error: `Missing: ${missing.join(', ')}`, pending: { missing, required: strategy.requiredFields } };
+      return { success: false, stage: 'credentials', error: `Missing: ${missing.join(', ')}`, missing, required: strategy.requiredFields } as AuthResult;
     }
     const pending = input ? await this.loadPending(provider) : null;
     const result = await strategy.authenticate(creds, this.deps, { input, pending });
@@ -126,22 +127,37 @@ class BrokerSessionService {
     return this.testConnection(provider, input);
   }
 
+  /**
+   * The single place a raw broker token may exist in a response. It never leaves here:
+   * callers get `token_length` so a UI can show "connected" without ever handling the
+   * credential itself.
+   */
   private async applyResult(provider: string, result: AuthResult): Promise<AuthResult> {
+    const strategy = getStrategy(provider) as any;
+
     if (result.status === 'needs_input') {
       await this.savePending(provider, result.pending || {}, result.pendingTtlSeconds || 300);
-      const { pending, pendingTtlSeconds, ...safe } = result;
+      const { pending, pendingTtlSeconds, ...safe } = result as any;
+      // Tell the caller WHICH input to prompt for, without leaking the parked token.
+      return { ...safe, inputType: strategy?.interactiveInputs?.[0] };
+    }
+
+    if (!result.success) {
+      const { retryPending, ...safe } = result as any;
+      // A rejected OTP must not discard the parked login: re-logging in would send the
+      // user a second code and invalidate the one they are holding.
+      if (!retryPending) await this.clearPending(provider);
       return safe;
     }
-    if (!result.success) {
-      await this.clearPending(provider);
-      return result;
-    }
+
     await this.clearPending(provider);
+    let token_length: number | undefined;
     if (result.token) {
       await this.saveToken(provider, result.token, result.ttlSeconds || 21000);
+      token_length = String(result.token).length;
     }
-    const { token, ttlSeconds, ...safe } = result;
-    return safe;
+    const { token, ttlSeconds, ...safe } = result as any;
+    return { ...safe, token_length };
   }
 
   async getOrRefreshToken(provider: string): Promise<string | null> {
@@ -159,5 +175,11 @@ class BrokerSessionService {
 
 module.exports = BrokerSessionService;
 module.exports.secondsUntilISTMidnight = secondsUntilISTMidnight;
-module.exports.secondsUntilNextISTHour = secondsUntilISTHour;
+// Was `= secondsUntilISTHour`, a name defined nowhere: a ReferenceError the moment this
+// module was imported. It went unnoticed because the only test that imports it required a
+// `.js` path the TypeScript migration had renamed away, so the file never once loaded.
+module.exports.secondsUntilNextISTHour = secondsUntilNextISTHour;
 module.exports.generateTOTP = generateTOTP;
+// Exported so tests can assert a non-Base32 secret is REJECTED rather than silently
+// falling back to raw bytes and emitting a valid-looking but wrong TOTP code.
+module.exports.normalizeBase32Secret = normalizeBase32Secret;

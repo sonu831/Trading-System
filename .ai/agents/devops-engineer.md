@@ -99,3 +99,10 @@ healthcheck:
 - [ ] Grafana dashboards load with data
 - [ ] CI pipeline passes (lint + test + build)
 - [ ] Backup and restore procedures work
+
+## Shared Module
+
+Always import constants, types, and enums from \shared/\ — never hardcode strings:
+\\\js
+const { KAFKA_TOPICS, PORTS, REDIS_KEYS } = require('/app/shared');
+\\\`nSee \shared/README.md\ for the full reference.

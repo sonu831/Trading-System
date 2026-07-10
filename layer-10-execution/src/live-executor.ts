@@ -133,16 +133,40 @@ class LiveExecutor {
     this.latency.stamp(signalId, 'sl_placed');
 
     const filledLots = Math.max(1, Math.floor(fill.filledQty / lotSize));
-    const position = this.positions.openPosition({ ...signal, optionType: signal.direction === 'LONG' ? 'CE' : 'PE' }, filledLots, fillPrice, instrument);
+    // instrument.optionType is resolved once, by StrikeSelector. Do not re-derive CE/PE here.
+    const position = this.positions.openPosition({ ...signal, optionType: instrument.optionType }, filledLots, fillPrice, instrument);
     position.ordertag = ordertag; position.entryOrderId = entry.orderId; position.slOrderId = slOrderId; position.broker = this.oms.name;
     this.risk.recordEntry();
-    await this.journal.recordTrade({ ...position, broker: this.oms.name, strike: instrument.strike, expiry: instrument.expiry, optionType: signal.direction === 'LONG' ? 'CE' : 'PE' });
+    await this.journal.recordTrade({ ...position, broker: this.oms.name, strike: instrument.strike, expiry: instrument.expiry, optionType: instrument.optionType });
     this.latency.finish(signalId, true);
     logger.info({ ordertag, symbol: instrument.nfoSymbol, fillPrice, lots: filledLots, sl: triggerPrice }, 'position opened + SL resting');
     return position;
   }
 
-  async checkExits(): Promise<void> { /* reconcile loop — delegates to position manager */ }
+  /**
+   * Mark open positions to the live premium and act on the position manager's decision.
+   *
+   * The broker-side resting SL-M (invariant E2) covers a hard stop even if this loop
+   * stalls. It does NOT cover target, trailing stop, or time stop — those live here.
+   * This body was empty, so in live mode a winner never took profit and a stalled trade
+   * never timed out; only the catastrophic stop ever fired.
+   */
+  async checkExits(): Promise<void> {
+    for (const pos of this.positions.getOpenPositions()) {
+      const ltp = Number(this.quotes.getQuote(pos.nfoSymbol)?.ltp);
+      if (!(ltp > 0)) {
+        // No quote is not a price of zero. Hold; the resting SL-M still protects us.
+        logger.warn({ id: pos.id, symbol: pos.nfoSymbol }, 'no quote — cannot evaluate exits');
+        continue;
+      }
+      this.positions.updatePrice(pos.id, ltp);
+      const decision = this.positions.checkExits(pos);
+      if (!decision) continue;
+      await this._closePosition(pos, decision.reason).catch((err: any) =>
+        logger.error({ err, id: pos.id, reason: decision.reason }, 'exit failed'),
+      );
+    }
+  }
 
   async squareOffAll(reason: string): Promise<void> {
     const open = this.positions.getOpenPositions();
@@ -190,7 +214,16 @@ class LiveExecutor {
   async _safeCancel(orderId: string): Promise<void> { try { await this.oms.cancelOrder(orderId); } catch (_) {} }
 
   _ordertag(symbol: string): string { return `${symbol.slice(-6)}-${Date.now().toString(36)}-${crypto.randomBytes(3).toString('hex')}`; }
-  _round(n: number): number { return Math.round(n * 100) / 100; }
+  /**
+   * Round to the instrument's tick size (NSE options: 0.05), not to 2 decimals.
+   * `Math.round(n * 100) / 100` produced off-tick prices like 123.62 that the exchange
+   * rejects — silently leaving a stop-loss unplaced.
+   */
+  _round(n: number): number {
+    const tick = this.config.instrument?.tickSize ?? 0.05;
+    // Scrub binary-float noise: 2472 * 0.05 is 123.60000000000001, and brokers reject it.
+    return Math.round((Math.round(n / tick) * tick) * 1e6) / 1e6;
+  }
   _delay(ms: number): Promise<void> { return new Promise(r => setTimeout(r, ms)); }
 
   async _emit(type: string, data: Record<string, unknown>): Promise<void> {

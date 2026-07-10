@@ -71,7 +71,15 @@ backups/
 # Graphify (local knowledge graph cache/output)
 graphify-out/
 
-# pnpm (project uses npm)
-pnpm-lock.yaml
-**/pnpm-lock.yaml
-pnpm-workspace.yaml
+# Package manager: pnpm ONLY.
+#
+# pnpm-lock.yaml is DELIBERATELY tracked, not ignored. Every layer Dockerfile runs
+# `pnpm install --frozen-lockfile`, and .github/workflows/ci.yml caches on
+# `${{ matrix.layer }}/pnpm-lock.yaml`. While those files were ignored, that install failed
+# on every CI run before it ever reached `pnpm test` -- which is how a repo whose entry
+# points and test suites were all broken still reported a green pipeline.
+#
+# npm lockfiles are ignored: two lockfiles for one package.json is two answers to
+# "what version is installed", and the one nothing reads always wins the argument.
+package-lock.json
+**/package-lock.json

@@ -10,7 +10,7 @@
  */
 const http = require('http');
 const path = require('path');
-const ExecutionService = require(path.join(__dirname, '..', 'src', 'modules', 'execution', 'ExecutionService.js'));
+const ExecutionService = require(path.join(__dirname, '..', 'src', 'modules', 'execution', 'ExecutionService'));
 
 let pass = 0, fail = 0;
 const ok = (n, c, e = '') => { if (c) { pass++; console.log(`  PASS  ${n}`); } else { fail++; console.log(`  FAIL  ${n} ${e}`); } };

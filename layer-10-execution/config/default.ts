@@ -53,6 +53,10 @@ module.exports = {
     exchange: 'NFO',
     lotSize: num(process.env.LOT_SIZE, 75),
     strikeStep: num(process.env.STRIKE_STEP, 50),
+    // NSE option prices move in 0.05 ticks. An order priced off-tick (a stop trigger
+    // at 123.62, say) is rejected by the exchange — and a rejected stop-loss means the
+    // position sits unprotected. Every price sent to the broker rounds to this.
+    tickSize: num(process.env.TICK_SIZE, 0.05),
     // NSE moved NIFTY weekly expiry — verify current weekday before going live.
     // ISO weekday: 1=Mon .. 7=Sun
     expiryWeekday: num(process.env.EXPIRY_WEEKDAY, 2),

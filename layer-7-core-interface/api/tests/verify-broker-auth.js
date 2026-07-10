@@ -14,7 +14,7 @@ const crypto = require('crypto');
 const OTPAuth = require('otpauth');
 
 const M = path.join(__dirname, '..', 'src', 'modules', 'broker');
-const BrokerSessionService = require(path.join(M, 'BrokerSessionService.js'));
+const BrokerSessionService = require(path.join(M, 'BrokerSessionService'));
 const { secondsUntilISTMidnight, secondsUntilNextISTHour, normalizeBase32Secret, generateTOTP } = BrokerSessionService;
 const { listStrategies, getStrategy } = require(path.join(M, 'strategies'));
 

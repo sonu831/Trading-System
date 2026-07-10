@@ -1,17 +1,12 @@
 /**
- * Shared Market Constants
- * 
- * Single source of truth for regime, signal, and direction enums.
- * Used by L4 (Go), L5 (Go), L6 (Node.js), L7 (API), L8 (Dashboard).
- * 
- * IMPORT THE APPROPRIATE FORMAT:
- *   Node.js:  const { REGIME } = require('/app/shared/constants');
- *   Go:       import "shared/constants"  (copy constants.go to L4/L5)
+ * Shared Market Constants — RUNTIME (CommonJS, no ts-node required).
  *
- * Deliberately plain CommonJS .js, not .ts: Docker resolves `/app/shared/constants`
- * with no build step, so a .ts twin is unloadable at runtime while still shadowing
- * this file for the type-checker. Types live in constants.d.ts; constants.go mirrors
- * it for Go, and tests/constants-parity.test.js fails if the two ever drift.
+ * 🏃 This is what Docker containers load: require('/app/shared/constants')
+ * 📝 Source of truth: constants.ts (type-safe, IDE-autocompletable)
+ * 🔁 Keep in sync: if you edit one, edit the other
+ *
+ * Used by: L1, L2, L6, L7, L8 (dashboard), L10 — ALL Node.js layers
+ * Go mirror: constants.go
  */
 
 // ── Market Regime ──────────────────────────────────

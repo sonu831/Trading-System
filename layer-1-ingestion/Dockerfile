@@ -1,4 +1,4 @@
-FROM node:20-alpine
+FROM node:24-alpine
 
 RUN npm install -g pnpm
 
@@ -23,4 +23,4 @@ USER node
 
 EXPOSE 3001
 
-CMD ["node", "src/index.js"]
+CMD ["node", "-r", "ts-node/register", "src/index.ts"]

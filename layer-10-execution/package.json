@@ -4,31 +4,31 @@
   "description": "Options scalper execution layer (paper/shadow/live) for Nifty 50 Trading System",
   "main": "src/index.ts",
   "scripts": {
-    "start": "node -r ts-node/register src/index.ts",
-    "dev": "nodemon --exec \"node -r ts-node/register\" src/index.ts",
-    "test": "npm run verify",
-    "verify": "npm run verify:paper && npm run verify:live && npm run verify:flattrade",
-    "verify:paper": "node -r ts-node/register tests/verify-paper.js",
-    "verify:live": "node -r ts-node/register tests/verify-live.js",
-    "verify:flattrade": "node -r ts-node/register tests/verify-flattrade-oms.js",
+    "start": "tsx src/index.ts",
+    "dev": "tsx watch src/index.ts",
+    "test": "pnpm run verify",
+    "verify": "pnpm run verify:paper && pnpm run verify:live && pnpm run verify:flattrade",
+    "verify:paper": "node --import tsx tests/verify-paper.js",
+    "verify:live": "node --import tsx tests/verify-live.js",
+    "verify:flattrade": "node --import tsx tests/verify-flattrade-oms.js",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "axios": "^1.7.2",
-    "dotenv": "^16.3.1",
-    "express": "^4.18.2",
+    "axios": "^1.18.1",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
     "kafkajs": "^2.2.4",
-    "luxon": "^3.4.4",
-    "pg": "^8.11.3",
-    "pino": "^9.6.0",
-    "pino-pretty": "^10.3.1",
-    "prom-client": "^14.2.0",
-    "redis": "^4.6.10",
-    "ts-node": "^10.9.2",
-    "typescript": "^5.9.3"
+    "luxon": "^3.7.2",
+    "pg": "^8.22.0",
+    "pino": "^10.3.1",
+    "pino-pretty": "^13.1.3",
+    "prom-client": "^15.1.3",
+    "redis": "^6.1.0",
+    "tsx": "^4.23.0",
+    "typescript": "^7.0.2"
   },
   "devDependencies": {
-    "jest": "^29.7.0",
-    "nodemon": "^3.0.1"
+    "jest": "^30.4.2",
+    "nodemon": "^3.1.14"
   }
 }

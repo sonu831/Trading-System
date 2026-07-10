@@ -1,7 +1,8 @@
 // @ts-nocheck
 import React, { useMemo } from 'react';
 import PropTypes from 'prop-types';
-import { DataTable, Badge, Card } from '@/components/ui';
+import { Badge, Card } from '@/components/ui';
+import { DataTable } from '@/components/molecules';
 
 // Utility for formatting time
 const formatTime = (isoString) => {

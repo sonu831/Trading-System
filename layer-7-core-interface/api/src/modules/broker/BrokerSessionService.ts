@@ -185,6 +185,18 @@ class BrokerSessionService {
   async getOrRefreshToken(provider: string): Promise<string | null> {
     const cached = await this.getCachedToken(provider);
     if (cached) return cached;
+
+    // Never trigger an interactive login during background refresh.
+    // If the strategy requires a human (OTP, redirect, request_code), bail out
+    // instead of silently sending an SMS or prompting the browser.
+    const strategy = getStrategy(provider) as any;
+    if (strategy) {
+      const creds = await this.brokerService.getDecryptedCredentials(provider);
+      if (creds && !strategy.canAuthenticateUnattended(creds)) {
+        return null;
+      }
+    }
+
     const result = await this.testConnection(provider);
     return result.success ? this.getCachedToken(provider) : null;
   }

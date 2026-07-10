@@ -29,6 +29,59 @@ const TOTP_SECRET = 'JBSWY3DPEHPK3PXP';
 // normalizeBase32Secret's guarantees rather than a stub's looser behaviour.
 const realTOTP = generateTOTP;
 
+/** Fake MStock adapter — routes all SDK calls through the same fake HTTP dispatcher. */
+function makeFakeAdapter(http) {
+  return {
+    id: 'mstock',
+    async login(params) {
+      try {
+        const resp = await http.post('https://mstock.login/connect/login', params);
+        const body = resp.data;
+        if (body?.status !== true && body?.status !== 'true') {
+          throw new Error(body?.message || 'MStock login failed');
+        }
+        return { jwtToken: body?.data?.jwtToken };
+      } catch (err) {
+        const msg = err.response?.data?.message || err.message;
+        const e = new Error(msg);
+        Object.assign(e, { response: err.response });
+        throw e;
+      }
+    },
+    async verifyTOTP(refreshToken, totp) {
+      try {
+        const resp = await http.post('https://mstock.login/session/verifytotp', { refreshToken, totp });
+        const body = resp.data;
+        if (body?.status !== true && body?.status !== 'true') {
+          throw new Error(body?.message || 'MStock TOTP verification failed');
+        }
+        return { jwtToken: body?.data?.jwtToken };
+      } catch (err) {
+        const msg = err.response?.data?.message || err.message;
+        const e = new Error(msg);
+        Object.assign(e, { response: err.response, serverTimeUtc: new Date().toISOString() });
+        throw e;
+      }
+    },
+    async verifyOTP(refreshToken, otp) {
+      try {
+        const resp = await http.post('https://mstock.login/session/verifyotp', { refreshToken, otp });
+        const body = resp.data;
+        if (body?.status !== true && body?.status !== 'true') {
+          throw new Error(body?.message || 'MStock OTP verification failed');
+        }
+        return { jwtToken: body?.data?.jwtToken };
+      } catch (err) {
+        const msg = err.response?.data?.message || err.message;
+        const e = new Error(msg);
+        Object.assign(e, { response: err.response });
+        throw e;
+      }
+    },
+    async logout() {},
+  };
+}
+
 /** In-memory stand-ins for BrokerService + a routable fake HTTP client. */
 function makeService({ creds, routes }) {
   const store = { session: {}, json: {} };
@@ -39,6 +92,7 @@ function makeService({ creds, routes }) {
     getSessionToken: async (p) => store.session[p] || null,
     saveSessionToken: async (p, token, ttl) => { store.session[p] = token; store.ttl = ttl; },
     clearSessionToken: async (p) => { delete store.session[p]; return { cleared: true }; },
+    saveAccessToken: async (p, token) => {}, // no-op in test: tests check session store, not DB
     setJson: async (k, v) => { store.json[k] = JSON.parse(JSON.stringify(v)); },
     getJson: async (k) => store.json[k] ?? null,
     delKey: async (k) => { delete store.json[k]; },
@@ -46,21 +100,25 @@ function makeService({ creds, routes }) {
 
   const dispatch = (method) => async (url, a, b) => {
     const body = method === 'post' ? a : undefined;
-    calls.push({ method, url, body });
+    const queryParams = b?.params || {};
+    calls.push({ method, url, body, params: queryParams });
     const handler = Object.keys(routes).find((r) => url.includes(r));
     if (!handler) throw new Error(`no fake route for ${url}`);
     const res = routes[handler];
-    if (typeof res === 'function') return res(body);
+    if (typeof res === 'function') return res(body, b);
     if (res instanceof Error) throw res;
     return { data: res };
   };
 
+  const http = { post: dispatch('post'), get: dispatch('get') };
+
   const svc = new BrokerSessionService({ brokerService });
   svc.deps = {
-    http: { post: dispatch('post'), get: dispatch('get') },
+    http,
     generateTOTP: realTOTP,
     sha256: (s) => crypto.createHash('sha256').update(s).digest('hex'),
     now: undefined,
+    adapter: makeFakeAdapter(http),
   };
   return { svc, store, calls };
 }
@@ -112,11 +170,13 @@ const VERIFY_OK = { status: true, data: { ClientId: 'C123', ClientName: 'TEST', 
       creds: { api_key: 'k', client_code: 'c', password: 'p' },
       routes: {
         '/connect/login': LOGIN_OK,
-        // Fake routes return an axios-shaped `{ data }`.
-        '/session/token': (body) =>
-          body.otp === '123456'
-            ? { data: { status: true, data: { jwtToken: TRADING_TOKEN } } }
-            : { data: { status: 'false', message: 'Entered OTP has been expired.' } },
+        '/session/verifyotp': (body) => {
+          if (body.otp === '123456') {
+            return { data: { status: true, data: { jwtToken: TRADING_TOKEN } } };
+          } else {
+            return { data: { status: 'false', message: 'Entered OTP has been expired.' } };
+          }
+        },
       },
     });
 
@@ -177,12 +237,12 @@ const VERIFY_OK = { status: true, data: { ClientId: 'C123', ClientName: 'TEST', 
   {
     const API_KEY = 'kapi', SECRET = 'ksecret', RT = 'reqtok123', AT = 'access-token-xyz';
     const expectedChecksum = crypto.createHash('sha256').update(`${API_KEY}${RT}${SECRET}`).digest('hex');
-    let seenBody = null;
+    let seenParams = null;
 
     const { svc, store } = makeService({
       creds: { api_key: API_KEY, api_secret: SECRET },
       routes: {
-        '/session/token': (body) => { seenBody = body; return { data: { status: 'success', data: { access_token: AT, user_name: 'Zed' } } }; },
+        '/session/token': (body, config) => { seenParams = config?.params || {}; return { data: { status: 'success', data: { access_token: AT, user_name: 'Zed' } } }; },
       },
     });
 
@@ -193,8 +253,7 @@ const VERIFY_OK = { status: true, data: { ClientId: 'C123', ClientName: 'TEST', 
 
     const done = await svc.completeSession('kite', { request_token: RT });
     ok('request_token exchange -> connected', done.success === true, done.error);
-    const params = new URLSearchParams(seenBody);
-    ok('checksum = SHA256(api_key + request_token + api_secret)', params.get('checksum') === expectedChecksum);
+    ok('checksum = SHA256(api_key + request_token + api_secret)', seenParams.checksum === expectedChecksum);
     ok('access_token cached (not the request_token)', store.session.kite === AT && store.session.kite !== RT);
     ok('raw token not returned', done.token === undefined);
   }
@@ -348,7 +407,7 @@ const VERIFY_OK = { status: true, data: { ClientId: 'C123', ClientName: 'TEST', 
     ok('hex secret THROWS (used to silently yield a wrong code)', throwsWith('a1b2c3d4e5f6', /not valid Base32/));
     ok('0/1 characters THROW', throwsWith('JBSWY3DPEHPK3PX0', /not valid Base32/));
     ok('empty THROWS', throwsWith('   ', /empty/));
-    ok('error names A-Z and 2-7', throwsWith('####', /A-Z and 2-7/));
+    ok('error names A-Z and 2-7', throwsWith('####', /A-Z, 2-7/));
 
     // The whole point: bad secrets must never reach the broker as a plausible code.
     let generated = null;

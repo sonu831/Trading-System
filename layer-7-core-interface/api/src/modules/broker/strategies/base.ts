@@ -58,9 +58,26 @@ export function secondsUntilISTMidnight(now: Date = new Date()): number {
   return Math.max(60, Math.floor((next - ist.getTime()) / 1000) - 120);
 }
 
-export function secondsUntilNextISTHour(now: Date = new Date()): number {
+export function secondsUntilNextISTHour(targetHour?: number, now?: Date): number {
+  // Support: secondsUntilNextISTHour(now: Date) and secondsUntilNextISTHour(hour: number, now: Date)
+  let hourTarget: number | undefined;
+  let date: Date;
+  if (typeof targetHour === 'number' && now instanceof Date) {
+    hourTarget = targetHour;
+    date = now;
+  } else if (targetHour instanceof Date) {
+    date = targetHour;
+  } else {
+    date = new Date();
+  }
   const IST = 5.5 * 3600000;
-  const ist = new Date(now.getTime() + IST);
-  const next = Date.UTC(ist.getUTCFullYear(), ist.getUTCMonth(), ist.getUTCDate(), ist.getUTCHours() + 1, 0, 0, 0);
-  return Math.max(60, Math.floor((next - ist.getTime()) / 1000));
+  const ist = new Date(date.getTime() + IST);
+  const currentHour = ist.getUTCHours();
+  const currentMin = ist.getUTCMinutes();
+  const currentSec = ist.getUTCSeconds();
+  const nextHour = hourTarget != null ? hourTarget : currentHour + 1;
+  const dayOffset = nextHour <= currentHour ? 1 : 0;
+  const diffHours = nextHour - currentHour + (dayOffset * 24);
+  const diffSeconds = diffHours * 3600 - currentMin * 60 - currentSec;
+  return Math.max(60, diffSeconds - 120);
 }

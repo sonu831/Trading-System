@@ -8,7 +8,6 @@ class SystemService extends BaseService {
   }
 
   async getSystemStatus() {
-    // Parallel fetching for performance
     const [logs, l1, l2, l4, l5, l6, l7, backfill, candleCount] = await Promise.all([
       this.systemRepository.getLogs(),
       this.systemRepository.getMetric('system:layer1:metrics'),
@@ -20,6 +19,19 @@ class SystemService extends BaseService {
       this.systemRepository.getMetric('system:layer1:backfill'),
       this.systemRepository.getCandleCount(),
     ]);
+
+    // Fetch enabled broker providers + their status
+    const BrokerRepository = require('../broker/BrokerRepository');
+    const brokerRepo = new BrokerRepository(this.systemRepository.prisma, this.systemRepository.redis);
+    const providers = await brokerRepo.findAllProviders().catch(() => []);
+    const brokerStatus = providers
+      .filter((p: any) => p.enabled)
+      .map((p: any) => ({
+        provider: p.provider,
+        role: p.role,
+        status: p.status || 'DISCONNECTED',
+        last_tested_at: p.last_tested_at,
+      }));
 
     // Defaults
     const safeL1 = l1 || { type: 'Stream', source: 'MStock', status: 'Unknown' };
@@ -44,6 +56,7 @@ class SystemService extends BaseService {
         layer7: { name: 'Presentation', status: 'ONLINE', metrics: safeL7 },
       },
       infra: { kafka: 'ONLINE', redis: 'ONLINE', timescaledb: 'ONLINE' },
+      brokers: brokerStatus,
     };
   }
 

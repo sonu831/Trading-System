@@ -1,7 +1,8 @@
 // @ts-nocheck
 import React, { useState, useEffect } from 'react';
 import { useSelector } from 'react-redux';
-import { Card, Input, Button, Badge, Table } from '@/components/ui';
+import { Card, Input, Button, Badge } from '@/components/ui';
+import { Table } from '@/components/molecules';
 import { selectPipelineStatus } from '@/store/slices/systemSlice';
 import BackfillProgress from './BackfillProgress';
 

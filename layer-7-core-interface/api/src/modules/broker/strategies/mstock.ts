@@ -125,7 +125,15 @@ async function loginAndVerify(
       return { success: true, status: 'connected', token: verifyResult.jwtToken, ttlSeconds: TTL, provider: 'mstock', auth_type: 'totp', stage: 'connected' };
     } catch (err: any) {
       log('fail', 'verifyTOTP FAILED', { error: err.message });
-      return { success: false, error: err.message, stage: 'totp_verify' };
+      const statusCode = err?.response?.status;
+      const serverTimeUtc = err?.serverTimeUtc || new Date().toISOString();
+      const likelyCauses = [
+        'TOTP may not be enabled on the account — Enable TOTP in trade.mstock.com → Trading APIs',
+        'The secret may not match (regenerate and re-enter the Base32 key)',
+        'A significant clock skew can produce a wrong code — check server time',
+      ];
+      const stageName = statusCode === 400 ? 'verify_totp' : 'totp_verify';
+      return { success: false, error: err.message, stage: stageName, serverTimeUtc, likelyCauses };
     }
   }
 

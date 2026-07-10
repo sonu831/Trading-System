@@ -13,6 +13,8 @@ RUN NODE_TLS_REJECT_UNAUTHORIZED=0 npx prisma generate
 
 COPY . .
 
+RUN npx tsc --outDir dist --module commonjs --target es2022 --esModuleInterop src/workers/indicator.processor.ts 2>/dev/null && cp dist/src/workers/indicator.processor.js src/workers/ || true
+
 EXPOSE 4000
 
 USER node

@@ -2,7 +2,7 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 import BackfillPanel from './components/BackfillPanel';
-import { Modal } from '@/components/ui';
+import { Modal } from '@/components/molecules';
 
 const BackfillModal = ({ isOpen, onClose }) => {
   return (

@@ -12,8 +12,9 @@ class KiteVendor extends BaseVendor {
   constructor(options) {
     super(options);
     this.name = 'Kite';
-    this.apiKey = process.env.ZERODHA_API_KEY;
-    this.accessToken = process.env.ZERODHA_ACCESS_TOKEN;
+    // Accept from options (DB-driven) or fall back to env (legacy)
+    this.apiKey = options.apiKey || process.env.ZERODHA_API_KEY || '';
+    this.accessToken = options.accessToken || options.sessionToken || process.env.ZERODHA_ACCESS_TOKEN || '';
     this.kc = new KiteConnect({ api_key: this.apiKey, access_token: this.accessToken });
     this.mapper = new KiteMapper();
     this.symbols = options.symbols || []; // Expected to be array of objects with token

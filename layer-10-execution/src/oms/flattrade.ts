@@ -39,19 +39,36 @@ function normalizeStatus(raw) {
 }
 
 class FlatTradeOMS extends BaseOMS {
-  constructor(config) {
+  constructor(config, credentialProvider) {
     super(config);
     this.name = 'flattrade';
-    this.userId = config.flattrade.userId;
-    this.accountId = config.flattrade.accountId || config.flattrade.userId;
-    this.apiKey = config.flattrade.apiKey;
-    this.baseUrl = (config.flattrade.baseUrl || 'https://piconnect.flattrade.in/PiConnectAPI').replace(/\/$/, '');
-    // jKey. In the target design this is injected from the central Broker Session Service.
-    this.token = config.flattrade.token;
+    this.credentialProvider = credentialProvider || null;
+
+    if (credentialProvider) {
+      this.userId = '';
+      this.accountId = '';
+      this.apiKey = '';
+      this.baseUrl = '';
+      this.token = '';
+    } else {
+      this.userId = config.flattrade.userId;
+      this.accountId = config.flattrade.accountId || config.flattrade.userId;
+      this.apiKey = config.flattrade.apiKey;
+      this.baseUrl = (config.flattrade.baseUrl || 'https://piconnect.flattrade.in/PiConnectAPI').replace(/\/$/, '');
+      this.token = config.flattrade.token;
+    }
     this.connected = false;
   }
 
   async connect() {
+    if (this.credentialProvider) {
+      const cfg = this.credentialProvider.getFlatTradeConfig();
+      this.userId = cfg.userId;
+      this.accountId = cfg.accountId || cfg.userId;
+      this.apiKey = cfg.apiKey;
+      this.baseUrl = cfg.baseUrl.replace(/\/$/, '');
+      this.token = cfg.token;
+    }
     if (!this.userId) throw new Error('FlatTrade credentials not configured (userId)');
     if (!this.jKey()) throw new Error('FlatTrade session token (jKey) not available — connect the provider first');
     this.connected = true;

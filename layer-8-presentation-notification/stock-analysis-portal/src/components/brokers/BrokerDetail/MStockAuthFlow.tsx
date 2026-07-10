@@ -1,7 +1,7 @@
 // @ts-nocheck
 import { useState } from 'react';
 
-const MStockAuthFlow = ({ broker }) => {
+const BrokerAuthTest = ({ broker }) => {
   const [testing, setTesting] = useState(false);
   const [result, setResult] = useState(null);
 
@@ -9,7 +9,7 @@ const MStockAuthFlow = ({ broker }) => {
     setTesting(true);
     setResult(null);
     try {
-      const res = await fetch('/api/v1/providers/mstock/test', { method: 'POST' });
+      const res = await fetch(`/api/v1/providers/${broker.provider}/test`, { method: 'POST' });
       const data = await res.json();
       setResult(data);
     } catch (err) {
@@ -22,7 +22,7 @@ const MStockAuthFlow = ({ broker }) => {
     <div className="bg-gray-800 rounded-lg border border-gray-700 p-4">
       <h3 className="text-lg font-semibold text-white mb-3">Connection Test</h3>
       <p className="text-sm text-gray-400 mb-4">
-        Tests the full login + TOTP handshake using your saved credentials (api_key, client_code, password, totp_secret). All stored encrypted server-side.
+        Tests the full login + TOTP handshake using your saved credentials. All stored encrypted server-side.
       </p>
 
       <button
@@ -65,4 +65,4 @@ const MStockAuthFlow = ({ broker }) => {
   );
 };
 
-export default MStockAuthFlow;
+export default BrokerAuthTest;

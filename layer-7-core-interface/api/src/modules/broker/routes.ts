@@ -61,6 +61,37 @@ async function brokerRoutes(fastify, options) {
     handler: brokerController.saveCredential,
   });
 
+  fastify.delete('/api/v1/providers/:id/credentials', {
+    schema: {
+      description: 'Delete a single credential field from a provider',
+      tags: ['Providers'],
+    },
+    handler: brokerController.deleteCredential,
+  });
+
+  fastify.get('/api/v1/providers/:provider/credentials/decrypted', {
+    schema: {
+      description: 'Return fully decrypted credentials for a provider (internal use by execution engine)',
+      tags: ['Providers'],
+    },
+    handler: async (req, reply) => {
+      try {
+        const { provider } = req.params as { provider: string };
+        const brokerRepo = (require('../../container').resolve('brokerRepository') as any);
+        const p = await brokerRepo.findProviderByName(provider);
+        if (!p) return reply.code(404).send({ success: false, error: 'Provider not found' });
+        if (!p.enabled) return reply.code(403).send({ success: false, error: 'Provider disabled' });
+        if (p.role !== 'execution' && p.role !== 'both') {
+          return reply.code(403).send({ success: false, error: 'Provider not configured for execution' });
+        }
+        const creds = await (require('../../container').resolve('brokerService') as any).getDecryptedCredentials(provider);
+        return { success: true, data: { provider, credentials: creds } };
+      } catch (err: any) {
+        return reply.code(500).send({ success: false, error: err.message });
+      }
+    },
+  });
+
   fastify.get('/api/v1/providers/:provider/status', {
     handler: brokerController.getProviderStatus,
   });

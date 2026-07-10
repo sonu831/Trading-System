@@ -2,8 +2,8 @@
 import { useState } from 'react';
 
 const FIELD_LABELS = {
-  api_key: 'API Key', client_code: 'Client Code', password: 'Password',
-  totp_secret: 'TOTP Secret', access_token: 'Access Token',
+  api_key: 'API Key', api_secret: 'API Secret', client_code: 'Client Code',
+  password: 'Password', totp_secret: 'TOTP Secret', access_token: 'Access Token',
   refresh_token: 'Refresh Token', feed_token: 'Feed Token',
 };
 
@@ -40,6 +40,11 @@ const CredentialField = ({ fieldName, value, isActive, onSave, onRemove }) => {
       <button onClick={handleSave} disabled={saving || !editValue.trim()} className="px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded text-xs transition disabled:opacity-50 flex-shrink-0">
         {saving ? '...' : 'Save'}
       </button>
+      {onRemove && (
+        <button onClick={() => onRemove(fieldName)} className="px-2 py-2 bg-red-600/40 hover:bg-red-600 text-red-300 hover:text-white rounded text-xs transition flex-shrink-0" title="Remove credential">
+          ×
+        </button>
+      )}
     </div>
   );
 };

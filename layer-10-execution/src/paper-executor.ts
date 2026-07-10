@@ -52,6 +52,17 @@ class PaperExecutor {
     return position;
   }
 
+  async snapshot(): Promise<void> {
+    for (const pos of this.positions.getOpenPositions()) {
+      const q = this.quotes.getQuote(pos.nfoSymbol);
+      const ltp = q?.ltp ?? pos.currentPrice ?? null;
+      if (ltp != null) {
+        pos.currentPrice = ltp;
+        await this.journal.recordPnlSnapshot(pos.id, pos.nfoSymbol, ltp, ltp, null, null, null, pos.pnl);
+      }
+    }
+  }
+
   /**
    * Mark open positions to the live option premium and exit on the SAME rules live uses.
    *

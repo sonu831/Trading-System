@@ -13,6 +13,7 @@ class BrokerController extends BaseController {
   disableProvider = async (req: any, reply: any) => { try { const d = await this.brokerService.disableProvider(parseInt(req.params.id)); return this.sendSuccess(reply, d, `${d.provider} disabled`); } catch (e: any) { return this.sendError(reply, e, e.statusCode || 500); } };
   getProviderStatus = async (req: any, reply: any) => { try { return this.sendSuccess(reply, await this.brokerService.getProviderStatus(req.params.provider)); } catch (e) { return this.sendError(reply, e); } };
   deleteProvider = async (req: any, reply: any) => { try { await this.brokerService.deleteProvider(parseInt(req.params.id)); return this.sendSuccess(reply, null, 'Provider deleted'); } catch (e: any) { return this.sendError(reply, e, e.statusCode || 500); } };
+  deleteCredential = async (req: any, reply: any) => { try { if (!req.query.field_name) return this.sendError(reply, new Error('field_name query param required'), 400); await this.brokerService.deleteCredential(parseInt(req.params.id), req.query.field_name); return this.sendSuccess(reply, null, 'Credential deleted'); } catch (e: any) { return this.sendError(reply, e, e.statusCode || 500); } };
 }
 
 module.exports = BrokerController;

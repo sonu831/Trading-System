@@ -4,7 +4,7 @@ import { useRouter } from 'next/router';
 import { useSelector, useDispatch } from 'react-redux';
 import BrokerConfig from './BrokerConfig';
 import CredentialForm from './CredentialForm';
-import MStockAuthFlow from './MStockAuthFlow';
+import BrokerAuthTest from './MStockAuthFlow';
 import BrokerStatusBadge from '@/components/brokers/BrokerList/BrokerStatusBadge';
 import { fetchBrokers, enableBroker, disableBroker, selectBrokers } from '@/store/slices/brokerSlice';
 
@@ -25,8 +25,6 @@ const BrokerDetail = ({ id }) => {
 
   if (loading) return <div className="text-center py-12 text-gray-400">Loading...</div>;
   if (!broker) return <div className="text-center py-12 text-gray-400">Broker not found</div>;
-
-  const apiKeyCred = broker.credentials?.find((c) => c.field_name === 'api_key');
 
   return (
     <div>
@@ -51,9 +49,7 @@ const BrokerDetail = ({ id }) => {
           <CredentialForm broker={broker} />
         </div>
         <div className="space-y-6">
-          {broker.provider === 'mstock' && (
-            <MStockAuthFlow broker={broker} apiKey={apiKeyCred?.value} />
-          )}
+          <BrokerAuthTest broker={broker} />
           <div className="bg-gray-800 rounded-lg border border-gray-700 p-4">
             <h3 className="text-lg font-semibold text-white mb-3">Connection Info</h3>
             <div className="space-y-2 text-sm">

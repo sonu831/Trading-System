@@ -6,6 +6,7 @@ const logger = require('./utils/logger');
 const { isAtOrAfter, tradingDateIST } = require('./utils/time');
 const { FlatTradeOMS } = require('./oms/flattrade');
 const { MStockOMS } = require('./oms/mstock');
+const { CredentialProvider } = require('./credential-provider');
 const { RiskManager } = require('./risk/manager');
 const { PositionManager } = require('./risk/position-manager');
 const { StrikeSelector } = require('./strike-selector');
@@ -25,18 +26,45 @@ const pnlGauge = new promClient.Gauge({ name: 'execution_daily_pnl', help: 'Dail
 
 let oms, riskManager, positionManager, strikeSelector, journal, quoteFeed, executor;
 let kafkaConsumer, kafkaProducer, redisClient, redisSubscriber;
+let credentialProvider: any;
 let reconcileInterval, snapshotInterval, squareOffInterval, dailyResetInterval;
 let lastResetDate = null;
 
 async function start() {
   logger.info(`Starting Layer 10: Execution Engine (mode=${config.tradeMode})...`);
 
+  // Start Redis first — credential-provider needs it for session tokens
+  await startRedis();
+
+  // Initialize credential provider (fetch from L7 API, subscribe to changes)
+  credentialProvider = new CredentialProvider({ redis: redisClient, backendApiUrl: config.backendApiUrl });
+  await credentialProvider.init();
+
+  // OMS creation — pass credentialProvider if available, fall back to config
   oms = createOMS();
   riskManager = new RiskManager(config);
   positionManager = new PositionManager(config);
   strikeSelector = new StrikeSelector(config);
   journal = new TradeJournal(config);
   quoteFeed = createQuoteFeed();
+
+  // Wire kill switch persistence (must happen AFTER riskManager is created)
+  riskManager.onKillSwitchChange = async (active: boolean) => {
+    await redisClient.set(config.redis.keys.killSwitch, active ? '1' : '0');
+  };
+  const ks = await redisClient.get(config.redis.keys.killSwitch);
+  if (ks === '1') riskManager.setKillSwitch(true, 'restored_from_redis');
+
+  // Hot reload: re-create OMS when providers change
+  credentialProvider.onProvidersChange(async () => {
+    logger.info('Providers changed, re-initializing OMS');
+    await oms.disconnect();
+    quoteFeed.stop();
+    oms = createOMS();
+    await oms.connect();
+    quoteFeed = createQuoteFeed();
+    quoteFeed.start();
+  });
 
   if (config.tradeMode === 'live') {
     // Requires OMS credentials + Kafka producer for execution events
@@ -49,7 +77,6 @@ async function start() {
   }
 
   await startKafka();
-  await startRedis();
   await startQuoteFeed();
 
   // Reconcile positions every 5s
@@ -78,6 +105,14 @@ async function start() {
 }
 
 function createOMS() {
+  if (credentialProvider) {
+    const active = credentialProvider.getActiveBroker() || config.broker;
+    if (active === 'flattrade') return new FlatTradeOMS(config, credentialProvider);
+    if (active === 'mstock') return new MStockOMS(config, credentialProvider);
+    logger.warn(`Unknown broker ${active}, using FlatTrade`);
+    return new FlatTradeOMS(config, credentialProvider);
+  }
+  // Fallback: read from env config (legacy path for direct env vars)
   if (config.broker === 'flattrade') return new FlatTradeOMS(config);
   if (config.broker === 'mstock') return new MStockOMS(config);
   logger.warn(`Unknown broker ${config.broker}, using FlatTrade`);
@@ -125,13 +160,9 @@ async function startRedis() {
   logger.info('Redis connected');
 
   // Persist the kill switch so a breaker trip (or /kill) survives a restart.
-  riskManager.onKillSwitchChange = async (active) => {
-    await redisClient.set(config.redis.keys.killSwitch, active ? '1' : '0');
-  };
+  // NOTE: onKillSwitchChange is wired in start() after riskManager is created.
 
   // Check kill switch on startup (must happen on the MAIN client, before it subscribes).
-  const ks = await redisClient.get(config.redis.keys.killSwitch);
-  if (ks === '1') riskManager.setKillSwitch(true, 'restored_from_redis');
 
   // node-redis v4: a subscribed client cannot run normal commands — use a dedicated connection.
   redisSubscriber = redisClient.duplicate();
@@ -289,6 +320,7 @@ async function shutdown() {
   if (quoteFeed) quoteFeed.stop();
   try { if (redisSubscriber) await redisSubscriber.quit(); } catch (_) { /* ignore */ }
   try { if (redisClient) await redisClient.quit(); } catch (_) { /* ignore */ }
+  try { if (credentialProvider) await credentialProvider.stop(); } catch (_) { /* ignore */ }
   try { if (journal) await journal.close(); } catch (_) { /* ignore */ }
   try { if (oms) await oms.disconnect(); } catch (_) { /* ignore */ }
   process.exit(0);

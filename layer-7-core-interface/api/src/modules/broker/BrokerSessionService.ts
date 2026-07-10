@@ -33,9 +33,15 @@ function normalizeBase32Secret(raw: unknown): string {
 
 function generateTOTP(secret: string): string {
   if (!OTPAuth) OTPAuth = require('otpauth');
-  const base32 = normalizeBase32Secret(secret);
+
+  // Validate via the same strict function the API uses for credential storage.
+  // A 6-digit generated OTP code is NOT a secret key — it will FAIL here with a
+  // descriptive error instead of silently producing wrong TOTP codes.
+  const clean = normalizeBase32Secret(secret);
+
+  const secretObj = OTPAuth.Secret.fromBase32(clean);
   return new OTPAuth.TOTP({
-    secret: OTPAuth.Secret.fromBase32(base32),
+    secret: secretObj,
     algorithm: 'SHA1', digits: 6, period: 30,
   }).generate();
 }

@@ -21,6 +21,7 @@ module.exports = {
 
   tradeMode: process.env.TRADE_MODE || 'paper', // paper | shadow | live
   broker: process.env.EXECUTION_BROKER || 'mstock', // mstock | flattrade
+  backendApiUrl: process.env.BACKEND_API_URL || 'http://backend-api:4000',
 
   kafka: {
     brokers: (process.env.KAFKA_BROKERS || 'localhost:9092').split(','),
@@ -97,7 +98,7 @@ module.exports = {
   quotes: {
     // broker: poll executor.getQuote (works read-only in paper mode with creds)
     // synthetic: random-walk for offline dev — NEVER meaningful for live
-    source: process.env.QUOTE_SOURCE || (process.env.MSTOCK_API_KEY ? 'broker' : 'synthetic'),
+    source: process.env.QUOTE_SOURCE || 'synthetic',
     pollMs: num(process.env.QUOTE_POLL_MS, 1000),
   },
 
@@ -105,10 +106,7 @@ module.exports = {
 
   mstock: {
     baseUrl: process.env.MSTOCK_BASE_URL || 'https://api.mstock.trade',
-    apiKey: process.env.MSTOCK_API_KEY || '',
-    accessToken: process.env.MSTOCK_ACCESS_TOKEN || '',
-    clientCode: process.env.MSTOCK_CLIENT_CODE || '',
-    // typeb endpoint paths — VERIFY against the MStock Postman collection before live.
+    // endpoints — VERIFY against the MStock Postman collection before live.
     endpoints: {
       placeOrder: '/openapi/typeb/orders/regular',
       modifyOrder: '/openapi/typeb/orders/regular',
@@ -121,13 +119,6 @@ module.exports = {
   },
 
   flattrade: {
-    userId: process.env.FLATTRADE_USER_ID || '',
-    accountId: process.env.FLATTRADE_ACTID || '',
-    apiKey: process.env.FLATTRADE_API_KEY || '',
-    // jKey from the login flow (auth.flattrade.in -> request_code -> /trade/apitoken).
-    // NOT the api_key. In the target design this is read from the central session (Redis).
-    token: process.env.FLATTRADE_TOKEN || '',
-    // Official Pi Connect base URL. `/PiConnectTP` and `/REST/` paths are wrong.
     baseUrl: process.env.FLATTRADE_BASE_URL || 'https://piconnect.flattrade.in/PiConnectAPI',
   },
 };

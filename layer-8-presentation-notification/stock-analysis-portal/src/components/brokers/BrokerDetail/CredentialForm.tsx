@@ -2,9 +2,9 @@
 import { useState } from 'react';
 import { useDispatch } from 'react-redux';
 import CredentialField from './CredentialField';
-import { saveCredential } from '@/store/slices/brokerSlice';
+import { saveCredential, deleteCredential } from '@/store/slices/brokerSlice';
 
-const CREDENTIAL_FIELDS = ['api_key', 'client_code', 'password', 'totp_secret'];
+const CREDENTIAL_FIELDS = ['api_key', 'api_secret', 'client_code', 'password', 'totp_secret', 'access_token'];
 
 const CredentialForm = ({ broker }) => {
   const dispatch = useDispatch();
@@ -24,6 +24,11 @@ const CredentialForm = ({ broker }) => {
     setShowAdd(false);
   };
 
+  const handleRemove = async (fieldName) => {
+    if (!window.confirm(`Remove ${fieldName} credential?`)) return;
+    await dispatch(deleteCredential({ providerId: broker.id, fieldName }));
+  };
+
   if (!broker) return null;
 
   return (
@@ -35,7 +40,7 @@ const CredentialForm = ({ broker }) => {
 
       <div className="space-y-1">
         {broker.credentials?.map((c) => (
-          <CredentialField key={c.field_name} fieldName={c.field_name} value={c.value || ''} isActive={c.is_active} onSave={handleSave} />
+          <CredentialField key={c.field_name} fieldName={c.field_name} value={c.value || ''} isActive={c.is_active} onSave={handleSave} onRemove={handleRemove} />
         ))}
       </div>
 

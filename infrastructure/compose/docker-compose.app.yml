@@ -284,13 +284,8 @@ services:
       - KAFKA_TOPIC_TRADE_SIGNALS=trade-signals
       - REDIS_URL=redis://redis:6379
       - TIMESCALE_URL=postgresql://${POSTGRES_USER:-trading}:${POSTGRES_PASSWORD:-trading123}@timescaledb:5432/${POSTGRES_DB:-nifty50}
+      - BACKEND_API_URL=http://backend-api:4000
       - UNDERLYING=${UNDERLYING:-NIFTY}
-      - MSTOCK_API_KEY=${MSTOCK_API_KEY}
-      - MSTOCK_ACCESS_TOKEN=${MSTOCK_ACCESS_TOKEN}
-      - MSTOCK_CLIENT_CODE=${MSTOCK_CLIENT_CODE}
-      - FLATTRADE_USER_ID=${FLATTRADE_USER_ID}
-      - FLATTRADE_API_KEY=${FLATTRADE_API_KEY}
-      - FLATTRADE_ACTID=${FLATTRADE_ACTID}
       - MAX_LOTS=${MAX_LOTS:-1}
       - MAX_CONCURRENT_POSITIONS=1
       - MAX_TRADES_PER_DAY=5
@@ -325,7 +320,8 @@ services:
     ports:
       - '80:80'
     depends_on:
-      - backend-api
+      backend-api:
+        condition: service_healthy
     networks:
       - trading-network
     restart: unless-stopped
@@ -343,11 +339,12 @@ services:
       - NEXT_PUBLIC_WS_URL=/
     networks:
       - trading-network
+    depends_on:
+      backend-api:
+        condition: service_healthy
     restart: unless-stopped
     volumes:
       - ../../shared:/app/shared:ro
-    command: >
-      /bin/sh -c " echo 'Waiting for Backend API...' && node /app/shared/scripts/wait-for-it.js backend-api:4000 && echo 'Backend API is up! Starting Dashboard...' && node server.js"
 
 # ===========================================
 # NETWORKS (External - shared with infra)

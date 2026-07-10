@@ -62,10 +62,10 @@ class FIIDIIScraper extends AltDataAdapter {
       const latest = records[records.length - 1];
       return {
         date: latest.date || latest.DATE,
-        fii_net: parseFloat(latest.fiiNetValue || 0),
-        dii_net: parseFloat(latest.diiNetValue || 0),
-        fii_index_futures: parseFloat(latest.fiiIndexFut || 0),
-        fii_stock_futures: parseFloat(latest.fiiStockFut || 0),
+        fii_net: latest.fiiNetValue ? parseFloat(latest.fiiNetValue) : null,
+        dii_net: latest.diiNetValue ? parseFloat(latest.diiNetValue) : null,
+        fii_index_futures: latest.fiiIndexFut ? parseFloat(latest.fiiIndexFut) : null,
+        fii_stock_futures: latest.fiiStockFut ? parseFloat(latest.fiiStockFut) : null,
         source: 'nse-api',
       };
     } catch (err) {

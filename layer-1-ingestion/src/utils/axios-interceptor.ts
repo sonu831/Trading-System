@@ -10,7 +10,7 @@
 
 const axios = require('axios');
 const { metrics } = require('./metrics');
-const { logger } = require('./logger');
+const logger = require('./logger');
 
 let isSetup = false;
 

@@ -1,5 +1,5 @@
 const axios = require('axios');
-const { logger } = require('../utils/logger');
+const logger = require('../utils/logger');
 const { FLATTRADE_BASE_URL, norenBody, isNorenOk, norenError } = require('../utils/flattrade');
 const { nextWeeklyExpiryIST } = require('../utils/ist-time');
 

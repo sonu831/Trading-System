@@ -40,6 +40,22 @@ export const disableBroker = createAsyncThunk('brokers/disable', async (id) => {
   return data.data;
 });
 
+export const deleteBroker = createAsyncThunk('brokers/delete', async (id) => {
+  const res = await fetch(`/api/v1/providers/${id}`, { method: 'DELETE' });
+  const data = await res.json();
+  if (!data.success) throw new Error(data.message || 'Failed to delete broker');
+  return id;
+});
+
+export const deleteCredential = createAsyncThunk('brokers/deleteCredential', async ({ providerId, fieldName }) => {
+  const res = await fetch(`/api/v1/providers/${providerId}/credentials?field_name=${fieldName}`, {
+    method: 'DELETE',
+  });
+  const data = await res.json();
+  if (!data.success) throw new Error(data.message || 'Failed to delete credential');
+  return { providerId, fieldName };
+});
+
 export const saveCredential = createAsyncThunk('brokers/saveCredential', async ({ providerId, field_name, field_value }) => {
   const res = await fetch(`/api/v1/providers/${providerId}/credentials`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -48,6 +64,16 @@ export const saveCredential = createAsyncThunk('brokers/saveCredential', async (
   const data = await res.json();
   if (!data.success) throw new Error(data.message || 'Failed to save credential');
   return { field_name };
+});
+
+export const saveCredentialsBulk = createAsyncThunk('brokers/saveCredentialsBulk', async ({ providerId, credentials }) => {
+  const res = await fetch(`/api/v1/providers/${providerId}/credentials/bulk`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ credentials }),
+  });
+  const data = await res.json();
+  if (!data.success) throw new Error(data.message || 'Failed to save credentials');
+  return { providerId, credentials };
 });
 
 const initialState = {
@@ -88,6 +114,44 @@ const brokerSlice = createSlice({
         const idx = state.list.findIndex((b) => b.id === action.payload.id);
         if (idx >= 0) state.list[idx] = action.payload;
         if (state.selected?.id === action.payload.id) state.selected = action.payload;
+      })
+      .addCase(deleteBroker.fulfilled, (state, action) => {
+        state.list = state.list.filter((b) => b.id !== action.payload);
+        if (state.selected?.id === action.payload) state.selected = null;
+      })
+      .addCase(saveCredential.fulfilled, (state, action) => {
+        const idx = state.list.findIndex((b) => b.id === action.meta.arg.providerId);
+        if (idx < 0) return;
+        const broker = state.list[idx];
+        const credIdx = broker.credentials?.findIndex((c) => c.field_name === action.meta.arg.field_name);
+        if (credIdx >= 0) {
+          broker.credentials[credIdx] = { ...broker.credentials[credIdx], value: '••••••••', is_active: !!action.meta.arg.field_value };
+        } else {
+          broker.credentials = [...(broker.credentials || []), { field_name: action.meta.arg.field_name, value: '••••••••', is_active: true }];
+        }
+        if (state.selected?.id === action.meta.arg.providerId) state.selected = broker;
+      })
+      .addCase(deleteCredential.fulfilled, (state, action) => {
+        const idx = state.list.findIndex((b) => b.id === action.payload.providerId);
+        if (idx < 0) return;
+        const broker = state.list[idx];
+        broker.credentials = (broker.credentials || []).filter((c) => c.field_name !== action.payload.fieldName);
+        if (state.selected?.id === action.payload.providerId) state.selected = broker;
+      })
+      .addCase(saveCredentialsBulk.fulfilled, (state, action) => {
+        const idx = state.list.findIndex((b) => b.id === action.payload.providerId);
+        if (idx < 0) return;
+        const broker = state.list[idx];
+        const newCreds = (action.payload.credentials || []).map((c) => ({
+          field_name: c.field_name,
+          value: c.field_value ? '••••••••' : '',
+          is_active: !!c.field_value,
+        }));
+        const existingMap = {};
+        (broker.credentials || []).forEach((c) => { existingMap[c.field_name] = c; });
+        newCreds.forEach((c) => { existingMap[c.field_name] = c; });
+        broker.credentials = Object.values(existingMap);
+        if (state.selected?.id === action.payload.providerId) state.selected = broker;
       });
   },
 });

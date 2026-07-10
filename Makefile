@@ -277,12 +277,13 @@ app:
 
 app-core:
 	$(call ensure_network)
-	@echo "🚀 Starting Core Pipeline (L1 Ingestion + L2 Processing + L7 API)..."
-	$(DC) -f $(COMPOSE_DIR)/docker-compose.app.yml up -d --build ingestion processing backend-api
+	@echo "🚀 Starting Core Pipeline (L1 Ingestion + L2 Processing + L7 API + L10 Execution)..."
+	$(DC) -f $(COMPOSE_DIR)/docker-compose.app.yml up -d --build ingestion processing backend-api execution
 	@echo "✅ Core pipeline running."
 	@echo "   - Ingestion:  http://localhost:9101"
 	@echo "   - Processing: http://localhost:3002"
 	@echo "   - Backend API: http://localhost:4000"
+	@echo "   - Execution:  http://localhost:8095"
 
 app-build:
 	$(call ensure_network)

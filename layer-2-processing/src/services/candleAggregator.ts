@@ -83,4 +83,4 @@ class CandleAggregator {
   destroy(): void { if (this.flushInterval) clearInterval(this.flushInterval); }
 }
 
-export = { CandleAggregator };
+module.exports = { CandleAggregator };

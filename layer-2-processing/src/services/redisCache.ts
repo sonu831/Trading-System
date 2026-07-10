@@ -50,4 +50,4 @@ async function setMetrics(metrics: Record<string, unknown>): Promise<void> {
   try { await client.set('system:layer2:metrics', JSON.stringify(metrics)); } catch (_: any) {}
 }
 
-export = { connectRedis, getClient, setLatestPrice, getLatestPrice, setLatestCandle, disconnectRedis, setMetrics };
+module.exports = { connectRedis, getClient, setLatestPrice, getLatestPrice, setLatestCandle, disconnectRedis, setMetrics };

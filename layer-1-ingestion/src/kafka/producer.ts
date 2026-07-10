@@ -8,7 +8,7 @@
  */
 
 const { Kafka, Partitioners } = require('kafkajs');
-const { logger } = require('../utils/logger');
+const logger = require('../utils/logger');
 const { metrics } = require('../utils/metrics');
 const symbolConfig = require('../../config/symbols.json');
 

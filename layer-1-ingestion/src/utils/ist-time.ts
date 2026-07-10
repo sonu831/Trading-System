@@ -7,7 +7,14 @@
  * confidently wrong, and the wrong one was the one that ran. The twin is gone;
  * `shared/tests/no-ts-js-twins.test.js` fails if any reappears.
  */
-const { EXPIRY_WEEKDAY_ISO } = require('../../shared/constants');
+// shared/ lives at a different depth in Docker (mounted at /app/shared) than in the local
+// checkout (repo-root/shared). Resolve the Docker mount first, fall back to the local path.
+// This ONLY papers over a path difference — if neither resolves, we throw, never default.
+function requireShared(mod: string): any {
+  try { return require(`/app/shared/${mod}`); }
+  catch { return require(`../../../shared/${mod}`); }
+}
+const { EXPIRY_WEEKDAY_ISO } = requireShared('constants');
 
 /** Minutes east of UTC for IST (+05:30). */
 function istOffsetMinutes(): number { return Number(process.env.IST_OFFSET_MINUTES) || 330; }
@@ -63,4 +70,4 @@ function nextWeeklyExpiryIST(
   return new Date(expiry.getTime() - istOffsetMinutes() * 60 * 1000);
 }
 
-export = { istOffsetMinutes, nowIST, tradingDateIST, nextWeeklyExpiryIST, isoToJsDay };
+module.exports = { istOffsetMinutes, nowIST, tradingDateIST, nextWeeklyExpiryIST, isoToJsDay };

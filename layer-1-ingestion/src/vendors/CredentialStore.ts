@@ -2,7 +2,7 @@
  * CredentialStore — reads enabled providers from L7 API, cache tokens from Redis.
  * Subscribes to `providers-changed` for hot-reload without restart.
  */
-const { logger } = require('../utils/logger');
+const logger = require('../utils/logger');
 
 interface Provider {
   provider: string;
@@ -27,6 +27,7 @@ class CredentialStore {
   backendApiUrl: string;
   providers: Provider[];
   tokens: Map<string, string>;
+  credentials: Map<string, Record<string, string>>;
   onChange: OnChangeCallback | null;
   subscriber: RedisClient | null;
 
@@ -35,6 +36,7 @@ class CredentialStore {
     this.backendApiUrl = backendApiUrl || process.env.BACKEND_API_URL || 'http://backend-api:4000';
     this.providers = [];
     this.tokens = new Map();
+    this.credentials = new Map();
     this.onChange = null;
     this.subscriber = redis.duplicate ? redis.duplicate() : null;
   }
@@ -54,6 +56,7 @@ class CredentialStore {
           this.providers = enabled;
           logger.info(`CredentialStore: ${enabled.length} enabled providers loaded`);
           await this.loadTokens();
+          await this.loadDecryptedCredentials();
           if (this.onChange) this.onChange(this.providers);
         }
       } else {
@@ -92,6 +95,21 @@ class CredentialStore {
     }
   }
 
+  private async loadDecryptedCredentials(): Promise<void> {
+    const axios = require('axios');
+    for (const p of this.providers) {
+      try {
+        const resp = await axios.get(`${this.backendApiUrl}/api/v1/providers/${p.provider}/credentials/decrypted`, { timeout: 5000 });
+        if (resp.data?.success && resp.data.data?.credentials) {
+          this.credentials.set(p.provider, resp.data.data.credentials);
+          logger.info(`CredentialStore: loaded decrypted credentials for ${p.provider}`);
+        }
+      } catch (err: any) {
+        logger.warn(`CredentialStore: failed to load credentials for ${p.provider}: ${err.message}`);
+      }
+    }
+  }
+
   private subscribeToChanges(): void {
     if (!this.subscriber) {
       logger.warn('CredentialStore: No Redis subscriber, skipping live updates');
@@ -115,10 +133,12 @@ class CredentialStore {
 
   getToken(provider: string): string | null { return this.tokens.get(provider) || null; }
 
+  getCredentials(provider: string): Record<string, string> | null { return this.credentials.get(provider) || null; }
+
   hasValidToken(provider: string): boolean { return this.tokens.has(provider); }
 
   onProvidersChange(callback: OnChangeCallback): void { this.onChange = callback; }
 }
 
-export = { CredentialStore };
+module.exports = { CredentialStore };
 export type { Provider, OnChangeCallback, RedisClient };

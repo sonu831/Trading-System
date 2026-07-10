@@ -33,9 +33,15 @@ function normalizeBase32Secret(raw: unknown): string {
 
 function generateTOTP(secret: string): string {
   if (!OTPAuth) OTPAuth = require('otpauth');
-  const base32 = normalizeBase32Secret(secret);
+
+  // Validate via the same strict function the API uses for credential storage.
+  // A 6-digit generated OTP code is NOT a secret key — it will FAIL here with a
+  // descriptive error instead of silently producing wrong TOTP codes.
+  const clean = normalizeBase32Secret(secret);
+
+  const secretObj = OTPAuth.Secret.fromBase32(clean);
   return new OTPAuth.TOTP({
-    secret: OTPAuth.Secret.fromBase32(base32),
+    secret: secretObj,
     algorithm: 'SHA1', digits: 6, period: 30,
   }).generate();
 }
@@ -45,6 +51,7 @@ interface BrokerService {
   getSessionToken(provider: string): Promise<string | null>;
   saveSessionToken(provider: string, token: string, ttl: number): Promise<void>;
   clearSessionToken(provider: string): Promise<void>;
+  saveAccessToken(provider: string, token: string): Promise<void>;
   setJson(key: string, value: unknown, ttl: number): Promise<void>;
   getJson(key: string): Promise<unknown>;
   delKey(key: string): Promise<void>;
@@ -154,7 +161,22 @@ class BrokerSessionService {
     let token_length: number | undefined;
     if (result.token) {
       await this.saveToken(provider, result.token, result.ttlSeconds || 21000);
+      await this.brokerService.saveAccessToken(provider, result.token);
       token_length = String(result.token).length;
+    }
+    // Update provider status in DB so dashboard reflects CONNECTED / ERROR
+    try {
+      const brokerRepo = (require('../../container').resolve('brokerRepository') as any);
+      const p = await brokerRepo.findProviderByName(provider);
+      if (p) {
+        await brokerRepo.updateProvider(p.id, {
+          status: result.success ? 'CONNECTED' : 'ERROR',
+          last_tested_at: new Date(),
+        });
+        console.log(`[broker-session] status updated: ${provider} → ${result.success ? 'CONNECTED' : 'ERROR'}`);
+      }
+    } catch (err: any) {
+      console.error(`[broker-session] status update failed for ${provider}:`, err.message);
     }
     const { token, ttlSeconds, ...safe } = result as any;
     return { ...safe, token_length };

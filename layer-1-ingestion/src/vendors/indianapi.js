@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const { BaseVendor } = require('./base');
-const { logger } = require('../utils/logger');
+const logger = require('../utils/logger');
 const { metrics } = require('../utils/metrics');
 
 class IndianApiVendor extends BaseVendor {

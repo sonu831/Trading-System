@@ -29,4 +29,4 @@ async function insertCandlesBatch(candles: Candle[]): Promise<void> {
   finally { client.release(); }
 }
 
-export = { insertCandle, insertCandlesBatch };
+module.exports = { insertCandle, insertCandlesBatch };

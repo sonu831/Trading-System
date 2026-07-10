@@ -158,3 +158,9 @@ export declare const PORTS: {
   readonly TELEGRAM_BOT: number;
   readonly EMAIL_SERVICE: number;
 };
+
+// Broker credential/provider metadata (added for the dashboard broker-settings UI).
+export declare const BROKER_CREDENTIAL_FIELDS: readonly string[];
+export declare const BROKER_REQUIRED_FIELDS: Readonly<Record<string, readonly string[]>>;
+export declare const BROKER_FORM_FIELDS: Readonly<Record<string, readonly string[]>>;
+export declare const BROKER_PROVIDERS: ReadonlyArray<{ value: string; label: string }>;

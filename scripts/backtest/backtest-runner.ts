@@ -164,8 +164,11 @@ class BacktestRunner {
     return trades;
   }
 
+  // Every metric below is computed from OptionSimulator's synthetic (Black-Scholes,
+  // constant-IV) premiums — see scripts/backtest/option-simulator.js. The result carries
+  // `synthetic: true` so no report can present these as realised P&L. Rule 13.
   computeMetrics(trades) {
-    if (trades.length === 0) return { total: 0 };
+    if (trades.length === 0) return { total: 0, synthetic: true, pricing: 'black-scholes-const-iv' };
 
     const wins = trades.filter(t => t.pnl > 0);
     const losses = trades.filter(t => t.pnl <= 0);
@@ -204,6 +207,8 @@ class BacktestRunner {
       expectancy: trades.length > 0 ? Math.round((totalPnl / trades.length) * 100) / 100 : 0,
       sharpe: stdDev > 0 ? Math.round((avgReturn / stdDev) * Math.sqrt(252) * 100) / 100 : 0,
       maxDrawdown: Math.round(maxDrawdown * 100) / 100,
+      synthetic: true,                       // Rule 13: model-priced, not real fills
+      pricing: 'black-scholes-const-iv',
     };
   }
 

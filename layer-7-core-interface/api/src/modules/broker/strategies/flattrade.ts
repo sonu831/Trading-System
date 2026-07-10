@@ -48,4 +48,4 @@ const strategy: BrokerAuthStrategy = {
   },
 };
 
-export = strategy;
+module.exports = strategy;

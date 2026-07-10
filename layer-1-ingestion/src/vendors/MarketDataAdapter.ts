@@ -3,7 +3,7 @@
  * VIX, option feeds, indices plug in via this contract.
  * TARGET_ARCHITECTURE.md §3: BrokerAdapter | MarketDataAdapter | AltDataAdapter
  */
-const { logger } = require('../utils/logger');
+const logger = require('../utils/logger');
 
 interface KafkaMessage {
   key: string;
@@ -74,5 +74,5 @@ class MarketDataAdapter {
   }
 }
 
-export = { MarketDataAdapter };
+module.exports = { MarketDataAdapter };
 export type { KafkaProducer, MarketData };

@@ -12,9 +12,10 @@ class BrokerRepository extends BaseRepository {
   async updateProvider(id: number, data: Record<string, unknown>): Promise<ProviderRow> { return this.prisma.broker_providers.update({ where: { id }, data }); }
   async deleteProvider(id: number): Promise<ProviderRow> { return this.prisma.broker_providers.delete({ where: { id } }); }
   async upsertCredential(providerId: number, fieldName: string, ciphertext: string, iv: string, tag: string): Promise<CredentialRow> { return this.prisma.broker_credentials.upsert({ where: { provider_id_field_name: { provider_id: providerId, field_name: fieldName } }, create: { provider_id: providerId, field_name: fieldName, ciphertext, iv, tag }, update: { ciphertext, iv, tag, updated_at: new Date() } }); }
+  async deleteCredential(providerId: number, fieldName: string): Promise<void> { await this.prisma.broker_credentials.deleteMany({ where: { provider_id: providerId, field_name: fieldName } }); }
   async saveSession(provider: string, tokenHash: string, status: string, expiresAt: Date): Promise<SessionRow> { return this.prisma.broker_sessions.upsert({ where: { provider }, create: { provider, token_hash: tokenHash, status, expires_at: expiresAt, last_login_at: new Date() }, update: { token_hash: tokenHash, status, expires_at: expiresAt, last_login_at: new Date(), last_error: null } }); }
   async findSession(provider: string): Promise<SessionRow | null> { return this.prisma.broker_sessions.findUnique({ where: { provider } }); }
   async publishConfigChange(provider: string): Promise<void> { await this.redis.publisher?.publish('providers-changed', JSON.stringify({ provider, timestamp: Date.now() })); }
 }
 
-export = { BrokerRepository };
+module.exports = BrokerRepository;

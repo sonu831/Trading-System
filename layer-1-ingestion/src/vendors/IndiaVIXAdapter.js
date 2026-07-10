@@ -10,7 +10,7 @@
  * Extends: MarketDataAdapter
  */
 const { MarketDataAdapter } = require('./MarketDataAdapter');
-const { logger } = require('../utils/logger');
+const logger = require('../utils/logger');
 
 class IndiaVIXAdapter extends MarketDataAdapter {
   constructor(options = {}) {

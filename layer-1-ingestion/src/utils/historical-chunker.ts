@@ -1,5 +1,5 @@
 const { DateTime } = require('luxon');
-const { logger } = require('../utils/logger');
+const logger = require('../utils/logger');
 
 class HistoricalChunker {
   /**

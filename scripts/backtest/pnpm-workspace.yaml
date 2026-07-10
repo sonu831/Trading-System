@@ -1,0 +1,4 @@
+# pnpm >= 11 reads dependency build-script approvals from here (see any layer for why).
+# esbuild ships a native binary via tsx and needs its postinstall script.
+allowBuilds:
+  esbuild: true

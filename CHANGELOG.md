@@ -5,6 +5,15 @@ All notable changes to the **Nifty 50 Trading System** project will be documente
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### 🛠 Changed
+
+- **L8 Dashboard — Phase 1 primitive dedup (frontend restructure)**:
+  - Removed the dead duplicate `src/components/atoms/` (Button, Card, Badge) — it had **zero importers**; every caller already uses the `@/components/ui` barrel.
+  - Promoted the better-typed implementations (with `ButtonProps`/`CardProps`/`BadgeProps` interfaces) from the deleted `atoms/` into the canonical `ui/` primitives. Behavior is byte-identical (same class strings/logic), so no runtime change and no import site touched.
+  - Establishes **one source of truth** for Button/Card/Badge (contract rule 14). First step of the atomic-design restructure documented in the [dashboard restructure proposal](https://claude.ai/code/artifact/7d9b368f-62b7-4b34-b6bb-9b269ce74a37).
+
 ## [0.8.0] - 2026-01-25
 
 ### 🚀 Added

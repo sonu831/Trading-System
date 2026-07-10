@@ -22,11 +22,14 @@ export interface BrokerAuthStrategy {
   authenticate(creds: Record<string, string>, deps: StrategyDeps, ctx: AuthContext): Promise<AuthResult>;
 }
 
+import type { BrokerAdapter } from '../adapters/broker-adapter.interface';
+
 export interface StrategyDeps {
   http: any;
   generateTOTP(secret: string): string;
   sha256(s: string): string;
   now?: Date;
+  adapter?: BrokerAdapter;
 }
 
 export interface AuthContext {

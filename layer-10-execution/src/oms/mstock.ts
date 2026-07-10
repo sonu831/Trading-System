@@ -3,14 +3,7 @@ import { BaseOMS } from './base';
 import type { OrderRequest, OrderModification } from './base';
 import type { QuoteResult, OrderResult } from '../../shared/types';
 import { logger } from '../utils/logger';
-
-interface MStockConfig {
-  baseUrl: string;
-  apiKey: string;
-  accessToken: string;
-  clientCode: string;
-  endpoints: Record<string, string>;
-}
+import type { CredentialProvider, MStockCredentials } from '../credential-provider';
 
 export class MStockOMS extends BaseOMS {
   private baseUrl: string;
@@ -18,19 +11,39 @@ export class MStockOMS extends BaseOMS {
   private accessToken: string;
   private clientCode: string;
   private endpoints: Record<string, string>;
+  private credentialProvider: CredentialProvider | null;
 
-  constructor(config: Record<string, any>) {
+  constructor(config: Record<string, any>, credentialProvider?: CredentialProvider) {
     super(config);
-    const m = config.mstock as MStockConfig;
     this.name = 'mstock';
-    this.baseUrl = m.baseUrl;
-    this.apiKey = m.apiKey;
-    this.accessToken = m.accessToken;
-    this.clientCode = m.clientCode;
-    this.endpoints = m.endpoints;
+    this.credentialProvider = credentialProvider || null;
+
+    // Use CredentialProvider if available, otherwise fall back to config.mstock
+    if (credentialProvider) {
+      this.baseUrl = '';
+      this.apiKey = '';
+      this.accessToken = '';
+      this.clientCode = '';
+      this.endpoints = {};
+    } else {
+      const m = config.mstock as any;
+      this.baseUrl = m?.baseUrl || '';
+      this.apiKey = m?.apiKey || '';
+      this.accessToken = m?.accessToken || '';
+      this.clientCode = m?.clientCode || '';
+      this.endpoints = m?.endpoints || {};
+    }
   }
 
   async connect(): Promise<void> {
+    if (this.credentialProvider) {
+      const cfg = this.credentialProvider.getMStockConfig();
+      this.apiKey = cfg.apiKey;
+      this.accessToken = cfg.accessToken;
+      this.clientCode = cfg.clientCode;
+      this.baseUrl = cfg.baseUrl;
+      this.endpoints = cfg.endpoints;
+    }
     if (!this.apiKey) throw new Error('MStock credentials not configured');
     this.connected = true;
     logger.info('MStockOMS: connected');
@@ -39,6 +52,8 @@ export class MStockOMS extends BaseOMS {
   async disconnect(): Promise<void> { this.connected = false; }
 
   setAccessToken(token: string): void { this.accessToken = token; }
+
+  getAccessToken(): string { return this.accessToken; }
 
   /**
    * LiveExecutor requires a broker-side resting stop (SL-M) and fill confirmation.

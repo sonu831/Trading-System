@@ -46,5 +46,5 @@ function maskValue(value: string | undefined): string {
   return value.substring(0, 3) + '***' + value.substring(value.length - 3);
 }
 
-export = { encrypt, decrypt, generateMasterKey, maskValue, getMasterKey };
+module.exports = { encrypt, decrypt, generateMasterKey, maskValue, getMasterKey };
 export type { EncryptedPayload };

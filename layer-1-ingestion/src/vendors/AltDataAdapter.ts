@@ -2,7 +2,7 @@
  * AltDataAdapter — advisory data sources (FII/DII, PCR scrapers, news).
  * Fragile sources must never block trading. Failures degrade gracefully.
  */
-const { logger } = require('../utils/logger');
+const logger = require('../utils/logger');
 import type { KafkaProducer } from './MarketDataAdapter';
 
 interface AltDataPoint {
@@ -85,5 +85,5 @@ class AltDataAdapter {
   }
 }
 
-export = { AltDataAdapter };
+module.exports = { AltDataAdapter };
 export type { Reliability, AltDataPoint };

@@ -2,9 +2,8 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import { useSelector, useDispatch } from 'react-redux';
-import BrokerConfig from './BrokerConfig';
-import CredentialForm from './CredentialForm';
-import MStockAuthFlow from './MStockAuthFlow';
+import BrokerForm from './BrokerForm';
+import BrokerAuthTest from './MStockAuthFlow';
 import BrokerStatusBadge from '@/components/brokers/BrokerList/BrokerStatusBadge';
 import { fetchBrokers, enableBroker, disableBroker, selectBrokers } from '@/store/slices/brokerSlice';
 
@@ -26,8 +25,6 @@ const BrokerDetail = ({ id }) => {
   if (loading) return <div className="text-center py-12 text-gray-400">Loading...</div>;
   if (!broker) return <div className="text-center py-12 text-gray-400">Broker not found</div>;
 
-  const apiKeyCred = broker.credentials?.find((c) => c.field_name === 'api_key');
-
   return (
     <div>
       <button onClick={() => router.push('/brokers')} className="text-gray-400 hover:text-white text-sm mb-4 inline-block">&larr; Back to Brokers</button>
@@ -47,13 +44,10 @@ const BrokerDetail = ({ id }) => {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="space-y-6">
-          <BrokerConfig broker={broker} />
-          <CredentialForm broker={broker} />
+          <BrokerForm broker={broker} />
         </div>
         <div className="space-y-6">
-          {broker.provider === 'mstock' && (
-            <MStockAuthFlow broker={broker} apiKey={apiKeyCred?.value} />
-          )}
+          <BrokerAuthTest broker={broker} />
           <div className="bg-gray-800 rounded-lg border border-gray-700 p-4">
             <h3 className="text-lg font-semibold text-white mb-3">Connection Info</h3>
             <div className="space-y-2 text-sm">

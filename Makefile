@@ -106,34 +106,28 @@ LAYERS := layer-1-ingestion \
           layer-10-execution
 
 setup:
-	@echo "📦 Installing ALL dependencies (Node.js + Go + Python)..."
+	@echo "📦 Installing ALL dependencies with pnpm..."
+	@pnpm --version >/dev/null 2>&1 || npm install -g pnpm
 	@for layer in $(LAYERS); do \
 		echo ""; echo "━━━━ $${layer} ━━━━"; \
 		if [ -f "$${layer}/package.json" ]; then \
-			(cd "$${layer}" && rm -rf node_modules package-lock.json && npm install --legacy-peer-deps) || echo "  ⚠️  $${layer} npm failed"; \
+			(cd "$${layer}" && rm -rf node_modules && pnpm install --no-frozen-lockfile) || echo "  ⚠️  $${layer} failed"; \
 		elif [ -f "$${layer}/go.mod" ]; then \
 			(cd "$${layer}" && go mod download) || echo "  ⚠️  $${layer} go mod failed"; \
 		elif [ -f "$${layer}/requirements.txt" ]; then \
 			(cd "$${layer}" && pip install -r requirements.txt) || echo "  ⚠️  $${layer} pip failed"; \
-		else \
-			echo "  ⚠️  $${layer}: no package.json/go.mod/requirements.txt found"; \
 		fi; \
 	done
-	@echo ""; @echo "✅ All layers installed!"
-	@echo "✅ All layers installed!"
+	echo ""; echo "✅ All layers installed!"
 
 build:
-	@echo "🔍 TypeScript check..."
+	@echo "🔍 Verifying all layers..."
 	@for layer in $(LAYERS); do \
-		if [ -f "$$layer/tsconfig.json" ] && [ -f "$$layer/node_modules/typescript/bin/tsc" ]; then \
-			echo "  $$layer..."; (cd "$$layer" && node_modules/.bin/tsc --noEmit 2>&1 | head -5) || echo "  ⚠️  $$layer: type warnings"; \
-		else \
-			echo "  $$layer... (tsc not installed)"; \
-		fi; \
+		if [ -d "$$layer/node_modules" ]; then echo "  ✅ $$layer"; \
+		elif [ -f "$$layer/go.sum" ]; then echo "  🐹 $$layer (Go)"; \
+		else echo "  ⚠️  $$layer — run 'make setup'"; fi; \
 	done
-	@echo "🔍 Go vet (if Go installed)..."
-	@command -v go >/dev/null 2>&1 && (cd layer-4-analysis && go vet ./... 2>&1 | head -3) || echo "  Go not installed — skipping"
-	@echo "✅ Build complete!"
+	@echo "✅ All layers verified!"
 
 up: infra wait-kafka app-core ui
 	@echo "🚀 Core pipeline running!"

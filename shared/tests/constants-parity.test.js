@@ -16,7 +16,8 @@ const path = require('node:path');
 
 const js = require('../constants.js');
 const goSrc = fs.readFileSync(path.join(__dirname, '..', 'constants.go'), 'utf8');
-const barrelSrc = fs.readFileSync(path.join(__dirname, '..', 'index.ts'), 'utf8');
+// index.js is the RUNTIME barrel (`require('/app/shared')`). index.d.ts only types it.
+const barrel = require('../index.js');
 
 let failures = 0;
 const check = (name, fn) => {
@@ -110,23 +111,25 @@ for (const [goName, [jsEnum, jsKey]] of Object.entries(ENUM_MAP)) {
 }
 
 // ── The barrel must re-export everything constants.js exports ──
-// An omitted name is not a type error; `import { X } from '@shared'` just yields undefined.
-check('index.ts re-exports every constants.js export', () => {
-  const exported = Object.keys(js);
-  const block = barrelSrc.match(/export\s*\{([\s\S]*?)\}\s*from\s*'\.\/constants'/);
-  assert.ok(block, "no `export { ... } from './constants'` block in index.ts");
-  const reExported = new Set(
-    block[1].split(',').map((s) => s.trim()).filter(Boolean),
-  );
-  const missing = exported.filter((name) => !reExported.has(name));
-  assert.deepStrictEqual(missing, [], `not re-exported by index.ts: ${missing.join(', ')}`);
+// An omitted name is not an error anywhere; `require('/app/shared').X` just yields undefined.
+check('index.js re-exports every constants.js export', () => {
+  const missing = Object.keys(js).filter((name) => barrel[name] === undefined);
+  assert.deepStrictEqual(missing, [], `not re-exported by index.js: ${missing.join(', ')}`);
 });
 
-// ── No .ts twin may shadow constants.js ──
-check('no shared/constants.ts shadowing constants.js', () => {
-  const twin = path.join(__dirname, '..', 'constants.ts');
-  assert.ok(!fs.existsSync(twin), 'shared/constants.ts exists and will shadow constants.js for tsc');
+check('index.js re-exports point at the SAME objects (no stale copies)', () => {
+  const divergent = Object.keys(js).filter((name) => barrel[name] !== js[name]);
+  assert.deepStrictEqual(divergent, [], `index.js has stale copies of: ${divergent.join(', ')}`);
 });
+
+// ── No .ts twin may shadow a runtime .js module in shared/ ──
+// (repo-wide equivalent: shared/tests/no-ts-js-twins.test.js)
+for (const mod of ['constants', 'index']) {
+  check(`no shared/${mod}.ts shadowing ${mod}.js`, () => {
+    const twin = path.join(__dirname, '..', `${mod}.ts`);
+    assert.ok(!fs.existsSync(twin), `shared/${mod}.ts exists; tsc would read it while Node reads ${mod}.js`);
+  });
+}
 
 console.log(`\n${failures === 0 ? 'PASS' : `FAIL — ${failures} assertion(s)`}`);
 process.exit(failures === 0 ? 0 : 1);

@@ -3,6 +3,10 @@ generator client {
   binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
 }
 
+// Pinned to Prisma 6. Prisma 7 removes `url` from the schema datasource and requires a
+// driver adapter passed to the PrismaClient constructor (see src/container.ts) plus the
+// new `prisma-client` generator. That migration is tracked in .ai/handoffs/ -- do not
+// bump prisma/@prisma/client to 7 without doing it, or `prisma generate` fails (P1012).
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")

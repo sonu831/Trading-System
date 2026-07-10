@@ -134,7 +134,7 @@ ok('shared FLATTRADE URL has no /REST/', !shared.BROKER_BASE_URLS.FLATTRADE.incl
 
 // ── L1-6b: expiry weekday is declared ONCE and never hardcoded ──
 console.log('\nL1-6b: expiry weekday is single-sourced, not asserted in-file');
-const istSrc = fs.readFileSync(path.join(__dirname, '..', 'src', 'utils', 'ist-time.js'), 'utf8');
+const istSrc = fs.readFileSync(path.join(__dirname, '..', 'src', 'utils', 'ist-time.ts'), 'utf8');
 ok('ist-time no longer claims "NIFTY expires every Thursday"', !/expires every Thursday/i.test(istSrc));
 ok('shared/ declares EXPIRY_WEEKDAY_ISO', !!shared.EXPIRY_WEEKDAY_ISO?.NIFTY);
 ok('EXPIRY_WEEKDAY_ISO.NIFTY is a valid ISO weekday (1..7)',

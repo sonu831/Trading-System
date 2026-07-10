@@ -1,3 +1,7 @@
+# pnpm >= 11 reads dependency build-script approvals from here.
+# esbuild (via tsx) and unrs-resolver ship native binaries and need their postinstall scripts.
+# Must be `true`, not the placeholder "set this to true or false" that a non-interactive
+# `pnpm install` writes when it hits an unapproved build.
 allowBuilds:
-  esbuild: set this to true or false
-  unrs-resolver: set this to true or false
+  esbuild: true
+  unrs-resolver: true

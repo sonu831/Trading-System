@@ -4,14 +4,28 @@ import { useState } from 'react';
 const BrokerAuthTest = ({ broker }) => {
   const [testing, setTesting] = useState(false);
   const [result, setResult] = useState(null);
+  const [totp, setTotp] = useState('');
+  const [showTotp, setShowTotp] = useState(false);
 
   const handleTest = async () => {
     setTesting(true);
     setResult(null);
     try {
-      const res = await fetch(`/api/v1/providers/${broker.provider}/test`, { method: 'POST' });
-      const data = await res.json();
-      setResult(data);
+      if (broker.provider === 'mstock' && totp && /^\d{6}$/.test(totp)) {
+        // Direct login: pass TOTP code to completeSession
+        const res = await fetch(`/api/v1/providers/${broker.provider}/session/complete`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ totp }),
+        });
+        const data = await res.json();
+        setResult(data);
+      } else {
+        // Standard test (unattended TOTP or OTP flow)
+        const res = await fetch(`/api/v1/providers/${broker.provider}/test`, { method: 'POST' });
+        const data = await res.json();
+        setResult(data);
+      }
     } catch (err) {
       setResult({ success: false, error: 'Network error: ' + err.message });
     }
@@ -22,8 +36,21 @@ const BrokerAuthTest = ({ broker }) => {
     <div className="bg-gray-800 rounded-lg border border-gray-700 p-4">
       <h3 className="text-lg font-semibold text-white mb-3">Connection Test</h3>
       <p className="text-sm text-gray-400 mb-4">
-        Tests the full login + TOTP handshake using your saved credentials. All stored encrypted server-side.
+        Enter the current 6-digit TOTP from your authenticator app for direct login. All stored encrypted server-side.
       </p>
+
+      {broker.provider === 'mstock' && (
+        <div className="mb-4 flex gap-2">
+          <input
+            type="text"
+            maxLength={6}
+            placeholder="TOTP code from app (e.g. 776395)"
+            value={totp}
+            onChange={(e) => /^\d{0,6}$/.test(e.target.value) && setTotp(e.target.value)}
+            className="flex-1 p-2 rounded bg-gray-700 border border-gray-600 text-white text-sm placeholder-gray-500 tracking-widest text-center text-lg"
+          />
+        </div>
+      )}
 
       <button
         onClick={handleTest}

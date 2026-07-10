@@ -6,8 +6,6 @@ import { updateBroker, saveCredentialsBulk } from '@/store/slices/brokerSlice';
 
 const ROLES = ['data', 'execution', 'both'];
 
-// Shared enums — if the dashboard can't resolve the shared module, these are the canonical fallbacks.
-// They must stay in sync with shared/constants.js.
 const BROKER_FORM_FIELDS = {
   mstock:    ['api_key', 'client_code', 'password', 'totp_secret'],
   flattrade: ['api_key', 'api_secret', 'access_token'],
@@ -23,27 +21,42 @@ const FIELD_LABELS = {
 const BrokerForm = ({ broker }) => {
   const dispatch = useDispatch();
   const fields = BROKER_FORM_FIELDS[broker?.provider] || [];
-  const existingMap = {};
-  (broker?.credentials || []).forEach((c) => { existingMap[c.field_name] = c.value || ''; });
 
   const [formValues, setFormValues] = useState({});
   const [role, setRole] = useState(broker?.role || 'data');
   const [priority, setPriority] = useState(broker?.priority || 1);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (broker) {
-      setRole(broker.role || 'data');
-      setPriority(broker.priority || 1);
-      const vals = {};
-      fields.forEach((f) => { vals[f] = existingMap[f] || ''; });
-      setFormValues(vals);
-    }
+    if (!broker) return;
+    setRole(broker.role || 'data');
+    setPriority(broker.priority || 1);
+    // Fetch decrypted credentials from backend — Redux list has masked values
+    const fetchCreds = async () => {
+      try {
+        const res = await fetch(`/api/v1/providers/${broker.provider}/credentials/decrypted`);
+        const data = await res.json();
+        if (data.success && data.data?.credentials) {
+          const vals = {};
+          fields.forEach((f) => { vals[f] = data.data.credentials[f] || ''; });
+          setFormValues(vals);
+        }
+      } catch (_) {}
+      setLoading(false);
+    };
+    fetchCreds();
   }, [broker]);
+
+  const [showFields, setShowFields] = useState({});
 
   const handleFieldChange = (field, value) => {
     setFormValues((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const toggleShow = (field) => {
+    setShowFields((prev) => ({ ...prev, [field]: !prev[field] }));
   };
 
   const handleSaveAll = async () => {
@@ -98,7 +111,7 @@ const BrokerForm = ({ broker }) => {
           <div key={field} className="flex items-center gap-3">
             <label className="w-28 flex-shrink-0 text-sm text-gray-300">{FIELD_LABELS[field] || field}</label>
             <input
-              type="password"
+              type={showFields[field] ? 'text' : 'password'}
               value={formValues[field] || ''}
               onChange={(e) => handleFieldChange(field, e.target.value)}
               placeholder={`Enter ${FIELD_LABELS[field] || field}`}
@@ -106,13 +119,10 @@ const BrokerForm = ({ broker }) => {
             />
             <button
               type="button"
-              onClick={() => {
-                const el = document.querySelector(`input[placeholder="Enter ${FIELD_LABELS[field] || field}"]`);
-                if (el) el.type = el.type === 'password' ? 'text' : 'password';
-              }}
+              onClick={() => toggleShow(field)}
               className="text-xs text-gray-400 hover:text-white flex-shrink-0"
             >
-              Show
+              {showFields[field] ? 'Hide' : 'Show'}
             </button>
           </div>
         ))}

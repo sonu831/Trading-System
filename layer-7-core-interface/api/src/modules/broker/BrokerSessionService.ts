@@ -161,9 +161,22 @@ class BrokerSessionService {
     let token_length: number | undefined;
     if (result.token) {
       await this.saveToken(provider, result.token, result.ttlSeconds || 21000);
-      // Persist to DB so L1/L10 read it from encrypted storage — survives Redis restarts.
       await this.brokerService.saveAccessToken(provider, result.token);
       token_length = String(result.token).length;
+    }
+    // Update provider status in DB so dashboard reflects CONNECTED / ERROR
+    try {
+      const brokerRepo = (require('../../container').resolve('brokerRepository') as any);
+      const p = await brokerRepo.findProviderByName(provider);
+      if (p) {
+        await brokerRepo.updateProvider(p.id, {
+          status: result.success ? 'CONNECTED' : 'ERROR',
+          last_tested_at: new Date(),
+        });
+        console.log(`[broker-session] status updated: ${provider} → ${result.success ? 'CONNECTED' : 'ERROR'}`);
+      }
+    } catch (err: any) {
+      console.error(`[broker-session] status update failed for ${provider}:`, err.message);
     }
     const { token, ttlSeconds, ...safe } = result as any;
     return { ...safe, token_length };

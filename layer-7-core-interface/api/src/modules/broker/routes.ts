@@ -96,7 +96,7 @@ async function brokerRoutes(fastify, options) {
 
   fastify.get('/api/v1/providers/:provider/credentials/decrypted', {
     schema: {
-      description: 'Return fully decrypted credentials for a provider (internal use by execution engine)',
+      description: 'Return fully decrypted credentials (internal use — dashboard + execution engine)',
       tags: ['Providers'],
     },
     handler: async (req, reply) => {
@@ -106,11 +106,8 @@ async function brokerRoutes(fastify, options) {
         const p = await brokerRepo.findProviderByName(provider);
         if (!p) return reply.code(404).send({ success: false, error: 'Provider not found' });
         if (!p.enabled) return reply.code(403).send({ success: false, error: 'Provider disabled' });
-        if (p.role !== 'execution' && p.role !== 'both') {
-          return reply.code(403).send({ success: false, error: 'Provider not configured for execution' });
-        }
         const creds = await (require('../../container').resolve('brokerService') as any).getDecryptedCredentials(provider);
-        return { success: true, data: { provider, credentials: creds } };
+        return { success: true, data: { provider, role: p.role, priority: p.priority, credentials: creds } };
       } catch (err: any) {
         return reply.code(500).send({ success: false, error: err.message });
       }
@@ -150,10 +147,13 @@ async function brokerRoutes(fastify, options) {
     handler: async (req, reply) => {
       try {
         const result = await brokerSessionService.testConnection(req.params.provider);
+        // Return updated provider data so the dashboard can show CONNECTED/DISCONNECTED immediately
+        const brokerRepo = (require('../../container').resolve('brokerRepository') as any);
+        const p = await brokerRepo.findProviderByName(req.params.provider);
         if (result.success) {
-          return { success: true, data: result };
+          return { success: true, data: result, provider: p ? { id: p.id, status: p.status, last_tested_at: p.last_tested_at } : null };
         }
-        return { success: false, error: result.error, data: result };
+        return { success: false, error: result.error, data: result, provider: p ? { id: p.id, status: p.status, last_tested_at: p.last_tested_at } : null };
       } catch (err) {
         return { success: false, error: err.message };
       }
@@ -173,6 +173,7 @@ async function brokerRoutes(fastify, options) {
         type: 'object',
         properties: {
           otp: { type: 'string' },
+          totp: { type: 'string' },   // direct 6-digit TOTP code for MStock one-step login
           request_token: { type: 'string' },
         },
       },
@@ -180,8 +181,10 @@ async function brokerRoutes(fastify, options) {
     handler: async (req, reply) => {
       try {
         const result = await brokerSessionService.completeSession(req.params.provider, req.body || {});
-        if (result.success) return { success: true, data: result };
-        return { success: false, error: result.error, data: result };
+        const brokerRepo = (require('../../container').resolve('brokerRepository') as any);
+        const p = await brokerRepo.findProviderByName(req.params.provider);
+        if (result.success) return { success: true, data: result, provider: p ? { id: p.id, status: p.status, last_tested_at: p.last_tested_at } : null };
+        return { success: false, error: result.error, data: result, provider: p ? { id: p.id, status: p.status, last_tested_at: p.last_tested_at } : null };
       } catch (err) {
         return { success: false, error: err.message };
       }
@@ -197,7 +200,7 @@ async function brokerRoutes(fastify, options) {
     },
     handler: async () => {
       const strategies = brokerSessionService.listStrategies();
-      const shared = require('../../../../shared/constants');
+      const shared = require('../../../shared/constants');
       return {
         success: true,
         data: strategies,

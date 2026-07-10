@@ -1,5 +1,4 @@
 {
-  "extends": "./shared/tsconfig.base.json",
   "compilerOptions": {
     "target": "ES2020",
     "module": "commonjs",
@@ -10,8 +9,6 @@
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
     "declaration": true,
-    "noEmit": true
-  },
-  "include": ["shared/**/*.ts"],
-  "exclude": ["node_modules", "dist", "**/node_modules"]
+    "types": ["node"]
+  }
 }

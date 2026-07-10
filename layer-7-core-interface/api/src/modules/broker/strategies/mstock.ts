@@ -14,12 +14,21 @@ import type { BrokerAuthStrategy, StrategyDeps, AuthContext, AuthResult } from '
 import { secondsUntilISTMidnight } from './base';
 import { getAdapter } from '../adapters';
 
+let authLog: any = null;
+try { authLog = require('../../../../shared/auth-logger').authLog.mstock; } catch (_) { /* shared module not mounted */ }
+const log = (level: string, msg: string, data?: any) => {
+  if (authLog?.[level]) return authLog[level](msg, data);
+  const ts = new Date().toISOString();
+  const line = data ? `[mstock-auth ${ts}] ${msg} ${JSON.stringify(data)}` : `[mstock-auth ${ts}] ${msg}`;
+  console.log(line);
+};
+
 const strategy: BrokerAuthStrategy = {
   id: 'mstock',
   label: 'mStock (Mirae Asset)',
   requiredFields: ['api_key', 'client_code', 'password'],
   optionalFields: ['totp_secret', 'access_token'],
-  interactiveInputs: ['otp'],
+  interactiveInputs: ['otp', 'totp'],
   capabilities: { data: true, execution: true, restingStop: false, orderStatus: false },
 
   ttlSeconds: secondsUntilISTMidnight,
@@ -35,15 +44,21 @@ const strategy: BrokerAuthStrategy = {
 
     const TTL = strategy.ttlSeconds(deps.now || new Date());
     const otp = (ctx?.input as any)?.otp;
+    const directTOTP = (ctx?.input as any)?.totp;  // user-provided TOTP code from authenticator app
     const parkedRequestToken = (ctx?.pending as any)?.requestToken;
 
-    // Interactive resume. Reuse parked login from step 1 — re-logging in
-    // sends a second OTP and invalidates the first.
+    // Interactive resume: OTP step 2 (reuse parked login from step 1)
     if (otp && parkedRequestToken) {
       return verifyOTPStep(adapter, parkedRequestToken, otp, TTL);
     }
 
-    // Step 1 — login (always with empty TOTP; SDK attaches api_key to headers)
+    // Direct login: user provided a 6-digit TOTP code — pass to SDK login in one shot.
+    // This is the standard SDK pattern: client.login({ totp: "776395" }) → JWT directly.
+    if (directTOTP && /^\d{6}$/.test(directTOTP)) {
+      return directLogin(adapter, { clientcode: client_code, password }, directTOTP, TTL);
+    }
+
+    // Standard two-step flow (with or without Base32 secret for unattended auth)
     return loginAndVerify(adapter, { clientcode: client_code, password }, totp_secret, TTL, deps);
   },
 };
@@ -70,34 +85,46 @@ async function loginAndVerify(
   TTL: number,
   deps: StrategyDeps,
 ): Promise<AuthResult> {
+  log('start', 'loginAndVerify', { clientcode: creds.clientcode, has_totp_secret: !!totp_secret, totp_secret_len: totp_secret?.length || 0 });
+
   // Step 1 — login
   let requestToken: string;
   try {
+    log('step', 'Step 1: calling adapter.login()');
     const loginResult = await adapter.login({ clientcode: creds.clientcode, password: creds.password, totp: '', state: '' });
     requestToken = loginResult.jwtToken;
+    log('ok', 'Step 1: login OK — got request token', { token_len: requestToken.length, is_uuid: requestToken.includes('-') });
   } catch (err: any) {
+    log('fail', 'Step 1: login FAILED', { error: err.message });
     return { success: false, error: err.message, stage: 'login' };
   }
 
   // Step 2a — TOTP (unattended)
   if (totp_secret) {
+    log('step', 'Step 2a: TOTP path — generating code');
     let totp: string;
     try {
       totp = deps.generateTOTP(totp_secret);
+      log('ok', 'TOTP code generated', { code_len: totp.length, code_preview: totp.slice(0, 1) + '*****' });
     } catch (genErr: any) {
+      log('fail', 'TOTP generation FAILED', { error: genErr.message, secret_len: totp_secret.length, first_char: totp_secret[0] });
       return { success: false, error: genErr.message, stage: 'totp_secret' };
     }
 
     try {
+      log('step', 'Step 2b: calling adapter.verifyTOTP()');
       const verifyResult = await adapter.verifyTOTP(requestToken, totp);
+      log('ok', 'verifyTOTP response', { has_jwt: !!verifyResult?.jwtToken, jwt_len: verifyResult?.jwtToken?.length || 0, is_same_as_request: verifyResult?.jwtToken === requestToken });
       if (!verifyResult?.jwtToken) {
         return { success: false, error: 'TOTP verification returned no trading token', stage: 'totp_verify' };
       }
       if (verifyResult.jwtToken === requestToken) {
         return { success: false, error: 'broker echoed the request token instead of a trading token', stage: 'totp_verify' };
       }
+      log('ok', 'TOTP auth SUCCESS — got JWT', { jwt_len: verifyResult.jwtToken.length });
       return { success: true, status: 'connected', token: verifyResult.jwtToken, ttlSeconds: TTL, provider: 'mstock', auth_type: 'totp', stage: 'connected' };
     } catch (err: any) {
+      log('fail', 'verifyTOTP FAILED', { error: err.message });
       return { success: false, error: err.message, stage: 'totp_verify' };
     }
   }
@@ -114,3 +141,24 @@ async function loginAndVerify(
 }
 
 module.exports = strategy;
+
+async function directLogin(
+  adapter: any,
+  creds: { clientcode: string; password: string },
+  totp: string,
+  TTL: number,
+): Promise<AuthResult> {
+  log('start', 'directLogin — one-step SDK login with TOTP code', { clientcode: creds.clientcode, totp_len: totp.length });
+  try {
+    log('step', 'Calling adapter.login({ totp: "******" }) — direct SDK flow');
+    const result = await adapter.login({ clientcode: creds.clientcode, password: creds.password, totp, state: 'live' });
+    log('ok', 'directLogin — JWT received', { jwt_len: result.jwtToken?.length || 0 });
+    if (!result?.jwtToken) {
+      return { success: false, error: 'Direct login returned no trading token', stage: 'login' };
+    }
+    return { success: true, status: 'connected', token: result.jwtToken, ttlSeconds: TTL, provider: 'mstock', auth_type: 'totp_direct', stage: 'connected' };
+  } catch (err: any) {
+    log('fail', 'directLogin FAILED', { error: err.message });
+    return { success: false, error: err.message, stage: 'login' };
+  }
+}

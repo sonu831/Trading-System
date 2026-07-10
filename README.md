@@ -189,23 +189,21 @@ This project uses an agentic AI workflow with 12 specialist agents across 6 skil
 
 ```
 Trading-System/
-├── README.md              ← You are here — master documentation hub
+├── README.md              ← Master documentation hub
 ├── ARCHITECTURE.md        ← Canonical architecture
-├── CLAUDE.md              ← AI instructions
 ├── Makefile               ← All commands (make help)
-├── docker-compose.yml     ← Root compose
-├── shared/                ← Single source of truth (constants, types, ports)
+├── shared/                ← [Single source of truth](shared/README.md) (constants, types, ports)
 ├── docs/                  ← All documentation
-├── .ai/                   ← AI agent workflow (manifest, contract, agents, skills)
-├── .claude/               ← Claude Code settings
-├── layer-1-ingestion/     ← L1: Broker data gateway (Node.js)
-├── layer-2-processing/    ← L2: Tick → candles (Node.js)
-├── layer-3-storage/       ← L3: TimescaleDB migrations + Redis schemas
-├── layer-4-analysis/      ← L4: Technical indicators (Go)
-├── layer-5-aggregation/   ← L5: Market breadth + sectors (Go)
-├── layer-6-signal/        ← L6: Regime engine + strategies (Node.js)
-├── layer-7-core-interface/← L7: REST API + WebSocket (Node.js/Fastify)
-├── layer-8-presentation/  ← L8: Dashboard + Telegram + Email
-├── layer-9-ai-service/    ← L9: ML inference (Python/FastAPI)
-├── layer-10-execution/    ← L10: Order execution (Node.js)
-└── infrastructure/        ← Docker compose, Kafka, monitoring
+├── .ai/                   ← AI agent workflow (12 agents, 6 skills)
+│
+├── [layer-1-ingestion/](layer-1-ingestion/README.md)     ← L1: Broker data gateway (Node.js)
+├── [layer-2-processing/](layer-2-processing/README.md)   ← L2: Tick → candles (Node.js)
+├── layer-3-storage/                                     ← L3: TimescaleDB + Redis schemas
+├── [layer-4-analysis/](layer-4-analysis/README.md)       ← L4: Indicators (Go)
+├── [layer-5-aggregation/](layer-5-aggregation/README.md) ← L5: Market breadth (Go)
+├── [layer-6-signal/](layer-6-signal/README.md)           ← L6: Regime + strategies (Node.js)
+├── [layer-7-core-interface/api/](layer-7-core-interface/api/README.md) ← L7: REST API (Node.js/Fastify)
+├── [layer-8-presentation/stock-analysis-portal/](layer-8-presentation-notification/stock-analysis-portal/README.md) ← L8: Dashboard (Next.js)
+├── layer-9-ai-service/                                  ← L9: ML inference (Python)
+├── [layer-10-execution/](layer-10-execution/README.md)   ← L10: Order execution (Node.js)
+└── infrastructure/                                      ← Docker, Kafka, monitoring

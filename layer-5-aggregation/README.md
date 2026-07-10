@@ -1,36 +1,41 @@
-# Layer 5: Aggregation Service 📊
+# Layer 5 — Aggregation (Market Breadth)
 
-## **What is this?**
+> **One job:** Aggregate per-stock indicators into market-wide breadth, sector rotation, and VIX regime.
+> **Tech:** Go 1.23 · **Port:** 8080
 
-The Aggregation Layer is a **Golang** service that acts as the "Market Strategist". It takes individual stock analysis from Layer 4 and synthesizes the **Big Picture**. It answers questions like "Is the market Bullish?", "Which Sector is leading?", "What is the Advance/Decline ratio?".
+## Architecture
 
-## **Why is it needed?**
+```
+analysis_updates (Redis) → 50 stocks → BreadthMetrics → Redis publish
+                              │
+                              ├── A/D Ratio
+                              ├── %>EMA20, %>EMA50, %>EMA200
+                              ├── Sector Momentum (17 sectors)
+                              ├── Top Gainers/Losers
+                              └── Market Sentiment (STRONGLY_BULLISH → STRONGLY_BEARISH)
+```
 
-- **Macro View**: Trading decisions often depend on overall market sentiment, not just individual stock price.
-- **Data Compression**: It processes mostly raw analysis data into consumable summaries (`MarketView`) for the Dashboard.
+## Files
 
-## **How it works**
+| File | Purpose |
+|------|---------|
+| `internal/breadth/breadth.go` | `CalculateBreadth()` → A/D ratio, EMA thresholds, sentiment |
+| `internal/breadth/breadth_test.go` | 7 tests: bull, bear, neutral markets |
+| `internal/aggregator/aggregator.go` | Main engine: 60s loop, concurrent stock analysis |
+| `internal/sectors/sectors.go` | Nifty 50 → 17 sector mapping |
+| `internal/db/client.go` | TimescaleDB queries (candles_1m) |
+| `internal/redis/client.go` | Redis publish (market_view) |
 
-1.  **Composite Scoring**:
-    - Receives analyzed stocks.
-    - Calculates a `CompositeScore` based on Trend + Momentum weights.
-    - Determines Sentiment: **BULLISH**, **BEARISH**, or **NEUTRAL**.
-2.  **Sector Analysis**:
-    - Groups stocks by sector (e.g., IT, Banking, Auto).
-    - Calculates average change and performance for each sector.
-3.  **Market Breadth**:
-    - Counts Advances (Stocks Green) vs Declines (Stocks Red).
-    - Calculates A/D Ratio.
-4.  **Pub/Sub Broadcasting**:
-    - Compiles `MarketView` object.
-    - Publishes to Redis Channel `market_view:latest` for the API/Dashboard.
+## Key Constants
 
-## **Key Logs & Monitoring**
+```go
+import shared "github.com/utkarsh-pandey/nifty50-trading-system/shared"
+// shared.SentimentBullish, shared.SectorStrongUp, shared.PortAggregation
+```
 
-- `[INFO] 📊 Starting market aggregation...`: Indicates cycle start.
-- `[INFO] ✅ Aggregation completed in 45ms | Sentiment: BULLISH`: High-level summary log.
+## Run
 
-## **Tech Stack**
-
-- **Golang**: Leveraging strict typing for financial calculations.
-- **Redis**: Heavily uses Redis for caching the "Latest State".
+```bash
+make layer5          # Local dev (Go run)
+go test ./...        # 7 breadth tests
+```

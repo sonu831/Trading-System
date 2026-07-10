@@ -20,4 +20,4 @@ USER node
 HEALTHCHECK --interval=30s --timeout=10s --start-period=90s --retries=5 \
     CMD node -e "require('http').get('http://localhost:4000/health',r=>{process.exit(r.statusCode===200?0:1)}).on('error',()=>process.exit(1))"
 
-CMD ["pm2-runtime", "ecosystem.config.js"]
+CMD ["npx", "tsx", "src/index.ts"]

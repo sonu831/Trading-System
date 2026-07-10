@@ -3,6 +3,14 @@
     "tradingview": {
       "command": "node",
       "args": ["layer-1-tradingview/src/server.js"]
+    },
+    "flattrade": {
+      "command": "npx",
+      "args": ["-y", "@flattrade/mcp"],
+      "env": {
+        "FLATTRADE_API_KEY": "${FLATTRADE_API_KEY}",
+        "FLATTRADE_API_SECRET": "${FLATTRADE_API_SECRET}"
+      }
     }
   }
 }

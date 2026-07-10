@@ -38,7 +38,7 @@ class RegimeEngine {
         clientId: 'regime-engine',
         brokers: this.kafkaBrokers,
       });
-      this.kafkaProducer = kafka.producer();
+      this.kafkaProducer = kafka.producer({ maxInFlightRequests: 1 });
       await this.kafkaProducer.connect();
       logger.info('RegimeEngine: Kafka connected');
     } catch (err) {
@@ -271,7 +271,7 @@ class RegimeEngine {
     // Publish to Redis
     if (this.redis) {
       try {
-        await this.redis.set('market-regime:latest', regime);
+        await this.redis.set('market-regime:latest', regime, { EX: 120 }); // 2 min TTL — stale regime must expire
         await this.redis.publish('market-regime', regime);
       } catch (err) {
         logger.error({ err }, 'RegimeEngine: Redis publish failed');

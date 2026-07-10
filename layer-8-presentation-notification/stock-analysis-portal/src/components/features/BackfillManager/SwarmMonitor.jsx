@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Badge, Button } from '../../ui';
+import { Card, Badge, Button } from '@/components/ui';
 
 const POLL_INTERVAL = 2000; // 2 seconds
 

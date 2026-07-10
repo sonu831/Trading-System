@@ -44,6 +44,9 @@
 
 | # | Task | Status | Agent |
 |---|------|--------|-------|
+| 2.1 | P0 Remediation: L1 option-chain poller + flattrade vendor (URL, jKey, JSON, fail-loud, IST) | DONE | system-architect |
+| 2.2 | P0 Remediation: Docker hygiene (.dockerignore x12, npm ci, non-root, HEALTHCHECK) | DONE | system-architect |
+| 2.3 | P0 Remediation: CI gates (verify-docker-hygiene.mjs, verify-flattrade-urls.js) | DONE | system-architect |
 | 2.1 | Verify option chain ingestion | IN PROGRESS | ingestion-specialist |
 | 2.2 | India VIX data source | DONE | ingestion-specialist |
 | 2.3 | MarketDataAdapter interface | DONE | ingestion-specialist |
@@ -125,6 +128,7 @@
 
 | Date | What | Files |
 |------|------|-------|
+| 2026-07-10 | **P0 Layer Remediation implemented**: L1 flattrade URL/jKey/JSON/fail-loud/IST fixes; Docker hygiene (.dockerignore x12, npm ci, non-root USER, HEALTHCHECK); CI gate scripts (32 regression assertions passing, 0 Docker violations) | 25+ files across L1, Dockerfiles, shared/, scripts/ |
 | 2026-07-10 | Broker login flow docs finalized; MStock flow corrected (two-step always required) | `BROKER_LOGIN_FLOWS.md`, `PROJECT_STATE.md`, `BrokerSessionService.js` |
 | 2026-07-09 | Broker credential vault + provider registry; Docker hardening; AI workflow | 80+ files across all layers |
 | 2026-07-09 | Architecture docs: TARGET, SIMPLE_ROBUST, MOMENTUM_TRADING | `docs/*.md` |

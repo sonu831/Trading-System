@@ -20,7 +20,7 @@
 
 | # | Rule | What it means | Enforced by |
 |---|------|---------------|-------------|
-| 1 | **GRAPHIFY-FIRST — ABSOLUTE MANDATE (NON-NEGOTIABLE, ZERO EXCEPTIONS)** | YOU MUST use graphify for EVERY codebase access. Before ANY grep/find/glob/ripgrep/read/search: run `graphify query "<concept>"` (broad), `graphify explain "<symbol>"` (one node + neighbors), or `graphify path "<A>" "<B>"` (relationship). If the CLI is blocked, read graphify-out/GRAPH_REPORT.md directly. Grep/find/Glob/Read as primary scans are STRICTLY FORBIDDEN — allowed ONLY as one-shot verification AFTER graphify pointed you at a specific symbol. Run `graphify update .` after EVERY code modification. Violation = contract breach. | PreToolUse hook (blocks grep/find/glob without prior graphify call) |
+| 1 | **GRAPHIFY-FIRST — ABSOLUTE MANDATE (NON-NEGOTIABLE, ZERO EXCEPTIONS)** | EVERY AI tool MUST use graphify for EVERY codebase access. This is the LAW. Before ANY grep/find/glob/ripgrep/read/search/file access: run `graphify query "<concept>"` (broad), `graphify explain "<symbol>"` (one node + neighbors), or `graphify path "<A>" "<B>"` (relationship). If the CLI is blocked, read graphify-out/GRAPH_REPORT.md directly — do NOT fall back to grep. Grep/find/Glob/Read as primary scans are STRICTLY FORBIDDEN — they are allowed ONLY as one-shot verification AFTER graphify pointed you at a specific symbol. Run `graphify update .` after EVERY code modification. Violation = contract breach = the AI is not following project rules. This is enforced by PreToolUse hook which blocks grep/find/glob/ripgrep if graphify was not called first on the same session. | PreToolUse hook (blocks grep/find/glob without prior graphify call) |
 | 2 | **Token-optimized commands (RTK, MANDATORY)** | Prefix EVERY shell command with `rtk` -- e.g. `rtk git status`, `rtk git diff`, `rtk cargo check`, `rtk npm run lint`, `rtk docker ps`. RTK filters verbose tool output (60-90% token reduction) and passes commands through unchanged when it has no filter, so it is ALWAYS safe. Use `rtk` even inside chains (`rtk git add . && rtk git commit ...`). | contract + review |
 | 3 | **Shared-tier dedup** | Any constant/enum/type/error-code/event-name/Kafka-topic used cross-layer MUST live in shared/. Search shared/ first; never re-declare layer-locally. | code review |
 | 4 | **Event-driven contracts** | Layers communicate ONLY via Kafka topics. No direct HTTP calls between layers. Every consumer must be idempotent. Every message must have a schema defined in shared/. | architecture |
@@ -30,6 +30,10 @@
 | 8 | **Language-specific conventions** | Node.js: ESLint + Prettier. Go: gofmt + golangci-lint. Python: Black + ruff. Each layer follows its language's idiomatic patterns. See CONTRIBUTING.md. | lint-staged + husky |
 | 9 | **No git writes without owner instruction** | Do not run git commit / push / branch or gh pr create unless explicitly asked. Leave work staged for review. | honor-system |
 | 10 | **Hand-off on exit** | Every report to the orchestrator ends with a ## Hand-off section listing what other agents/tools must pick up (write '- None.' if empty). | next-agent-observable |
+| 11 | **Fail closed -- never fall back silently** | A capability you cannot provide must REFUSE to construct (LiveExecutor rejects an OMS without supportsRestingStop/getOrderStatus). A degraded dependency must surface as an error, never as a default value. Never 'repair' malformed input by guessing: a non-Base32 TOTP secret once fell back to raw bytes and produced a valid-looking but WRONG code. Distinguish error classes (malformed secret != rejected code) so the next engineer looks in the right place. See .ai/skills/engineering-standards.md sections 1-2. | code review + regression tests |
+| 12 | **Verify by execution, never by document** | A status file is not evidence. PROJECT_STATE.md claimed live/paper/shadow all worked; live placed NO orders and paper exited every trade flat at zero P&L. Before claiming anything works, RUN it: `cd layer-10-execution && npm run verify`, `cd layer-7-core-interface/api && npm run verify`. Test the real function, not a stub of it. When a test fails, state explicitly whether the CODE or the TEST is wrong. Encode every fixed bug as a named regression assertion. | npm run verify + CI |
+| 13 | **Never fabricate a value -- unknown is not zero** | Absent data renders as an em dash, returns null, throws, or uses a discriminated union. It is NEVER coerced to 0/false/{}. On a trading screen a confident 0 is worse than a blank: the pre-audit engine reported Rs.0 P&L on every trade and a UI printing 0 would have hidden it for weeks. Stale data must announce itself -- freshness is a safety property. | code review + UI rule U4/U8 |
+| 14 | **Adapters at every boundary; one source of truth for every constant** | One wrapper per external system (broker auth strategy, BrokerAdapter for orders, src/api adapters behind src/ports for the UI). Adding a broker = a new file + one registry line, with zero edits to the service. Organisms never fetch. Any constant/type/topic/port used in more than one place lives in exactly ONE place (shared/ if cross-layer): the execution port once existed in four files that disagreed, and the only symptom was a silent 'ENGINE OFFLINE'. | code review + shared-tier dedup (rule 3) |
 
 ### Shared skills (same for every tool -- reading the doc = knowing the skill)
 
@@ -37,11 +41,12 @@
 |-------|------|
 | Skill: Database Operations (TimescaleDB + Redis) | `.ai/skills/database.md` |
 | Skill: Docker Compose Orchestration | `.ai/skills/docker.md` |
-| Skill: Graphify Knowledge Graph | `.ai/skills/graphify.md` |
+| Skill: Engineering Standards (architecture + coding discipline) | `.ai/skills/engineering-standards.md` |
+| Skill: Graphify Knowledge Graph — ABSOLUTE MANDATE | `.ai/skills/graphify.md` |
 | Skill: Kafka Event Patterns | `.ai/skills/kafka-patterns.md` |
 | Skill: TradingView MCP Chart Analysis | `.ai/skills/tradingview.md` |
 
-### Agents: 12 specialist docs in `.ai/agents/` (see `.ai/CONTRACT.md` for the roster + coordination playbook)
+### Agents: 13 specialist docs in `.ai/agents/` (see `.ai/CONTRACT.md` for the roster + coordination playbook)
 
 ### Memory + knowledge base (shared by path)
 
@@ -99,6 +104,29 @@ This project uses a hub-and-spoke AI configuration system. The canonical source 
   - backend-api compose: added `DATABASE_URL`, `depends_on` with health conditions
 - **DO NOT REDO:** These fixes are in place. Any new services should follow the same patterns.
 
+#### 2026-07-10 — P0 Layer Remediation (DONE)
+- **Tool/agent:** OpenCode (system-architect)
+- **Source:** `docs/LAYER_REMEDIATION_PLAN.md` — audited defects across all layers
+- **Files touched (P0 items 1–3 complete):**
+  - `layer-1-ingestion/src/utils/flattrade.js` — NEW: FLATTRADE_BASE_URL, norenBody, isNorenOk, norenError utilities
+  - `layer-1-ingestion/src/utils/ist-time.js` — NEW: IST-aware nextWeeklyExpiryIST, nowIST helpers
+  - `layer-1-ingestion/src/vendors/flattrade.js` — Fixed: correct /PiConnectAPI base URL, jKey ≠ apiKey, JSON content-type, fail-loud stats, bounded concurrency
+  - `layer-1-ingestion/src/vendors/option-chain-poller.js` — Already fixed in prior session (imports new utils)
+  - `layer-1-ingestion/tests/verify-flattrade-urls.js` — NEW: 32 regression assertions (all passing)
+  - `shared/constants.js` — Added BROKER_BASE_URLS, REDIS_KEYS for cross-layer dedup
+  - `vendor/flattrade/config.json` — Fixed /PiConnectTP → /PiConnectAPI, /REST/ removed
+  - `.dockerignore` × 12 — Created for every build context that was missing one
+  - 6 Dockerfiles — npm ci --omit=dev (node images), non-root USER + HEALTHCHECK (root images), wget → node HEALTHCHECK (Alpine compat)
+  - `scripts/verify-docker-hygiene.mjs` — NEW: CI gate enforcing I-1 through I-5
+- **Verification results:**
+  - `node layer-1-ingestion/tests/verify-flattrade-urls.js` → **32/32 passing**
+  - `node scripts/verify-docker-hygiene.mjs` → **CLEAN — 0 violations**
+- **Remaining (P1–P3, see LAYER_REMEDIATION_PLAN.md §13):**
+  - P1: L6 regime/strategy tests, L2 CandleAggregator tests
+  - P2: L4 indicator fixture tests, L5 breadth tests, L7 regime-key contract test
+  - P3: L8 light theme/layering/sockets, L9 backtest verification
+- **DO NOT REDO:** P0 defects in L1 Flattrade pipeline and Docker hygiene are fixed with CI gates.
+
 ## Repo Layout
 
 | Directory | Layer | Tech | Purpose |
@@ -106,6 +134,7 @@ This project uses a hub-and-spoke AI configuration system. The canonical source 
 | `layer-1-ingestion` | 1 | Node.js | Live tick ingestion from brokers (Zerodha/MStock/FlatTrade) → Kafka |
 | `layer-1-flattrade-python` | 1 | Python | FlatTrade broker adapter |
 | `layer-1-tradingview` | 1b | Node.js | TradingView MCP server — AI chart analysis via CDP (see below) |
+| `layer-1-flattrade-mcp` | 1c | MCP (npx) | Flattrade MCP server — AI-assisted trading: orders, quotes, portfolio, WebSocket (see below) |
 | `layer-2-processing` | 2 | Node.js | Tick → candle builder |
 | `layer-3-storage` | 3 | TimescaleDB + Redis | Historical + real-time storage |
 | `layer-4-analysis` | 4 | Go | Technical indicators (RSI, MACD, EMAs) |
@@ -137,6 +166,25 @@ An MCP server (stdio) with 68 tools that reads and controls a live TradingView D
 - **Setup**: `npm install` inside `layer-1-tradingview/` once; TradingView Desktop must be running with CDP enabled (`tv_launch` tool can start it).
 - **Constraints**: not a streaming source — one symbol at a time, cannot run headless. It is an AI-assisted analysis / discretionary-signal input, NOT part of the tick pipeline (that's `layer-1-ingestion`).
 - **Upstream**: subtree of https://github.com/sonu831/trading-view-bot — sync with `git subtree pull --prefix=layer-1-tradingview trading-view-bot main`.
+
+## Layer 1c: Flattrade MCP (`layer-1-flattrade-mcp`)
+
+An official MCP server (`@flattrade/mcp`, published by Flattrade) with 17+ tools that connects AI assistants to a live Flattrade trading account. Registered in the root `.mcp.json`, so the `flattrade` MCP tools are available in Claude Code sessions here alongside TradingView MCP.
+
+- **Install**: `npx @flattrade/mcp` auto-installs on first Claude Code session — no local setup needed.
+- **Tools**: login, profile, funds, holdings, positions, orders, trades, margin, search-symbol, quotes, option-chain, historical-data, websocket (live ticks), place-order, modify-order, cancel-order, alerts.
+- **Credentials**: reads `FLATTRADE_API_KEY` + `FLATTRADE_API_SECRET` from environment (same `.env` keys as the L1/L10 FlatTrade adapters). Credentials stay local — nothing leaves your machine.
+- **Use cases**:
+  - AI-assisted discretionary trading: "Buy 50 shares of RELIANCE at market" → MCP places the order
+  - Portfolio snapshot: "Show my holdings and today's P&L" → MCP fetches live data
+  - Market research: "Show me NIFTY option chain for this expiry" → MCP returns full chain
+  - Quick validation: "What was my last fill price on INFY?" → MCP queries order book
+- **Constraints**: this is a discretionary / AI-assisted channel, NOT part of the automated Kafka pipeline. For automated strategy execution, use `layer-10-execution`. MCP orders go through Flattrade's API directly.
+- **Relationship to existing pipeline**:
+  - `layer-1-ingestion` (FlatTradeVendor) → automated tick pipeline (Kafka)  
+  - `layer-10-execution` (FlatTradeOMS) → automated order execution  
+  - Flattrade MCP → AI-assisted trading + manual interventions + market checks
+  - All three share the same `FLATTRADE_API_KEY` + `FLATTRADE_API_SECRET` credentials
 
 ## Conventions
 

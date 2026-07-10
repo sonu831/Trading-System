@@ -1,5 +1,5 @@
 import '@/styles/globals.css';
-import { ThemeProvider } from '../utils/theme-provider';
+import { ThemeProvider } from '@/utils/theme-provider';
 import { Provider } from 'react-redux';
 import { store } from '@/store';
 

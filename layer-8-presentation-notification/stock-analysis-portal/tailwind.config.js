@@ -15,6 +15,7 @@ module.exports = {
           DEFAULT: 'rgb(var(--color-surface) / <alpha-value>)',
           hover: 'rgb(var(--color-surface-hover) / <alpha-value>)',
         },
+        input: 'rgb(var(--color-surface) / <alpha-value>)',
         border: 'rgb(var(--color-border) / <alpha-value>)',
 
         // Text

@@ -1,4 +1,11 @@
 services:
+  # ── Global logging defaults (disk safety) ─────────
+  x-logging: &logging
+    driver: "json-file"
+    options:
+      max-size: "50m"
+      max-file: "5"
+
   # ===========================================
   # MESSAGE QUEUE - Apache Kafka
   # ===========================================

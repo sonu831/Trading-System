@@ -12,6 +12,7 @@ class VendorManager {
     this.vendors = new Map();
     this.onTick = options.onTick;
     this.credentialStore = options.credentialStore || null;
+    this._tokenRefreshInterval = null;
   }
 
   /**
@@ -40,6 +41,24 @@ class VendorManager {
 
     logger.info(`VendorManager: Initializing [${providerNames.join(', ')}]...`);
     this.initVendors(providerNames);
+
+    if (this.credentialStore) {
+      this._tokenRefreshInterval = setInterval(() => this.refreshTokens(), 30000);
+    }
+  }
+
+  async refreshTokens() {
+    try {
+      await this.credentialStore.loadTokens();
+      for (const [name, vendor] of this.vendors) {
+        const token = this.credentialStore.getToken(name);
+        if (token && vendor.setAccessToken) {
+          vendor.setAccessToken(token);
+        }
+      }
+    } catch (err) {
+      // Silently skip — token refresh is best-effort; L7 is the authority.
+    }
   }
 
   initVendors(providerNames) {
@@ -114,6 +133,10 @@ class VendorManager {
   }
 
   async disconnect() {
+    if (this._tokenRefreshInterval) {
+      clearInterval(this._tokenRefreshInterval);
+      this._tokenRefreshInterval = null;
+    }
     for (const [name, vendor] of this.vendors) {
       try { await vendor.disconnect(); } catch (e) { logger.error(e); }
     }

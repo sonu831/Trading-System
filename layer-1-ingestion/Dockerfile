@@ -7,7 +7,7 @@ RUN npm config set strict-ssl false
 
 # Install dependencies
 COPY package*.json ./
-RUN npm install --only=production
+RUN npm ci --omit=dev
 
 # Copy source code
 COPY . .

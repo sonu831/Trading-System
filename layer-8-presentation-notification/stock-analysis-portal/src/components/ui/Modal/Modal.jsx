@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import PropTypes from 'prop-types';
-import Card from '../Card';
-import Button from '../Button';
+import Card from '@/components/ui/Card';
+import Button from '@/components/ui/Button';
 
 const Modal = ({ isOpen, onClose, children, size = 'md', className = '' }) => {
   const [visible, setVisible] = useState(false);

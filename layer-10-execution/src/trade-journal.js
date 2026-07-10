@@ -12,13 +12,14 @@ class TradeJournal {
     const values = [
       new Date(), trade.id || `trade-${Date.now()}`, trade.symbol, trade.strategyId, trade.tier,
       trade.action || 'ENTRY', trade.direction, trade.instrument || 'OPTION',
-      trade.strike || null, trade.expiry || null, trade.optionType || null, trade.lots || 1,
-      trade.entryPrice || 0, trade.exitPrice || null, trade.stopLoss || null, trade.target || null,
-      trade.pnl || 0, trade.slippage || 0, trade.broker || 'paper',
+      trade.strike || null, trade.expiry || null, trade.optionType || null, trade.lots ?? null,
+      trade.entryPrice ?? null, trade.exitPrice ?? null, trade.stopLoss ?? null, trade.target ?? null,
+      trade.pnl ?? null, trade.slippage ?? null, trade.broker || 'paper',
       `${this.orderTagPrefix}-${Date.now()}`, trade.exitReason || null,
       trade.regime ? JSON.stringify(trade.regime) : null,
       trade.breadthSnapshot ? JSON.stringify(trade.breadthSnapshot) : null,
     ];
+    if (trade.pnl == null) logger.warn({ tradeId: trade.id }, 'Trade logged with null P&L — data may be missing');
     try { await this.pool.query(query, values); } catch (err) { logger.error({ err }, 'Trade journal: insert failed'); }
   }
 
@@ -27,7 +28,7 @@ class TradeJournal {
     const values = [
       new Date(), order.orderId || `ord-${Date.now()}`, order.tradeId,
       order.symbol, order.action, order.orderType || 'MARKET',
-      order.quantity || 0, order.price || 0, order.triggerPrice || 0,
+      order.quantity ?? null, order.price ?? null, order.triggerPrice ?? null,
       order.status || 'PENDING', order.broker || 'paper',
       order.latencyMs || 0, order.error || null,
       order.rawResponse ? JSON.stringify(order.rawResponse) : null,

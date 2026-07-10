@@ -50,7 +50,7 @@ class MStockOMS extends BaseOMS {
       symbol: order.symbol,
       side: order.action === 'BUY' ? 'B' : 'S',
       quantity: order.quantity,
-      price: order.price || 0,
+      price: order.price ?? null,
       orderType: order.price ? 'LIMIT' : 'MARKET',
       productType: 'I',
       validity: 'DAY',
@@ -62,8 +62,8 @@ class MStockOMS extends BaseOMS {
     const body = {
       clientCode: this.clientCode,
       orderNo: orderId,
-      quantity: modifications.quantity || 0,
-      price: modifications.price || 0,
+      quantity: modifications.quantity ?? null,
+      price: modifications.price ?? null,
       orderType: modifications.price ? 'LIMIT' : 'MARKET',
     };
     return this.post(this.endpoints.modifyOrder, body);
@@ -85,7 +85,12 @@ class MStockOMS extends BaseOMS {
   async getQuote(symbol) {
     const res = await this.post(this.endpoints.quote, { clientCode: this.clientCode, symbol });
     if (res) {
-      return { ltp: parseFloat(res.lastPrice || 0), bid: parseFloat(res.bid || 0), ask: parseFloat(res.ask || 0), oi: parseInt(res.oi || 0) };
+      const ltp = res.lastPrice ? parseFloat(res.lastPrice) : null;
+      const bid = res.bid ? parseFloat(res.bid) : null;
+      const ask = res.ask ? parseFloat(res.ask) : null;
+      const oi = res.oi ? parseInt(res.oi, 10) : null;
+      if (ltp == null) { logger.warn({ symbol }, 'MStockOMS: quote returned no LTP'); }
+      return { ltp, bid, ask, oi };
     }
     return null;
   }

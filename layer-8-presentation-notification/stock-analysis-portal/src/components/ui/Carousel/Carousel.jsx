@@ -1,6 +1,6 @@
 import React, { useRef } from 'react';
 import PropTypes from 'prop-types';
-import Card from '../Card';
+import Card from '@/components/ui/Card';
 
 const Carousel = ({ children, title, className = '' }) => {
   const scrollRef = useRef(null);

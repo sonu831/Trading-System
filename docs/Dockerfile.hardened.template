@@ -1,0 +1,36 @@
+# ===========================================================
+# HARDENED Node.js Dockerfile — REFERENCE TEMPLATE
+# Copy this pattern for any new Node.js service.
+# ===========================================================
+# Features:
+#   - Multi-stage (builder → runtime) — smaller image
+#   - npm ci --omit=dev — reproducible builds
+#   - Non-root USER — security
+#   - tini init — proper SIGTERM forwarding
+#   - Real HEALTHCHECK — endpoint probe
+#   - Resource limits in compose — prevent noisy-neighbor
+#   - No NODE_TLS_REJECT_UNAUTHORIZED=0 — TLS always on
+#   - Log rotation in compose — 50MB max, 5 files
+# ===========================================================
+
+# ── Builder stage (optional — skip for pure JS services) ──
+FROM node:20-alpine AS builder
+WORKDIR /app
+# Install CA certs if behind corporate proxy:
+# COPY ca-cert.pem /usr/local/share/ca-certificates/corp.crt
+# RUN apk add --no-cache ca-certificates && update-ca-certificates
+COPY package*.json ./
+RUN npm ci --omit=dev
+COPY . .
+
+# ── Runtime stage ─────────────────────────────────────────
+FROM node:20-alpine AS runtime
+RUN apk add --no-cache tini && addgroup -S app && adduser -S app -G app
+WORKDIR /app
+COPY --from=builder --chown=app:app /app /app
+USER app
+EXPOSE 3000
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=5 \
+    CMD node -e "require('http').get('http://localhost:3000/health',r=>{process.exit(r.statusCode===200?0:1)}).on('error',()=>process.exit(1))"
+ENTRYPOINT ["/sbin/tini", "--"]
+CMD ["node", "src/index.js"]

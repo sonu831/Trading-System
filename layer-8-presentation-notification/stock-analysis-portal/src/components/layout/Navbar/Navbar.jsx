@@ -3,7 +3,7 @@ import PropTypes from 'prop-types';
 import { useDispatch, useSelector } from 'react-redux';
 import { setBackfillModalOpen } from '@/store/slices/systemSlice';
 import { fetchExecutionState, selectTradeMode } from '@/store/slices/executionSlice';
-import { ThemeToggle } from '../../ui';
+import { ThemeToggle } from '@/components/ui';
 import { TradeModeBadge, KillSwitchButton } from '@/components/trading';
 
 import Link from 'next/link';
@@ -78,6 +78,15 @@ const Navbar = ({ viewMode, setViewMode, systemStatus = 'ONLINE' }) => {
             </div>
             {/* Hover Glow Effect */}
             <div className="absolute inset-0 bg-gradient-to-r from-emerald-400/0 via-white/20 to-emerald-400/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700 ease-in-out"></div>
+          </Link>
+
+          <Link
+            href="/scalp"
+            className="relative group overflow-hidden px-5 py-2 rounded-lg font-bold text-sm transition-all duration-300 shadow-md transform hover:-translate-y-0.5 bg-gradient-to-r from-amber-600 to-amber-500 text-white hover:shadow-amber-500/25 border border-amber-400/20"
+            title="Scalp Cockpit"
+          >
+            <div className="relative z-10 flex items-center gap-2"><span className="text-lg">⚡</span><span>Scalp</span></div>
+            <div className="absolute inset-0 bg-gradient-to-r from-amber-400/0 via-white/20 to-amber-400/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700 ease-in-out"></div>
           </Link>
 
           <Link

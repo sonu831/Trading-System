@@ -26,11 +26,12 @@ type Client struct {
 	pool *pgxpool.Pool
 }
 
-// NewClient creates a new TimescaleDB client
+// NewClient creates a new TimescaleDB client.
+// Requires TIMESCALE_URL env var — never falls back to a hardcoded credential.
 func NewClient(ctx context.Context) (*Client, error) {
 	connURL := os.Getenv("TIMESCALE_URL")
 	if connURL == "" {
-		connURL = "postgresql://trading:trading123@localhost:5432/nifty50"
+		return nil, fmt.Errorf("TIMESCALE_URL environment variable is required — hardcoded credentials are forbidden per shared/constants.go")
 	}
 
 	pool, err := pgxpool.New(ctx, connURL)

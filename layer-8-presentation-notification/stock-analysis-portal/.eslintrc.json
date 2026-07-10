@@ -1,0 +1,49 @@
+{
+  "extends": ["next/core-web-vitals"],
+  "rules": {
+    "no-restricted-imports": ["error", {
+      "patterns": [
+        {
+          "group": ["../organisms/*", "../templates/*", "../pages/*"],
+          "message": "Atoms must not import from organisms, templates, or pages."
+        },
+        {
+          "group": ["../organisms/*", "../templates/*", "../pages/*"],
+          "message": "Molecules must not import from organisms, templates, or pages."
+        }
+      ]
+    }]
+  },
+  "overrides": [
+    {
+      "files": ["src/components/atoms/**/*.{ts,tsx}"],
+      "rules": {
+        "no-restricted-imports": ["error", {
+          "patterns": [
+            { "group": ["**/molecules/*", "**/organisms/*", "**/templates/*", "**/pages/*"], "message": "Atoms may not import upward in the atomic design hierarchy" }
+          ]
+        }]
+      }
+    },
+    {
+      "files": ["src/components/molecules/**/*.{ts,tsx}"],
+      "rules": {
+        "no-restricted-imports": ["error", {
+          "patterns": [
+            { "group": ["**/organisms/*", "**/templates/*", "**/pages/*"], "message": "Molecules may only import atoms" }
+          ]
+        }]
+      }
+    },
+    {
+      "files": ["src/components/organisms/**/*.{ts,tsx}"],
+      "rules": {
+        "no-restricted-imports": ["error", {
+          "patterns": [
+            { "group": ["**/templates/*", "**/pages/*"], "message": "Organisms may only import atoms + molecules" }
+          ]
+        }]
+      }
+    }
+  ]
+}

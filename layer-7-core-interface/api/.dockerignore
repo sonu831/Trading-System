@@ -1,7 +1,28 @@
+# Keep the build context small and secret-free.
+# Without `node_modules` here, `COPY . .` copies the HOST node_modules into the image,
+# shadowing the Linux install with (possibly Windows-built) native modules.
 node_modules
-npm-debug.log
-Dockerfile
-.dockerignore
+npm-debug.log*
+yarn-error.log*
+
 .git
 .gitignore
+.github
+
+# rule 6 — secrets must never enter an image layer
+.env
+.env.*
+!.env.example
+
+dist
+build
+coverage
+.nyc_output
+
+tests
+__tests__
+
+Dockerfile
+.dockerignore
 README.md
+*.md

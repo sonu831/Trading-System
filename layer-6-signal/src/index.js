@@ -148,7 +148,7 @@ async function start() {
           heap_used: (mem.heapUsed / 1024 / 1024).toFixed(2) + 'MB',
           uptime: process.uptime().toFixed(0) + 's',
           timestamp: Date.now(),
-        });
+        }, { EX: 60 }); // 1 min TTL — metrics refresh every 5s
       } catch (e) {
         logger.error({ err: e }, 'Metric Publish Error');
       }

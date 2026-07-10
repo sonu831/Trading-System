@@ -1,0 +1,80 @@
+const { createContainer, asClass, asValue, asFunction, Lifetime } = require('awilix');
+const { PrismaClient } = require('@prisma/client');
+const redis = require('./redis/client');
+
+// Import Base Classes (for reference/extension)
+const BaseRepository = require('./common/repositories/BaseRepository');
+
+// Import Application Classes (Will be auto-loaded pattern later, but manual for now)
+// Data Availability Feature
+
+
+// Initialize Singletons
+const prisma = new PrismaClient({
+  datasources: {
+    db: {
+      url: process.env.TIMESCALE_URL || process.env.DATABASE_URL,
+    },
+  },
+  // Limit connection pool per PM2 instance to prevent exhaustion
+  // 4 instances × 5 connections = 20 total (safe for 100 max_connections)
+  log: ['warn', 'error'],
+});
+
+// Configure connection pool size via environment variable appended to URL
+// This is parsed by Prisma from the connection string: ?connection_limit=5
+// Redis client is already initialized in its module
+
+// Configure Container
+const container = createContainer();
+
+container.register({
+  // 1. External dependencies
+  prisma: asValue(prisma),
+  redis: asValue(redis),
+
+  // 2. Base Classes
+  baseRepo: asClass(BaseRepository),
+
+  // 3. Application Components (Repositories -> Services -> Controllers)
+  // Data Availability
+
+
+  // Signals
+  signalRepository: asClass(require('./modules/signals/SignalRepository')).singleton(),
+  signalService: asClass(require('./modules/signals/SignalService')).singleton(),
+  signalController: asClass(require('./modules/signals/SignalController')).singleton(),
+
+  // System (Status & Backfill)
+  systemRepository: asClass(require('./modules/system/SystemRepository')).singleton(),
+  systemService: asClass(require('./modules/system/SystemService')).singleton(),
+  systemController: asClass(require('./modules/system/SystemController')).singleton(),
+
+  // Market (View & Data)
+  marketRepository: asClass(require('./modules/market/MarketRepository')).singleton(),
+  marketService: asClass(require('./modules/market/MarketService')).singleton(),
+  marketController: asClass(require('./modules/market/MarketController')).singleton(),
+
+  // Analysis (Technical Analysis + Candles)
+  analysisRepository: asClass(require('./modules/analysis/AnalysisRepository')).singleton(),
+  analysisService: asClass(require('./modules/analysis/AnalysisService')).singleton(),
+  analysisController: asClass(require('./modules/analysis/AnalysisController')).singleton(),
+
+  // Broker (Provider Registry + Credential Vault)
+  brokerRepository: asClass(require('./modules/broker/BrokerRepository')).singleton(),
+  brokerService: asClass(require('./modules/broker/BrokerService')).singleton(),
+  brokerController: asClass(require('./modules/broker/BrokerController')).singleton(),
+  brokerSessionService: asClass(require('./modules/broker/BrokerSessionService')).singleton(),
+
+  // Execution (proxy onto Layer 10: positions, risk, kill switch)
+  executionService: asClass(require('./modules/execution/ExecutionService')).singleton(),
+  executionController: asClass(require('./modules/execution/ExecutionController')).singleton(),
+
+  // Regime (multi-TF market regime from L6 + breadth from L5, read via Redis)
+  regimeService: asClass(require('./modules/regime/RegimeService')).singleton(),
+  regimeController: asClass(require('./modules/regime/RegimeController')).singleton(),
+
+  // MStock Specific Endpoints
+});
+
+module.exports = container;

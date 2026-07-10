@@ -1,13 +1,12 @@
 FROM node:20-alpine
 
-WORKDIR /app
+RUN npm install -g pnpm
 
-# Bypass SSL for npm at build time only (corporate proxy)
-RUN npm config set strict-ssl false
+WORKDIR /app
 
 # Install dependencies
 COPY package*.json ./
-RUN npm ci --omit=dev
+RUN pnpm install --frozen-lockfile --prod
 
 # Copy source code
 COPY . .

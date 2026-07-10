@@ -1,7 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  reactStrictMode: true,
   output: 'standalone',
+  reactStrictMode: true,
+  
   async rewrites() {
     // Use localhost for local dev, backend-api for Docker
     const apiHost = process.env.NODE_ENV === 'development' ? 'localhost:4000' : 'backend-api:4000';

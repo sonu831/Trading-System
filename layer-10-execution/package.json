@@ -2,15 +2,16 @@
   "name": "layer-10-execution",
   "version": "0.1.0",
   "description": "Options scalper execution layer (paper/shadow/live) for Nifty 50 Trading System",
-  "main": "src/index.js",
+  "main": "src/index.ts",
   "scripts": {
-    "start": "node src/index.js",
-    "dev": "nodemon src/index.js",
+    "start": "node -r ts-node/register src/index.ts",
+    "dev": "nodemon --exec \"node -r ts-node/register\" src/index.ts",
     "test": "npm run verify",
     "verify": "npm run verify:paper && npm run verify:live && npm run verify:flattrade",
-    "verify:paper": "node tests/verify-paper.js",
-    "verify:live": "node tests/verify-live.js",
-    "verify:flattrade": "node tests/verify-flattrade-oms.js"
+    "verify:paper": "node -r ts-node/register tests/verify-paper.js",
+    "verify:live": "node -r ts-node/register tests/verify-live.js",
+    "verify:flattrade": "node -r ts-node/register tests/verify-flattrade-oms.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
     "axios": "^1.7.2",
@@ -22,7 +23,9 @@
     "pino": "^9.6.0",
     "pino-pretty": "^10.3.1",
     "prom-client": "^14.2.0",
-    "redis": "^4.6.10"
+    "redis": "^4.6.10",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.3"
   },
   "devDependencies": {
     "jest": "^29.7.0",

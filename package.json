@@ -13,7 +13,7 @@
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "fix": "npm run lint:fix && npm run format",
+    "fix": "pnpm run lint:fix && pnpm run format",
     "sync-ai": "node scripts/sync-ai.mjs",
     "sync-ai-check": "node scripts/sync-ai.mjs --check"
   },

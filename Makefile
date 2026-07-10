@@ -106,7 +106,7 @@ setup:
 	@echo "📦 Installing node_modules for all layers..."
 	@for dir in $(LAYERS); do \
 		echo ""; echo "━━━━ $${dir} ━━━━"; \
-		(cd "$${dir}" && npm install --legacy-peer-deps) || echo "  ⚠️  $${dir} skipped"; \
+		(cd "$${dir}" && pnpm install) || echo "  ⚠️  $${dir} skipped"; \
 	done
 	@echo ""
 	@echo "✅ All layers installed!"
@@ -520,17 +520,17 @@ backfill-status:
 
 
 test:
-	cd layer-1-ingestion && npm test
-	cd layer-2-processing && npm test
+	cd layer-1-ingestion && pnpm test
+	cd layer-2-processing && pnpm test
 	cd layer-4-analysis && go test ./... -v -count=1
 	cd layer-5-aggregation && go test ./... -v -count=1
-	cd layer-6-signal && npm test
+	cd layer-6-signal && pnpm test
 
 test-layer1:
-	cd layer-1-ingestion && npm test
+	cd layer-1-ingestion && pnpm test
 
 test-layer2:
-	cd layer-2-processing && npm test
+	cd layer-2-processing && pnpm test
 
 test-layer4:
 	cd layer-4-analysis && go test ./... -v -count=1
@@ -539,7 +539,7 @@ test-layer5:
 	cd layer-5-aggregation && go test ./... -v -count=1
 
 test-layer6:
-	cd layer-6-signal && npm test
+	cd layer-6-signal && pnpm test
 
 test-go:
 	cd layer-4-analysis && go test ./... -v -count=1
@@ -557,11 +557,11 @@ dev: infra
 
 layer1:
 	@echo "🚀 Starting Layer 1 (Ingestion)..."
-	@export $$(cat .env | grep -v '^#' | xargs) && cd layer-1-ingestion && npm run dev
+	@export $$(cat .env | grep -v '^#' | xargs) && cd layer-1-ingestion && pnpm run dev
 
 layer2:
 	@echo "🚀 Starting Layer 2 (Processing)..."
-	@export $$(cat .env | grep -v '^#' | xargs) && cd layer-2-processing && npm run dev
+	@export $$(cat .env | grep -v '^#' | xargs) && cd layer-2-processing && pnpm run dev
 
 layer4:
 	@echo "🚀 Starting Layer 4 (Analysis)..."
@@ -573,15 +573,15 @@ layer5:
 
 layer6:
 	@echo "🚀 Starting Layer 6 (Signal)..."
-	@export $$(cat .env | grep -v '^#' | xargs) && cd layer-6-signal && npm run dev
+	@export $$(cat .env | grep -v '^#' | xargs) && cd layer-6-signal && pnpm run dev
 
 layer7-api:
 	@echo "🚀 Starting Layer 7 API (Fastify)..."
-	@export $$(cat .env | grep -v '^#' | xargs) && cd layer-7-core-interface/api && npm run dev
+	@export $$(cat .env | grep -v '^#' | xargs) && cd layer-7-core-interface/api && pnpm run dev
 
 layer7-dashboard:
 	@echo "🚀 Starting Layer 8 Dashboard (Next.js)..."
-	@export $$(cat .env | grep -v '^#' | xargs) && cd layer-8-presentation-notification/stock-analysis-portal && npm run dev
+	@export $$(cat .env | grep -v '^#' | xargs) && cd layer-8-presentation-notification/stock-analysis-portal && pnpm run dev
 
 # ─── Short aliases ───
 layer7: layer7-api
@@ -595,7 +595,7 @@ layer9:
 
 layer10:
 	@echo "🚀 Starting Layer 10 (Execution)..."
-	@export $$(cat .env | grep -v '^#' | xargs) && cd layer-10-execution && npm run dev
+	@export $$(cat .env | grep -v '^#' | xargs) && cd layer-10-execution && pnpm run dev
 
 # ─── Docker single-service targets ───
 docker-ingestion:

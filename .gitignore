@@ -70,3 +70,8 @@ backups/
 
 # Graphify (local knowledge graph cache/output)
 graphify-out/
+
+# pnpm (project uses npm)
+pnpm-lock.yaml
+**/pnpm-lock.yaml
+pnpm-workspace.yaml

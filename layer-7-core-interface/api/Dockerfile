@@ -1,30 +1,23 @@
 FROM node:20-alpine
+RUN npm install -g pnpm pm2
 
 WORKDIR /app
 
-# Bypass SSL certificate verification (for corporate proxy/firewall)
-RUN npm config set strict-ssl false
-
-# Install dependencies
 COPY package*.json ./
+COPY pnpm-lock.yaml* ./
 COPY prisma ./prisma/
 
-# Install all dependencies (including dev for prisma CLI) AND PM2 globally
-RUN npm install --legacy-peer-deps && npm install fastify@5 --save-exact && npm install pm2 -g
+RUN pnpm install --frozen-lockfile
 
-# Generate Prisma Client (disable SSL verification for binary download)
-RUN NODE_TLS_REJECT_UNAUTHORIZED=0 npx prisma generate
+RUN NODE_TLS_REJECT_UNAUTHORIZED=0 pnpm exec prisma generate
 
-# Copy source code
 COPY . .
 
 EXPOSE 4000
 
-# Run as non-root user
 USER node
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=90s --retries=5 \
     CMD node -e "require('http').get('http://localhost:4000/health',r=>{process.exit(r.statusCode===200?0:1)})"
 
-# Run with PM2 in production for clustering and zero-downtime reloads
 CMD ["pm2-runtime", "ecosystem.config.js"]

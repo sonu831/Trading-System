@@ -1,1 +1,2 @@
-npx lint-staged
+// @ts-nocheck
+pnpm exec lint-staged

@@ -24,7 +24,7 @@ graphify query "<concept>"  # Search codebase via knowledge graph
 | 2026-07-09 | Broker credential vault + provider registry implemented | system-architect |
 | 2026-07-09 | Docker compose fixes (network, version-check, healthcheck) | devops-engineer |
 | 2026-07-09 | AI workflow infrastructure initialized | system-architect |
-| 2026-07-09 | **Momentum Module — Phases A–F built**: Data foundation (A), Regime Engine (B), Strategy Framework (C), Backtest + Optimizer (D), L10 Execution (E), Validation Roadmap (F). See `PROJECT_STATE.md` and `docs/MOMENTUM_TRADING_ARCHITECTURE.md` | opencode |
+| 2026-07-09 | **Momentum Module — Phases A–F built**: Data foundation (A), Regime Engine (B), Strategy Framework (C), Backtest + Optimizer (D), L10 Execution (E), Validation Roadmap (F). See `docs/PROJECT_STATE.md` and `docs/MOMENTUM_TRADING_ARCHITECTURE.md` | opencode |
 
 ## Active Gaps / Known Issues
 

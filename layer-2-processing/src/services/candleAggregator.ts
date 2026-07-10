@@ -1,6 +1,11 @@
 /**
- * CandleAggregator — builds 1-min OHLCV candles from tick stream.
- * Idempotent: duplicate ticks produce the same candle.
+ * CandleAggregator — builds single-timeframe OHLCV candles from a tick stream.
+ *
+ * NOT idempotent: it has no tick identity, so a redelivered tick is summed twice.
+ * Deduplication is the Kafka consumer's job (it owns offsets and message keys).
+ *
+ * Emits ONE timeframe, set by `intervalMs` (default 60s). Multi-timeframe candles
+ * are derived downstream as TimescaleDB continuous aggregates, not here.
  */
 const logger = require('../utils/logger');
 
@@ -48,7 +53,19 @@ class CandleAggregator {
     }
   }
 
-  checkBoundaries(): void { /* flushes candles that crossed the minute boundary */ }
+  /**
+   * Flush candles whose interval has elapsed in wall-clock time.
+   *
+   * Without this, a candle only closes when the NEXT tick for that symbol arrives.
+   * An illiquid symbol, or the final candle of the session, would never be emitted.
+   * This body was empty (a comment describing work no code did) and no test covered it.
+   */
+  checkBoundaries(): void {
+    const currentKey = this.getCandleKey(Date.now());
+    for (const symbol of Object.keys(this.candles)) {
+      this.flushPrevious(symbol, currentKey);
+    }
+  }
 
   flushAll(): void {
     for (const symbol of Object.keys(this.candles)) {

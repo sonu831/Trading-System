@@ -15,28 +15,31 @@ jobs:
           - layer-1-ingestion
           - layer-2-processing
           - layer-6-signal
-          - layer-7-presentation/api
-          - layer-7-presentation/dashboard
-          - layer-7-presentation/telegram-bot
+          - layer-7-core-interface/api
+          - layer-8-presentation-notification/stock-analysis-portal
+          - layer-8-presentation-notification/telegram-bot
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
-      - name: Use Node.js 18
-        uses: actions/setup-node@v3
+      - uses: pnpm/action-setup@v4
+        with: { version: 'latest' }
+
+      - name: Use Node.js 20
+        uses: actions/setup-node@v4
         with:
-          node-version: 18
-          cache: 'npm'
-          cache-dependency-path: ${{ matrix.layer }}/package-lock.json
+          node-version: 20
+          cache: 'pnpm'
+          cache-dependency-path: ${{ matrix.layer }}/pnpm-lock.yaml
 
       - name: Install Dependencies
         working-directory: ${{ matrix.layer }}
-        run: npm install
+        run: pnpm install --frozen-lockfile
 
       - name: Lint (if script exists)
         working-directory: ${{ matrix.layer }}
-        run: npm run lint --if-present
+        run: pnpm run lint --if-present
 
       - name: Test (if script exists)
         working-directory: ${{ matrix.layer }}
-        run: npm test --if-present
+        run: pnpm test --if-present

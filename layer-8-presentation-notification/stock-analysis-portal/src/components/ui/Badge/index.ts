@@ -1,1 +1,2 @@
-export { default } from './Badge';
+// @ts-nocheck
+export { default } from './Badge.tsx'

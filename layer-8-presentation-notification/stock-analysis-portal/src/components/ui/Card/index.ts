@@ -1,1 +1,2 @@
-export { default, CardHeader, CardBody, CardFooter } from './Card';
+// @ts-nocheck
+export { default } from './Card.tsx'

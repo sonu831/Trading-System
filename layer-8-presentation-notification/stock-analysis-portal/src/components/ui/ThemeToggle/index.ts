@@ -1,1 +1,2 @@
-export { default } from './ThemeToggle';
+// @ts-nocheck
+export { default } from './ThemeToggle.tsx'

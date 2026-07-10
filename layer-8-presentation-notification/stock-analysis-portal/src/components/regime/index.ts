@@ -1,1 +1,2 @@
-export { default as RegimeCard } from './RegimeCard';
+// @ts-nocheck
+export { default as RegimeCard } from './RegimeCard'

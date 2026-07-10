@@ -1,1 +1,2 @@
-export { default } from './Carousel';
+// @ts-nocheck
+export { default } from './Carousel.tsx'

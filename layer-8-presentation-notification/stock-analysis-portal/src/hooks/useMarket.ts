@@ -51,8 +51,8 @@ export function useSessionClock() {
   const [clock, setClock] = useState<any>(null);
   useEffect(() => {
     let active = true;
-    const fetch = () => fetch('/api/v1/session/clock').then(r => r.json()).then(d => { if (active && d.success) setClock(d.data); });
-    fetch(); const t = setInterval(fetch, 30000);
+    const poll = () => globalThis.fetch('/api/v1/session/clock').then(r => r.json()).then(d => { if (active && d.success) setClock(d.data); });
+    poll(); const t = setInterval(poll, 30000);
     return () => { active = false; clearInterval(t); };
   }, []);
   return clock;

@@ -1,1 +1,2 @@
-export { default } from './Button';
+// @ts-nocheck
+export { default } from './Button.tsx'

@@ -1,7 +1,25 @@
-// ═══════════════════════════════════════════════════════
-// shared/types.ts — domain types for the cockpit
-// Generated from L7 Fastify JSON schemas (source of truth)
-// ═══════════════════════════════════════════════════════
+// ── Market Data ──────────────────────────────────────
+export interface IndexQuote {
+  symbol?: string;
+  ltp: number;
+  change?: number;
+  changePct?: number;
+  open?: number;
+  high?: number;
+  low?: number;
+  prevClose?: number;
+  volume?: number;
+  timestamp?: string;
+}
+
+export interface CandleData {
+  time: string | number;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+}
 
 // ── Regime ───────────────────────────────────────────
 export type TrendType = 'TREND_UP' | 'TREND_DOWN' | 'RANGE' | 'UNKNOWN';
@@ -11,7 +29,7 @@ export type TierType = 'T1' | 'T2' | 'T3';
 
 export interface RegimeState {
   trend: TrendType;
-  strength: number;         // 0.0 - 1.0
+  strength: number;
   volatility: VolatilityType;
   phase: PhaseType;
   tfAlignment: Record<string, number>;
@@ -23,7 +41,6 @@ export interface RegimeState {
   timestamp: string;
 }
 
-// ── Breadth ──────────────────────────────────────────
 export interface BreadthState {
   advancing: number;
   declining: number;
@@ -68,6 +85,19 @@ export interface TradeSignal {
   timestamp: string;
 }
 
+// ── Strategy ─────────────────────────────────────────
+export interface StrategyConfig {
+  id: string;
+  name: string;
+  enabled: boolean;
+  tier: TierType;
+  description?: string;
+  params: Record<string, unknown>;
+  regimeAffinity: string[];
+  cooldownMs: number;
+  lastTriggeredAt?: string;
+}
+
 // ── Option Chain ─────────────────────────────────────
 export interface OptionQuote {
   ltp: number;
@@ -95,10 +125,6 @@ export interface StalenessResult {
 }
 
 // ── Safety types ─────────────────────────────────────
-export type Rupees = number & { readonly __brand: 'INR' };
-export type Premium = number & { readonly __brand: 'OPTION_PREMIUM' };
-export type SpotPrice = number & { readonly __brand: 'SPOT' };
-
 export type Loaded<T> =
   | { status: 'loading' }
   | { status: 'unreachable'; reason: string }

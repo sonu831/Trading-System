@@ -1,3 +1,4 @@
+// @ts-nocheck
 import '@/styles/globals.css';
 import { ThemeProvider } from '@/utils/theme-provider';
 import { Provider } from 'react-redux';

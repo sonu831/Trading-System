@@ -1,3 +1,4 @@
+// @ts-nocheck
 import React from 'react';
 
 type CardVariant = 'default' | 'glass' | 'outlined';

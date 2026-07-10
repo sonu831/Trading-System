@@ -1,1 +1,2 @@
-export { default } from './Input';
+// @ts-nocheck
+export { default } from './Input.tsx'

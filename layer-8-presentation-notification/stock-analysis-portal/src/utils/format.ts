@@ -1,49 +1,34 @@
 const isNum = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
 
-export const EMPTY = '\u2014'; // em dash
+export const EMPTY = '\u2014';
+
+interface FormatOpts { decimals?: number }
 
 export function formatTime(timestamp: string | number | null | undefined): string {
   if (!timestamp) return 'N/A';
   try {
-    let dateObj: Date;
-    if (typeof timestamp === 'string') {
-      dateObj = new Date(timestamp.replace(/(\.\d{3})\d+/, '$1'));
-    } else {
-      dateObj = new Date(timestamp);
-    }
-    if (isNaN(dateObj.getTime())) return String(timestamp);
-    return dateObj.toLocaleTimeString();
-  } catch {
-    return String(timestamp);
-  }
+    let d: Date;
+    if (typeof timestamp === 'string') d = new Date(timestamp.replace(/(\.\d{3})\d+/, '$1'));
+    else d = new Date(timestamp);
+    if (isNaN(d.getTime())) return String(timestamp);
+    return d.toLocaleTimeString();
+  } catch { return String(timestamp); }
 }
 
 export function formatDate(timestamp: string | number | null | undefined): string {
   if (!timestamp) return 'N/A';
   try {
-    let dateObj: Date;
-    if (typeof timestamp === 'string') {
-      dateObj = new Date(timestamp.replace(/(\.\d{3})\d+/, '$1'));
-    } else {
-      dateObj = new Date(timestamp);
-    }
-    if (isNaN(dateObj.getTime())) return String(timestamp);
-    return dateObj.toLocaleDateString();
-  } catch {
-    return String(timestamp);
-  }
-}
-
-interface FormatOpts {
-  decimals?: number;
+    let d: Date;
+    if (typeof timestamp === 'string') d = new Date(timestamp.replace(/(\.\d{3})\d+/, '$1'));
+    else d = new Date(timestamp);
+    if (isNaN(d.getTime())) return String(timestamp);
+    return d.toLocaleDateString();
+  } catch { return String(timestamp); }
 }
 
 export function formatCurrency(value: unknown, { decimals = 2 }: FormatOpts = {}): string {
   if (!isNum(value)) return EMPTY;
-  return `\u20B9${value.toLocaleString('en-IN', {
-    minimumFractionDigits: decimals,
-    maximumFractionDigits: decimals,
-  })}`;
+  return `\u20B9${value.toLocaleString('en-IN', { minimumFractionDigits: decimals, maximumFractionDigits: decimals })}`;
 }
 
 export function formatSignedCurrency(value: unknown, opts?: FormatOpts): string {

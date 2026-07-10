@@ -4,13 +4,13 @@
     "module": "commonjs",
     "strict": true,
     "allowJs": true,
-    "esModuleInterop": true,
     "skipLibCheck": true,
+    "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
     "outDir": "./dist",
     "rootDir": "./src",
-    "declaration": true,
-    "resolveJsonModule": true
+    "types": ["node"],
+    "declaration": false
   },
   "include": ["src/**/*.ts"],
   "exclude": ["node_modules", "dist", "tests"]

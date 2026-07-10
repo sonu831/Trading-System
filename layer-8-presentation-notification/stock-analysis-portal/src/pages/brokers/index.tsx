@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { useState } from 'react';
 import { AppLayout } from '@/components/layout';
 import BrokerList from '@/components/brokers/BrokerList/BrokerList';

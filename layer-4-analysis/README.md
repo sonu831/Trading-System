@@ -1,60 +1,44 @@
-# Layer 4: Analysis Engine 📊
+# Layer 4 — Analysis (Technical Indicators)
 
-The **Analysis Engine** is the computational heart of the trading system. It is responsible for transforming raw market data (candles) into actionable insights using both **Traditional Technical Analysis** and **Modern AI Inference**.
+> **One job:** Compute technical indicators for 50 stocks in parallel.
+> **Tech:** Go 1.23 · **Port:** 8081
 
-## 🏗 Architecture
+## Architecture
 
-### Hybrid Intelligence Model
-
-This service implements the **Hybrid Intelligence** pattern:
-
-1.  **Hard Math (Go)**: It calculates deterministic indicators (RSI, EMAs) extremely fast using `sdcoffey/techan`.
-2.  **Soft Inference (Python)**: It delegates the probabilistic judgment to `layer-9-ai-service`.
-
-### Data Flow
-
-```mermaid
-sequenceDiagram
-    participant DB as TimescaleDB
-    participant L4 as Analysis Engine
-    participant L9 as AI Service
-    participant Redis
-
-    L4->>DB: Fetch 300 Candles
-    L4->>L4: Calculate RSI, MACD, EMA
-    L4->>L9: POST /predict (Features)
-    L9-->>L4: Prediction (0.85)
-    L4->>L4: Compute Final Score
-    L4->>Redis: Publish AnalysisResult
+```
+candles_1m (TimescaleDB) → 50 goroutines → StockAnalysis → Redis publish
+                              │
+                              ├── RSI (Wilder's smoothing)
+                              ├── MACD (12/26/9)
+                              ├── EMA (9, 21, 55, 200)
+                              ├── ATR (14)
+                              ├── VWAP
+                              ├── Supertrend (10, 3)
+                              ├── Bollinger Bands (20, 2)
+                              └── ADX + Ichimoku
 ```
 
-## 🛠 Features
+## Files
 
-### 1. Parallel Processing
+| File | Purpose |
+|------|---------|
+| `internal/indicators/indicators.go` | All indicator implementations |
+| `internal/indicators/indicators_test.go` | 10 tests including benchmarks |
+| `internal/analyzer/engine.go` | 50-stock parallel analysis engine |
+| `internal/db/client.go` | TimescaleDB queries (candles_1m) |
+| `internal/redis/client.go` | Redis publish (analysis_updates) |
+| `internal/ai/client.go` | Calls L9 AI inference |
 
-The engine uses the **Fan-Out/Fan-In** concurrency pattern.
+## Key Constants (from Go shared module)
 
-- Spawns 50+ Goroutines (one per stock).
-- Latency for analyzing 50 stocks: **< 100ms** (including AI inference).
+```go
+import shared "github.com/utkarsh-pandey/nifty50-trading-system/shared"
+// shared.TrendUp, shared.PortAnalysis, shared.TopicAnalysisUpdates
+```
 
-### 2. Technical Scorecard
+## Run
 
-Calculates a "Trend Score" (-5 to +5):
-
-- **RSI**: <30 (+2), >70 (-2)
-- **MACD**: Histogram crossover
-- **EMA**: Price vs EMA200 (Long Term Trend)
-- **Supertrend**: Directionality
-
-### 3. API Endpoints
-
-- `GET /analyze?symbol=X`: Returns JSON scorecard.
-- `GET /analyze/market`: Returns Market Sentiment (Bullish/Bearish counts).
-- `GET /metrics`: Prometheus metrics.
-
-## 💻 Code Structure
-
-- `cmd/main.go`: Entry point, starts HTTP Server (8081).
-- `internal/analyzer`: Core engine loop, Goroutine management.
-- `internal/indicators`: Technical analysis logic (`techan` wrapper).
-- `internal/ai`: Client for communicating with Layer 9.
+```bash
+make layer4          # Local dev (Go run)
+go test ./...        # 10 tests + benchmarks
+```

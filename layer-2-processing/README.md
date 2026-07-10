@@ -1,30 +1,40 @@
-# Layer 2: Processing Service ⚙️
+# Layer 2 — Processing (Tick → Candle Builder)
 
-## **What is this?**
+> **One job:** Consume raw ticks from Kafka, build 1-minute OHLCV candles, write to TimescaleDB, cache in Redis.
+> **Tech:** Node.js 20 · **Port:** 3002
 
-The Processing Layer is a high-performance **Golang** service. It is the "Data Refinery" of the system. It consumes the raw stream of ticks from Layer 1 and converts them into structured, analyzable data blocks called **Candles** (OHLCV - Open, High, Low, Close, Volume).
+## Architecture
 
-## **Why is it needed?**
+```
+raw-ticks (Kafka) → CandleAggregator → 1m OHLCV → TimescaleDB (candles_1m)
+                         │                         │
+                         └── Redis (ltp, candle) ──┘
+                    OptionChainWriter → options_chain (TimescaleDB)
+```
 
-- **Noise Reduction**: Raw ticks are too granular for trend analysis. Aggregating them into 1-minute candles provides a cleaner signal.
-- **Persistence**: It ensures every piece of market history is safely stored in **TimeScaleDB** for future backtesting and historical analysis.
+## Files
 
-## **How it works**
+| File | Purpose |
+|------|---------|
+| `src/services/candleAggregator.js` | Tick → 1m OHLCV, checkBoundaries() flushes on minute boundary |
+| `src/services/candleWriter.js` | `INSERT INTO candles_1m ON CONFLICT DO NOTHING` |
+| `src/services/redisCache.js` | `ltp:{symbol}` (60s TTL), `candle:{symbol}:1m` (120s TTL) |
+| `src/services/optionChainWriter.js` | Consumes `option-chain` topic → writes options_chain hypertable |
+| `src/services/bounded-queue.js` | Max 5000 ticks, drop policy, backpressure flag |
+| `src/kafka/consumer.js` | Manual commits, versioned group (v4) |
+| `src/kafka/optionChainConsumer.js` | Dedicated option chain consumer |
 
-1.  **Kafka Consumer**: Listens to the `market_ticks` topic.
-2.  **Aggregation Engine**:
-    - Maintains an in-memory "Current Candle" for every stock token.
-    - **Logic**:
-      - If internal candle time < 1 minute: Update `High`, `Low`, `Close`, `Volume`.
-      - If 1 minute passed: "Closes" the candle, flushes it to DB, and starts a new one.
-3.  **Database Write**: Uses `pgx` (Postgres Driver) to bulk-insert closed candles into `candles_1m` hypertable.
+## Key Constants
 
-## **Key Logs & Monitoring**
+```js
+const { KAFKA_TOPICS, KAFKA_GROUPS, REDIS_KEYS } = require('/app/shared');
+// KAFKA_TOPICS.RAW_TICKS → 'raw-ticks'
+// KAFKA_GROUPS.L2_PROCESSING → 'layer-2-processing-group-v4'
+```
 
-- `[INFO] Candle Closed: RELIANCE`: Indicates a minute bar was completed.
-- `[INFO] DB Write Success`: Confirms data implementation persistence.
+## Run
 
-## **Tech Stack**
-
-- **Language**: Go 1.21+
-- **Libraries**: `segmentio/kafka-go`, `jackc/pgx`
+```bash
+make layer2          # Local dev
+npm test             # 4 candle aggregator tests
+```

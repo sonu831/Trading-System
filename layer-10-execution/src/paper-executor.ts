@@ -45,6 +45,8 @@ class PaperExecutor {
     if (lots <= 0) return null;
 
     const position = this.positions.openPosition(signal, lots, ask, instrument);
+    position.synthetic = true;     // Rule 13: paper trades are simulated
+    position.source = 'paper';
     if (this.tradeMode !== 'shadow') this.risk.recordEntry();
     await this.journal.recordTrade(position);
     return position;

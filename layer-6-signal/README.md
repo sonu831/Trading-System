@@ -1,32 +1,53 @@
-# Layer 6: Signal Service ⚡
+# Layer 6 — Signal (Regime Engine + Strategy Framework)
 
-## **What is this?**
+> **One job:** Classify market regime across 4 timeframes, evaluate pluggable strategies, emit trade signals.
+> **Tech:** Node.js 20 · **Port:** 8082
 
-The Signal Layer is a **Node.js** service dedicated to decision making. This is the "Trader" persona of the system. It evaluates the aggregated market view and individual stock metrics against predefined **Trading Strategies** to generate actionable Buy/Sell signals.
+## Architecture
 
-## **Why is it needed?**
+```
+analysis_updates + sentiment_scores (Kafka/Redis)
+    │
+    ▼
+Regime Engine ──→ Multi-TF Classification (5m, 15m, 1h, D)
+    │                 trend · strength · volatility · phase · tiers
+    ▼
+Strategy Router ──→ Enabled Strategies (by regime affinity)
+    │                 momentum-burst (T1) · trend-pullback (T2)
+    ▼
+trade_signals (Kafka) → L10 Execution
+```
 
-- **Automation**: Removes human emotion from entry/exit decisions.
-- **Speed**: Can evaluate 50 stocks against 5 strategies in milliseconds.
+## Files
 
-## **How it works**
+| File | Purpose |
+|------|---------|
+| `src/regime/engine.js` | Multi-TF regime classification + Redis/Kafka publish |
+| `src/regime/indicators.js` | Pure JS: SMA, EMA, ATR, ADX, detectTrend, detectVolatility, detectPhase |
+| `src/strategies/base.js` | `BaseStrategy` — `evaluateEntry()`, `managePosition()` contract |
+| `src/strategies/orchestrator.js` | Main loop: fetches candles, builds context, runs strategies |
+| `src/strategies/registry.js` | Strategy registry: register, get, enable/disable |
+| `src/strategies/router.js` | Selects strategies by regime affinity + tradeable tiers |
+| `src/strategies/plugins/` | momentum-burst (T1 scalp), trend-pullback (T2 intraday) |
 
-1.  **Strategy Engine**:
-    - Loads strategies (e.g., `RSI_Divergence`, `Golden_Crossover`).
-    - Each strategy has: `Name`, `Conditions`, `RiskProfile`.
-2.  **Evaluation Loop**:
-    - Consumes `analysis_updates` from Redis.
-    - Checks if conditions match (e.g., `RSI < 30` AND `Price > EMA200`).
-3.  **Confidence Scoring**:
-    - Assigns a confidence score (0-100%) based on how strong the signal is (e.g., confluence of multiple indicators).
-4.  **Alerting**:
-    - Pushes the Signal to the `signals` list in Redis.
-    - (Optional) Can trigger webhooks or Telegram alerts.
+## Adding a New Strategy
 
-## **Key Logs & Monitoring**
+```js
+// 1. Copy pattern from plugins/momentum-burst.js
+// 2. Extend BaseStrategy with evaluateEntry(ctx) + managePosition(pos, ctx)
+// 3. Register in orchestrator.js built-in list
+// 4. Add to config.json (enable/disable + params)
+```
 
-- `[SIGNAL] BUY RELIANCE @ 2450 | Strat: DipBuy | Conf: 85%`: Clear audit trail of generated signals.
+## Key Constants
 
-## **Extending Strategies**
+```js
+const { REGIME_TREND, REGIME_VOLATILITY, SIGNAL_TIER, KAFKA_TOPICS } = require('/app/shared');
+```
 
-New strategies can be added by creating a module in `src/strategies/` and registering it in the engine.
+## Run
+
+```bash
+make layer6          # Local dev
+npm test             # 10 regime indicator tests
+```

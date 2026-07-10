@@ -66,6 +66,9 @@ class OptionSimulator {
 
     return {
       signal,
+      source: 'synthetic',    // Rule 13: never fabricate — always declare provenance
+      synthetic: true,
+      model: 'black-scholes',
       strike: K,
       optionType,
       entryPremium: Math.round(entryPremium * 100) / 100,

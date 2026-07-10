@@ -330,6 +330,25 @@ services:
       - trading-network
     restart: unless-stopped
 
+  # Layer 8: Dashboard
+  dashboard:
+    build:
+      context: ../../layer-8-presentation-notification/stock-analysis-portal
+      dockerfile: Dockerfile
+    container_name: dashboard
+    ports:
+      - '3000:3000'
+    environment:
+      - NEXT_PUBLIC_API_URL=/api/v1
+      - NEXT_PUBLIC_WS_URL=/
+    networks:
+      - trading-network
+    restart: unless-stopped
+    volumes:
+      - ../../shared:/app/shared:ro
+    command: >
+      /bin/sh -c " echo 'Waiting for Backend API...' && node /app/shared/scripts/wait-for-it.js backend-api:4000 && echo 'Backend API is up! Starting Dashboard...' && node server.js"
+
 # ===========================================
 # NETWORKS (External - shared with infra)
 # ===========================================

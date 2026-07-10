@@ -1,12 +1,11 @@
-FROM node:24-alpine AS builder
-RUN npm install -g pnpm
+FROM node:20-alpine AS builder
 WORKDIR /app
+RUN npm config set strict-ssl false
 COPY package*.json ./
-COPY pnpm-lock.yaml* ./
-RUN pnpm install --frozen-lockfile --prod
+RUN npm install --legacy-peer-deps --omit=dev
 COPY . .
 
-FROM node:24-alpine AS runtime
+FROM node:20-alpine AS runtime
 RUN apk add --no-cache tini && addgroup -S app && adduser -S app -G app
 WORKDIR /app
 COPY --from=builder --chown=app:app /app /app

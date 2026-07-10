@@ -123,7 +123,9 @@ class BrokerService extends BaseService {
   async saveSessionToken(provider, token, ttlSeconds) {
     const key = `broker:session:${provider}`;
     const session = { token, expiresAt: Date.now() + ttlSeconds * 1000 };
-    await this.brokerRepository.redis.publisher.set(key, JSON.stringify(session), 'EX', ttlSeconds);
+    // node-redis v4 takes options as an OBJECT. `set(key, val, 'EX', ttl)` is ioredis
+    // syntax: the extra positional args are silently dropped and the key never expires.
+    await this.brokerRepository.redis.publisher.set(key, JSON.stringify(session), { EX: ttlSeconds });
     const tokenHash = require('crypto').createHash('sha256').update(token).digest('hex');
     await this.brokerRepository.saveSession(
       provider,
@@ -131,6 +133,28 @@ class BrokerService extends BaseService {
       'CONNECTED',
       new Date(Date.now() + ttlSeconds * 1000)
     );
+  }
+
+  /** Drop the cached session so the next caller re-authenticates. */
+  async clearSessionToken(provider) {
+    await this.brokerRepository.redis.publisher.del(`broker:session:${provider}`);
+    return { provider, cleared: true };
+  }
+
+  // ── Generic short-lived JSON store (interactive auth: request tokens, etc.) ──
+  // node-redis v4 wants options as an OBJECT: `{ EX: ttl }`, not ioredis' positional 'EX', ttl.
+
+  async setJson(key, value, ttlSeconds) {
+    const opts = ttlSeconds > 0 ? { EX: ttlSeconds } : undefined;
+    await this.brokerRepository.redis.publisher.set(key, JSON.stringify(value), opts);
+  }
+
+  async getJson(key) {
+    return this.brokerRepository.redis.get(key);
+  }
+
+  async delKey(key) {
+    await this.brokerRepository.redis.publisher.del(key);
   }
 
   async getProviderStatus(providerName) {

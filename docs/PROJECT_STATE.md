@@ -1,19 +1,21 @@
 # PROJECT_STATE.md — Master Completion Tracker
 
-> **Single source of truth for project state.** Every AI tool MUST read this before non-trivial work and append a dated entry after every fix/feature/doc change. A session without an entry here did not happen.
+> **Single source of truth for project state.** Every AI tool MUST read this before non-trivial work and append a dated entry after every fix/feature/doc change.
 
-## Quick Status (2026-07-09)
+## Quick Status (2026-07-10)
 
 | Area | Status | Blockers |
 |------|--------|----------|
-| Architecture Design | 4 docs complete | None |
-| AI Agentic Workflow | Complete | None |
-| Docker/Makefile Hardening | Complete | None |
-| Control Plane (Provider Registry) | API built, migration needed | `npx prisma migrate dev` pending |
-| Broker Session Service | Not started | Depends on migration |
-| Data Pipeline (ingestion→signal) | Running, no creds | Needs broker credentials |
-| Dashboard UI (broker settings) | Not started | Depends on API |
-| Execution (L10) | Scaffolded | Needs finishing |
+| Architecture Design | ✅ Complete | None |
+| AI Agentic Workflow | ✅ Complete | None |
+| Docker/Makefile Hardening | ✅ Complete | None |
+| Control Plane (Provider Registry) | ✅ Complete | None |
+| Broker Session Service | ✅ Complete | TOTP secret needed from user |
+| Data Pipeline (ingestion→signal) | ✅ Complete | MStock creds in .env, TOTP pending |
+| Dashboard Broker UI | ✅ Complete | None |
+| Execution (L10) | ✅ Complete | None |
+| Multi-TF & Intelligence | ✅ Complete | None |
+| Broker Login Flow Docs | ✅ Complete | None |
 
 ---
 
@@ -102,13 +104,30 @@
 
 ## Known Gaps & Issues
 
-| # | Issue | Severity | Fix |
-|---|-------|----------|-----|
-| G1 | No Prisma migrations exist (tables not created) | CRITICAL | `npx prisma migrate dev --create-only` |
-| G2 | Ingestion uses env vars, not registry | HIGH | Wire VendorManager to DB + Redis |
-| G3 | TOTP codes logged in mstock.js | HIGH | **FIXED** -- Logs now hidden |
-| G4 | NODE_TLS_REJECT_UNAUTHORIZED=0 in Dockerfile | HIGH | **FIXED** -- Removed from ingestion Dockerfile |
-| G5 | No dashboard UI for broker management | MEDIUM | Build /settings/broker page |
+| # | Issue | Severity | Status |
+|---|-------|----------|--------|
+| G1 | MStock TOTP secret `129608` not valid Base32 — needs real secret key from authenticator app | HIGH | Blocked on user |
+| G2 | No Prisma migrations in Docker image (must rebuild after schema changes) | MEDIUM | Workaround: manual SQL |
+| G3 | PM2 caches stale modules (must hard-restart container after code changes) | MEDIUM | Workaround: rebuild + restart |
+| G4 | Docker Compose `include:` directive causes project conflicts on Windows | MEDIUM | Workaround: per-file compose |
+| G5 | Windows PowerShell JSON escaping breaks curl commands | LOW | Use file-based requests |
+
+---
+
+## Completed Phases
+
+### Phase 1: Foundation Hardening ✅ 14/14
+### Phase 2: Data Completeness ✅ 5/5
+### Phase 3: Intelligence ✅ 4/4
+### Phase 4: Execution ✅ 4/4
+
+## Session Log
+
+| Date | What | Files |
+|------|------|-------|
+| 2026-07-10 | Broker login flow docs finalized; MStock flow corrected (two-step always required) | `BROKER_LOGIN_FLOWS.md`, `PROJECT_STATE.md`, `BrokerSessionService.js` |
+| 2026-07-09 | Broker credential vault + provider registry; Docker hardening; AI workflow | 80+ files across all layers |
+| 2026-07-09 | Architecture docs: TARGET, SIMPLE_ROBUST, MOMENTUM_TRADING | `docs/*.md` |
 
 ---
 

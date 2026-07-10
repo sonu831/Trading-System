@@ -75,14 +75,17 @@ async function brokerRoutes(fastify, options) {
 
   fastify.post('/api/v1/providers/:provider/test', {
     schema: {
-      description: 'Test broker connection (login + TOTP)',
+      description: 'Test broker connection (login + TOTP / OTP / request_token)',
       tags: ['Providers'],
       response: {
         200: {
           type: 'object',
           properties: {
             success: { type: 'boolean' },
-            data: { type: 'object' },
+            // `additionalProperties: true` is REQUIRED. A bare `{type:'object'}` makes
+            // Fastify's serializer strip every key, so the client saw `data: {}` and lost
+            // `stage`, `inputType`, `likelyCauses`, `missing`, ... — all the diagnostics.
+            data: { type: 'object', additionalProperties: true },
             error: { type: 'string' },
           },
         },
@@ -99,6 +102,43 @@ async function brokerRoutes(fastify, options) {
         return { success: false, error: err.message };
       }
     },
+  });
+
+  /**
+   * Broker auth flows are not all unattended. MStock (without TOTP) mails/SMSes an OTP;
+   * Kite returns a single-use `request_token` via a browser redirect. `test` parks the
+   * interim state and replies `needs_input`; this finishes the handshake.
+   */
+  fastify.post('/api/v1/providers/:provider/session/complete', {
+    schema: {
+      description: 'Complete an interactive broker login (e.g. MStock OTP, Kite request_token)',
+      tags: ['Providers'],
+      body: {
+        type: 'object',
+        properties: {
+          otp: { type: 'string' },
+          request_token: { type: 'string' },
+        },
+      },
+    },
+    handler: async (req, reply) => {
+      try {
+        const result = await brokerSessionService.completeSession(req.params.provider, req.body || {});
+        if (result.success) return { success: true, data: result };
+        return { success: false, error: result.error, data: result };
+      } catch (err) {
+        return { success: false, error: err.message };
+      }
+    },
+  });
+
+  /** Lets the dashboard render the right credential form + interactive prompts per broker. */
+  fastify.get('/api/v1/broker-strategies', {
+    schema: {
+      description: 'Supported brokers with their required fields, interactive inputs and capabilities',
+      tags: ['Providers'],
+    },
+    handler: async () => ({ success: true, data: brokerSessionService.listStrategies() }),
   });
 }
 

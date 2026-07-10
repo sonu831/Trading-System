@@ -223,6 +223,35 @@ DISCONNECTED ──login()──► LOGGING_IN ──ok──► TOTP_VERIFYING 
 - **L3 (DB):** stores encrypted creds (`broker_credentials`) + session audit (`broker_sessions`).
 - **L8 (UI):** a broker panel showing live status and Connect/Re-login/Disconnect buttons.
 
+#### MStock Type B login — the exact flow (verified against the official docs)
+
+This has been implemented incorrectly **twice**, so it is written down and guarded by tests
+(`layer-7-core-interface/api/tests/verify-mstock-session.js`, `npm run verify`).
+
+```
+1. POST https://api.mstock.trade/openapi/typeb/connect/login
+     headers: X-Mirae-Version: 1 · Content-Type: application/json
+     body:    { clientcode, password, totp: "", state: "" }
+     ──► data.jwtToken  =  a short-lived REQUEST token (a UUID, e.g. 697c39bf-9411-…)
+                           **NOT** the trading token.
+
+2. POST https://api.mstock.trade/openapi/typeb/session/verifytotp
+     headers: X-Mirae-Version: 1 · X-PrivateKey: <api_key> · Content-Type: application/json
+     body:    { refreshToken: <the request token from step 1>, totp: <6-digit code> }
+     ──► data.jwtToken  =  the real TRADING token  (Authorization: Bearer <this>)
+```
+
+| Trap | Reality |
+|------|---------|
+| "TOTP enabled ⇒ login returns the trading token" | **False.** Enabling TOTP only stops the OTP SMS/email. Step 2 is still required. |
+| `if (resp.status === true)` | Login returns `"status": "true"` — a **string**. Accept both. |
+| Fixed token TTL (e.g. 21000s) | Docs: *"Generated JWT token will be valid till 12:00 AM of generated day."* TTL = seconds to the next **IST midnight**. |
+| Auth header alone is enough | Every authenticated call also needs **`X-PrivateKey: <api_key>`**, else *"API is suspended/expired for use"*. |
+| Docs' endpoint table | Lists `/openapi/typeb/openapi/typeb/session/verifytotp` (path duplicated) and describes `Authorization: token api_key:access_token` for Fund Summary. **The cURL samples are authoritative:** `/openapi/typeb/session/verifytotp` and `Authorization: Bearer <jwtToken>`. |
+
+Without a stored `totp_secret` the session **cannot** be established unattended (the OTP is delivered
+out-of-band). The service returns `stage: 'needs_otp'` and caches nothing — it must never report success.
+
 **Why this is better (maps to the principles):**
 - **Centralized (your ask):** the MStock flow exists in exactly one place — L7 + DB + Redis — not smeared across
   L1/L10. One login, one token, one refresh loop, one audit trail.

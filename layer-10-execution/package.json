@@ -7,9 +7,10 @@
     "start": "node src/index.js",
     "dev": "nodemon src/index.js",
     "test": "npm run verify",
-    "verify": "npm run verify:paper && npm run verify:live",
+    "verify": "npm run verify:paper && npm run verify:live && npm run verify:flattrade",
     "verify:paper": "node tests/verify-paper.js",
-    "verify:live": "node tests/verify-live.js"
+    "verify:live": "node tests/verify-live.js",
+    "verify:flattrade": "node tests/verify-flattrade-oms.js"
   },
   "dependencies": {
     "axios": "^1.7.2",

@@ -6,7 +6,10 @@
   "scripts": {
     "start": "pm2-runtime ecosystem.config.js",
     "dev": "npx nodemon src/index.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "npm run verify",
+    "verify": "npm run verify:broker-auth && npm run verify:execution-proxy",
+    "verify:broker-auth": "node tests/verify-broker-auth.js",
+    "verify:execution-proxy": "node tests/verify-execution-proxy.js"
   },
   "dependencies": {
     "@fastify/cors": "^10.0.1",

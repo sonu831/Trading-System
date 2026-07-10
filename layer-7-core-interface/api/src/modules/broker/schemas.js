@@ -25,7 +25,11 @@ const credentialSaveSchema = {
     type: 'object',
     required: ['field_name', 'field_value'],
     properties: {
-      field_name: { type: 'string', enum: ['api_key', 'client_code', 'password', 'totp_secret', 'access_token'] },
+      // `api_secret` is required by Kite (checksum) and FlatTrade (request_code exchange).
+      field_name: {
+        type: 'string',
+        enum: ['api_key', 'api_secret', 'client_code', 'password', 'totp_secret', 'access_token'],
+      },
       field_value: { type: 'string', minLength: 1 },
     },
   },

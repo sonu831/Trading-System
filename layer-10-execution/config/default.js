@@ -120,7 +120,10 @@ module.exports = {
     userId: process.env.FLATTRADE_USER_ID || '',
     accountId: process.env.FLATTRADE_ACTID || '',
     apiKey: process.env.FLATTRADE_API_KEY || '',
+    // jKey from the login flow (auth.flattrade.in -> request_code -> /trade/apitoken).
+    // NOT the api_key. In the target design this is read from the central session (Redis).
     token: process.env.FLATTRADE_TOKEN || '',
-    baseUrl: process.env.FLATTRADE_BASE_URL || 'https://piconnect.flattrade.in/PiConnectTP',
+    // Official Pi Connect base URL. `/PiConnectTP` and `/REST/` paths are wrong.
+    baseUrl: process.env.FLATTRADE_BASE_URL || 'https://piconnect.flattrade.in/PiConnectAPI',
   },
 };

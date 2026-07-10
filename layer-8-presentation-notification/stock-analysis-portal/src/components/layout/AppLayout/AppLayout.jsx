@@ -3,8 +3,8 @@ import PropTypes from 'prop-types';
 import { useSelector, useDispatch } from 'react-redux';
 import { selectBackfillModalOpen, setBackfillModalOpen } from '@/store/slices/systemSlice';
 import { BackfillModal } from '@/components/features/Backfill';
-import Navbar from '../Navbar';
-import Footer from '../Footer';
+import Navbar from '@/components/layout/Navbar';
+import Footer from '@/components/layout/Footer';
 
 const AppLayout = ({ children, viewMode, setViewMode, systemStatus }) => {
   const isBackfillOpen = useSelector(selectBackfillModalOpen);

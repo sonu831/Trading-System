@@ -45,7 +45,7 @@ class StrategyOrchestrator {
         clientId: 'strategy-orchestrator',
         brokers: this.kafkaBrokers,
       });
-      this.kafkaProducer = kafka.producer();
+      this.kafkaProducer = kafka.producer({ maxInFlightRequests: 1 });
       await this.kafkaProducer.connect();
       logger.info('StrategyOrchestrator: Kafka connected');
     } catch (err) {

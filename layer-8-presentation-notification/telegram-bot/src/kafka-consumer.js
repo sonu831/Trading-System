@@ -37,13 +37,13 @@ class TelegramKafkaConsumer {
     });
 
     this.consumer = this.kafka.consumer({
-      groupId: 'telegram-notification-consumer',
+      groupId: 'telegram-notification-consumer-v1',
       sessionTimeout: 30000,
       heartbeatInterval: 3000,
     });
 
     this.producer = this.kafka.producer({
-      allowAutoTopicCreation: true,
+      maxInFlightRequests: 1,
     });
   }
 

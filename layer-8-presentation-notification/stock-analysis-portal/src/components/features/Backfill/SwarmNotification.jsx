@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Card, Badge, Button } from '../../ui';
+import { Card, Badge, Button } from '@/components/ui';
 
 const POLL_INTERVAL = 5000; // Poll less frequently for global notification
 

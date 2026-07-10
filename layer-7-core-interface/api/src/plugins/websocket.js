@@ -47,7 +47,7 @@ async function socketPlugin(fastify, options) {
       try {
         const tick = typeof message === 'string' ? JSON.parse(message) : message;
         io.to('ticks').emit('tick', tick);
-      } catch (_) {}
+      } catch (err) { fastify.log.warn({ err, channel: 'market_ticks' }, 'WS push: failed to emit tick'); }
     });
 
     // Option chain: Redis channel "option_chain_updates" → socket room "chain"
@@ -55,7 +55,7 @@ async function socketPlugin(fastify, options) {
       try {
         const data = typeof message === 'string' ? JSON.parse(message) : message;
         io.to('chain').emit('chain', data);
-      } catch (_) {}
+      } catch (err) { fastify.log.warn({ err, channel: 'option_chain_updates' }, 'WS push: failed to emit chain'); }
     });
 
     // Regime: Redis channel "market-regime" → socket room "regime"
@@ -63,15 +63,13 @@ async function socketPlugin(fastify, options) {
       try {
         const data = typeof message === 'string' ? JSON.parse(message) : message;
         io.to('regime').emit('regime', data);
-      } catch (_) {}
+      } catch (err) { fastify.log.warn({ err, channel: 'market-regime' }, 'WS push: failed to emit regime'); }
     });
 
     // Positions: Redis channel "execution:state" → socket room "positions"
     subClient.subscribe('execution:state', (message) => {
-      try {
-        const state = typeof message === 'string' ? JSON.parse(message) : message;
-        io.to('positions').emit('positions', state.positions || []);
-      } catch (_) {}
+      try { const state = typeof message === 'string' ? JSON.parse(message) : message; io.to('positions').emit('positions', state.positions || []); }
+      catch (err) { fastify.log.warn({ err, channel: 'execution:state' }, 'WS push: failed to emit positions'); }
     });
 
     fastify.log.info('WebSocket real-time publishers active');

@@ -6,7 +6,10 @@ require (
 	github.com/go-redis/redis/v8 v8.11.5
 	github.com/jackc/pgx/v5 v5.7.1
 	github.com/prometheus/client_golang v1.22.0
+	github.com/utkarsh-pandey/nifty50-trading-system/shared v0.0.0
 )
+
+replace github.com/utkarsh-pandey/nifty50-trading-system/shared => ../../shared
 
 require (
 	github.com/beorn7/perks v1.0.1 // indirect

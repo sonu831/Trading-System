@@ -40,6 +40,11 @@ services:
     networks:
       - trading-network
     restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
     deploy:
       resources:
         limits:
@@ -86,6 +91,11 @@ services:
     networks:
       - trading-network
     restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
     deploy:
       resources:
         limits:
@@ -110,6 +120,11 @@ services:
     networks:
       - trading-network
     restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
     deploy:
       resources:
         limits:
@@ -131,6 +146,11 @@ services:
     networks:
       - trading-network
     restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
     deploy:
       resources:
         limits:
@@ -159,6 +179,11 @@ services:
     networks:
       - trading-network
     restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
     deploy:
       resources:
         limits:
@@ -192,6 +217,11 @@ services:
     networks:
       - trading-network
     restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
     deploy:
       resources:
         limits:
@@ -216,6 +246,11 @@ services:
     networks:
       - trading-network
     restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
     deploy:
       resources:
         limits:
@@ -260,9 +295,19 @@ services:
       - MAX_CONCURRENT_POSITIONS=1
       - MAX_TRADES_PER_DAY=5
       - MAX_DAILY_LOSS=2500
+    volumes:
+      # Rule 3 (shared-tier dedup) was unachievable here: without this mount L10 cannot
+      # `require('/app/shared/constants')`, so it re-declared broker URLs, ports and the
+      # expiry weekday locally — and they drifted.
+      - ../../shared:/app/shared:ro
     networks:
       - trading-network
     restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
     deploy:
       resources:
         limits:

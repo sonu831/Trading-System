@@ -1,19 +1,23 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
-import PropTypes from 'prop-types';
+import React, { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 
-const ThemeContext = createContext({
+type ThemeName = 'dark' | 'light';
+
+interface ThemeContextValue {
+  theme: ThemeName;
+  setTheme: (theme: ThemeName) => void;
+}
+
+const ThemeContext = createContext<ThemeContextValue>({
   theme: 'dark',
   setTheme: () => {},
 });
 
-export function ThemeProvider({ children }) {
-  // Default to dark theme for this "premium" finance app
-  const [theme, setTheme] = useState('dark');
+export function ThemeProvider({ children }: { children: ReactNode }) {
+  const [theme, setTheme] = useState<ThemeName>('dark');
 
   useEffect(() => {
-    // Check local storage or system preference
-    const savedTheme = localStorage.getItem('theme');
-    if (savedTheme) {
+    const savedTheme = localStorage.getItem('theme') as ThemeName | null;
+    if (savedTheme && (savedTheme === 'dark' || savedTheme === 'light')) {
       setTheme(savedTheme);
     } else if (window.matchMedia('(prefers-color-scheme: light)').matches) {
       setTheme('light');
@@ -29,9 +33,5 @@ export function ThemeProvider({ children }) {
 
   return <ThemeContext.Provider value={{ theme, setTheme }}>{children}</ThemeContext.Provider>;
 }
-
-ThemeProvider.propTypes = {
-  children: PropTypes.node.isRequired,
-};
 
 export const useTheme = () => useContext(ThemeContext);

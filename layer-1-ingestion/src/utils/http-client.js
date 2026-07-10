@@ -10,12 +10,20 @@
  */
 
 const axios = require('axios');
+const http = require('http');
+const https = require('https');
 const { metrics } = require('./metrics');
 const { logger } = require('./logger');
 
-// Create axios instance with interceptors
+// Connection pooling — keeps TLS sessions warm (avoids 100-300ms per handshake)
+const httpAgent = new http.Agent({ keepAlive: true, maxSockets: 25, keepAliveMsecs: 30000 });
+const httpsAgent = new https.Agent({ keepAlive: true, maxSockets: 25, keepAliveMsecs: 30000 });
+
+// Create axios instance with interceptors + pooled connections
 const httpClient = axios.create({
-  timeout: 30000, // 30 second timeout
+  timeout: 30000,
+  httpAgent,
+  httpsAgent,
 });
 
 // Request Interceptor - Attach start time

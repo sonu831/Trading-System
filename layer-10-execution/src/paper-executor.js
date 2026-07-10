@@ -153,7 +153,8 @@ class PaperExecutor {
   async snapshot() {
     for (const pos of this.positions.getOpenPositions()) {
       const quote = this.quotes.getQuote(pos.nfoSymbol);
-      const ltp = quote?.ltp || pos.currentPrice || 0;
+      const ltp = quote?.ltp ?? pos.currentPrice ?? null;
+      if (ltp == null) { logger.warn({ pos: pos.id }, 'PaperExecutor: snapshot — no LTP available'); return; }
       await this.journal.recordPnlSnapshot(pos.id, pos.symbol, ltp, ltp, null, null, null, pos.pnl);
     }
   }

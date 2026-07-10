@@ -513,9 +513,30 @@ backfill-status:
 test:
 	cd layer-1-ingestion && npm test
 	cd layer-2-processing && npm test
+	cd layer-4-analysis && go test ./... -v -count=1
+	cd layer-5-aggregation && go test ./... -v -count=1
+	cd layer-6-signal && npm test
 
 test-layer1:
 	cd layer-1-ingestion && npm test
+
+test-layer2:
+	cd layer-2-processing && npm test
+
+test-layer4:
+	cd layer-4-analysis && go test ./... -v -count=1
+
+test-layer5:
+	cd layer-5-aggregation && go test ./... -v -count=1
+
+test-layer6:
+	cd layer-6-signal && npm test
+
+test-go:
+	cd layer-4-analysis && go test ./... -v -count=1
+	cd layer-5-aggregation && go test ./... -v -count=1
+
+test-all: test test-go
 
 # ===========================================================
 # 6. LOCAL DEVELOPMENT

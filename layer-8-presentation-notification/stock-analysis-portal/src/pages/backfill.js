@@ -1,8 +1,8 @@
 import React from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
-import useBackfillManager from '../hooks/useBackfillManager';
-import BackfillManager from '../components/features/BackfillManager';
+import useBackfillManager from '@/hooks/useBackfillManager';
+import BackfillManager from '@/components/features/BackfillManager';
 
 /**
  * Backfill Manager Page

@@ -77,7 +77,6 @@ func (c *Client) Predict(symbol string, features []FeatureVector) (*PredictionRe
 	}
 
 	return &result, nil
-	return &result, nil
 }
 
 type MarketAnalysisRequest struct {

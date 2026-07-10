@@ -1,11 +1,12 @@
+import type { Socket } from 'socket.io-client';
 import { useEffect, useRef, useCallback } from 'react';
 import { useDispatch } from 'react-redux';
 import { io } from 'socket.io-client';
 import { cockpitTickPushed, cockpitChainPushed, cockpitRegimePushed, cockpitPositionPushed } from '@/store/slices/cockpitSlice';
 
-const SOCKET_URL = process.env.NEXT_PUBLIC_WS_URL || '/';
+const SOCKET_URL = (process.env.NEXT_PUBLIC_WS_URL as string) || '/';
 
-let socketInstance = null;
+let socketInstance: Socket | null = null;
 
 function getSocket() {
   if (!socketInstance) {
@@ -22,9 +23,9 @@ function getSocket() {
 export function useSocket() {
   const socket = getSocket();
   const dispatch = useDispatch();
-  const roomsRef = useRef(new Set());
+  const roomsRef = useRef<Set<string>>(new Set());
 
-  const subscribe = useCallback((room) => {
+  const subscribe = useCallback((room: string) => {
     if (!roomsRef.current.has(room)) {
       roomsRef.current.add(room);
       socket.emit('subscribe', room);

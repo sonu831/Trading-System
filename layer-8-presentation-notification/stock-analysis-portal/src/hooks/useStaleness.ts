@@ -4,8 +4,8 @@ import { selectStaleness } from '@/store/slices/cockpitSlice';
 const STALE_AMBER_MS = 30000;   // 30s → amber
 const STALE_RED_MS = 120000;    // 2min → red
 
-export function useStaleness(stream) {
-  const staleness = useSelector(selectStaleness);
+export function useStaleness(stream: string): { status: string; label: string; age?: number } {
+  const staleness = useSelector(selectStaleness) as Record<string, number | undefined>;
   const lastUpdated = staleness[stream];
   if (!lastUpdated) return { status: 'loading', label: 'Waiting' };
 

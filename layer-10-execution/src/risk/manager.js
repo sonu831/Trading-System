@@ -78,7 +78,8 @@ class RiskManager {
   /** Record realised P&L at EXIT. Does not touch tradesToday (counted at entry). */
   recordTrade(trade) {
     const state = this.getDailyState(tradingDateIST());
-    const pnl = Number(trade?.pnl) || 0;
+    const pnl = Number(trade?.pnl); // null/undefined → NaN → treated as unknown
+    if (isNaN(pnl) || trade.pnl == null) { logger.warn({ tradeId: trade.id }, 'RiskManager: trade has null P&L — treating as 0 for risk envelope, but data may be missing'); }
     if (pnl < 0) state.dailyLoss += Math.abs(pnl);
     state.totalPnl += pnl;
 

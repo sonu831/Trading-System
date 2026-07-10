@@ -253,7 +253,8 @@ class LiveExecutor {
   async snapshot() {
     for (const pos of this.positions.getOpenPositions()) {
       const q = this.quotes.getQuote(pos.nfoSymbol);
-      const ltp = q?.ltp || pos.currentPrice || 0;
+      const ltp = q?.ltp ?? pos.currentPrice ?? null;
+      if (ltp == null) { logger.warn({ pos: pos.id }, 'LiveExecutor: snapshot — no LTP available, P&L snapshot skipped'); return; }
       await this.journal.recordPnlSnapshot(pos.id, pos.symbol, ltp, ltp, null, null, null, pos.pnl);
     }
   }

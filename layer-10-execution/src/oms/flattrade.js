@@ -93,7 +93,7 @@ class FlatTradeOMS extends BaseOMS {
       tsym: order.symbol,
       qty: String(order.quantity),
       // Market orders carry price 0; a stop-market carries a trigger, not a price.
-      prc: String(orderType === 'MKT' || orderType === 'SL-MKT' ? 0 : order.price || 0),
+      prc: String(orderType === 'MKT' || orderType === 'SL-MKT' ? '0' : (order.price ?? '0')),
       dscqty: '0',
       prd: this.productCode(order.productType),
       trantype: order.action === 'BUY' ? 'B' : 'S',
@@ -102,7 +102,7 @@ class FlatTradeOMS extends BaseOMS {
       ordersource: 'API',
     };
     // `trgprc` must only be sent for SL / SL-M orders (docs).
-    if (isStop) data.trgprc = String(order.triggerPrice || 0);
+    if (isStop) data.trgprc = String(order.triggerPrice ?? '0');
     // `remarks` is how the ordertag reaches the broker — required for idempotent retries.
     if (order.ordertag) data.remarks = order.ordertag;
 
@@ -119,10 +119,10 @@ class FlatTradeOMS extends BaseOMS {
       exch: modifications.exchange || 'NFO',
       norenordno: String(orderId),
       prctyp: orderType,
-      prc: String(orderType === 'MKT' || orderType === 'SL-MKT' ? 0 : modifications.price || 0),
+      prc: String(orderType === 'MKT' || orderType === 'SL-MKT' ? '0' : (modifications.price ?? '0')),
       ret: modifications.validity || 'DAY',
     };
-    if (isStop) data.trgprc = String(modifications.triggerPrice || 0);
+    if (isStop) data.trgprc = String(modifications.triggerPrice ?? '0');
     if (modifications.quantity) data.qty = String(modifications.quantity);
     if (modifications.symbol) data.tsym = modifications.symbol;
 
@@ -164,8 +164,8 @@ class FlatTradeOMS extends BaseOMS {
 
     return {
       status: normalizeStatus(row.status),
-      filledQty: parseInt(row.fillshares || 0, 10),
-      avgPrice: parseFloat(row.avgprc || 0),
+      filledQty: row.fillshares ? parseInt(row.fillshares, 10) : null,
+      avgPrice: row.avgprc ? parseFloat(row.avgprc) : null,
       rejectReason: row.rejreason || null,
       raw: row,
     };
@@ -181,10 +181,10 @@ class FlatTradeOMS extends BaseOMS {
     const res = await this.callApi('GetQuotes', { uid: this.userId, exch: 'NFO', token: String(symbol) });
     if (!res) return null;
     return {
-      ltp: parseFloat(res.lp || 0),
-      bid: parseFloat(res.bp || 0),
-      ask: parseFloat(res.sp || 0),
-      oi: parseInt(res.oi || 0, 10),
+      ltp: res.lp ? parseFloat(res.lp) : null,
+      bid: res.bp ? parseFloat(res.bp) : null,
+      ask: res.sp ? parseFloat(res.sp) : null,
+      oi: res.oi ? parseInt(res.oi, 10) : null,
     };
   }
 

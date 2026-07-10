@@ -4,7 +4,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import BrokerConfig from './BrokerConfig';
 import CredentialForm from './CredentialForm';
 import MStockAuthFlow from './MStockAuthFlow';
-import BrokerStatusBadge from '../BrokerList/BrokerStatusBadge';
+import BrokerStatusBadge from '@/components/brokers/BrokerList/BrokerStatusBadge';
 import { fetchBrokers, enableBroker, disableBroker, selectBrokers } from '@/store/slices/brokerSlice';
 
 const BrokerDetail = ({ id }) => {

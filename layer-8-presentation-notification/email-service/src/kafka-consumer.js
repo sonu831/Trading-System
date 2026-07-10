@@ -36,13 +36,13 @@ class EmailKafkaConsumer {
     });
 
     this.consumer = this.kafka.consumer({
-      groupId: 'email-notification-consumer',
+      groupId: 'email-notification-consumer-v1',
       sessionTimeout: 60000,
       heartbeatInterval: 10000,
     });
 
     this.producer = this.kafka.producer({
-      allowAutoTopicCreation: true,
+      maxInFlightRequests: 1,
     });
   }
 

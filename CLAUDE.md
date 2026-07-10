@@ -134,6 +134,7 @@ This project uses a hub-and-spoke AI configuration system. The canonical source 
 | `layer-1-ingestion` | 1 | Node.js | Live tick ingestion from brokers (Zerodha/MStock/FlatTrade) → Kafka |
 | `layer-1-flattrade-python` | 1 | Python | FlatTrade broker adapter |
 | `layer-1-tradingview` | 1b | Node.js | TradingView MCP server — AI chart analysis via CDP (see below) |
+| `layer-1-flattrade-mcp` | 1c | MCP (npx) | Flattrade MCP server — AI-assisted trading: orders, quotes, portfolio, WebSocket (see below) |
 | `layer-2-processing` | 2 | Node.js | Tick → candle builder |
 | `layer-3-storage` | 3 | TimescaleDB + Redis | Historical + real-time storage |
 | `layer-4-analysis` | 4 | Go | Technical indicators (RSI, MACD, EMAs) |
@@ -165,6 +166,25 @@ An MCP server (stdio) with 68 tools that reads and controls a live TradingView D
 - **Setup**: `npm install` inside `layer-1-tradingview/` once; TradingView Desktop must be running with CDP enabled (`tv_launch` tool can start it).
 - **Constraints**: not a streaming source — one symbol at a time, cannot run headless. It is an AI-assisted analysis / discretionary-signal input, NOT part of the tick pipeline (that's `layer-1-ingestion`).
 - **Upstream**: subtree of https://github.com/sonu831/trading-view-bot — sync with `git subtree pull --prefix=layer-1-tradingview trading-view-bot main`.
+
+## Layer 1c: Flattrade MCP (`layer-1-flattrade-mcp`)
+
+An official MCP server (`@flattrade/mcp`, published by Flattrade) with 17+ tools that connects AI assistants to a live Flattrade trading account. Registered in the root `.mcp.json`, so the `flattrade` MCP tools are available in Claude Code sessions here alongside TradingView MCP.
+
+- **Install**: `npx @flattrade/mcp` auto-installs on first Claude Code session — no local setup needed.
+- **Tools**: login, profile, funds, holdings, positions, orders, trades, margin, search-symbol, quotes, option-chain, historical-data, websocket (live ticks), place-order, modify-order, cancel-order, alerts.
+- **Credentials**: reads `FLATTRADE_API_KEY` + `FLATTRADE_API_SECRET` from environment (same `.env` keys as the L1/L10 FlatTrade adapters). Credentials stay local — nothing leaves your machine.
+- **Use cases**:
+  - AI-assisted discretionary trading: "Buy 50 shares of RELIANCE at market" → MCP places the order
+  - Portfolio snapshot: "Show my holdings and today's P&L" → MCP fetches live data
+  - Market research: "Show me NIFTY option chain for this expiry" → MCP returns full chain
+  - Quick validation: "What was my last fill price on INFY?" → MCP queries order book
+- **Constraints**: this is a discretionary / AI-assisted channel, NOT part of the automated Kafka pipeline. For automated strategy execution, use `layer-10-execution`. MCP orders go through Flattrade's API directly.
+- **Relationship to existing pipeline**:
+  - `layer-1-ingestion` (FlatTradeVendor) → automated tick pipeline (Kafka)  
+  - `layer-10-execution` (FlatTradeOMS) → automated order execution  
+  - Flattrade MCP → AI-assisted trading + manual interventions + market checks
+  - All three share the same `FLATTRADE_API_KEY` + `FLATTRADE_API_SECRET` credentials
 
 ## Conventions
 

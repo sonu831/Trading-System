@@ -1,6 +1,6 @@
 import React from 'react';
-import { useTheme } from '../../../utils/theme-provider';
-import Button from '../Button';
+import { useTheme } from '@/utils/theme-provider';
+import Button from '@/components/ui/Button';
 
 /**
  * ThemeToggle Component

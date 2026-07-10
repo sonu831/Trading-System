@@ -1,30 +1,5 @@
 import { useState, useEffect } from 'react';
-
-function useExpiries(underlying) {
-  const [expiries, setExpiries] = useState([]);
-  useEffect(() => {
-    fetch(`/api/v1/options/expiries?underlying=${underlying}`)
-      .then(r => r.json()).then(d => { if (d.success) setExpiries(d.data.expiries || []); });
-  }, [underlying]);
-  return expiries;
-}
-
-function useOptionChain(underlying, expiry, strikes = 7) {
-  const [data, setData] = useState({ rows: [], spot: null, atm: 0 });
-  useEffect(() => {
-    let active = true;
-    const fetchData = () => {
-      const url = `/api/v1/options/chain?underlying=${underlying}&strikes=${strikes}${expiry ? '&expiry=' + expiry : ''}`;
-      fetch(url).then(r => r.json()).then(d => {
-        if (active && d.success) setData(d.data);
-      });
-    };
-    fetchData();
-    const t = setInterval(fetchData, 5000);
-    return () => { active = false; clearInterval(t); };
-  }, [underlying, expiry, strikes]);
-  return data;
-}
+import { useExpiries, useOptionChain } from '@/hooks/useMarket';
 
 function formatNum(n, decimals = 2) { return n != null ? Number(n).toFixed(decimals) : '—'; }
 function spreadPct(ask, bid) { return (ask && bid && ask > 0) ? ((ask - bid) / ask * 100).toFixed(1) + '%' : '—'; }

@@ -95,14 +95,15 @@ async function startKafka() {
   kafkaConsumer = kafka.consumer({ groupId: config.kafka.groupId, sessionTimeout: 30000, heartbeatInterval: 3000 });
   await kafkaConsumer.connect();
   await kafkaConsumer.subscribe({ topic: config.kafka.topics.signals, fromBeginning: false });
-  await kafkaConsumer.run({ eachMessage: async ({ message }) => {
+  await kafkaConsumer.run({ autoCommit: false, eachMessage: async ({ topic, partition, message }) => {
     try {
       const signal = JSON.parse(message.value.toString());
       signalsReceived.inc({ strategy: signal.strategyId || 'unknown', action: signal.action });
       logger.info({ signal }, 'Signal received');
       await executor.executeSignal(signal);
+      await kafkaConsumer.commitOffsets([{ topic, partition, offset: (Number(message.offset) + 1).toString() }]);
     } catch (err) {
-      logger.error({ err }, 'Failed to process signal');
+      logger.error({ err, offset: message.offset }, 'Failed to process signal — offset NOT committed');
     }
   }});
   logger.info(`Kafka consumer connected, subscribed to ${config.kafka.topics.signals}`);
@@ -159,7 +160,7 @@ async function reconcile() {
     positionsGauge.set(positionManager.getOpenPositions().length);
 
     const state = riskManager.getState();
-    pnlGauge.set({ type: 'daily' }, state.dailyState.totalPnl || 0);
+    pnlGauge.set({ type: 'daily' }, state.dailyState.totalPnl ?? 0);
 
     // Publish state to Redis
     if (redisClient) {
@@ -180,7 +181,7 @@ async function reconcile() {
           type: 'execution_update',
           mode: config.tradeMode,
           positions: openCount,
-          dailyPnl: riskManager.getState().dailyState?.totalPnl || 0,
+          dailyPnl: riskManager.getState().dailyState?.totalPnl ?? 0,
           killSwitch: riskManager.killSwitch,
           timestamp: new Date().toISOString(),
         }));

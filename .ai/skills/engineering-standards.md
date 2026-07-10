@@ -203,6 +203,79 @@ What we *do* adopt is HFT-grade discipline, because it buys **consistency** (no 
 - [ ] Session logic uses the IST helpers, not the host clock?
 - [ ] New behaviour has a named regression assertion.
 - [ ] `graphify update .` run after code changes (rule 1).
+- [ ] Dashboard: no `../../` relative imports — use `@/` aliases only.
+- [ ] Dashboard: new code is `.ts`/`.tsx`, typed with `strict: true`.
+- [ ] Dashboard: shared constants in `shared/constants.js`, not re-declared locally.
+
+---
+
+## 12. Dashboard TypeScript & Import Conventions (enforced by `tsc --noEmit`)
+
+### Import rules
+
+- **NEVER** use `../../` deep relative imports — use the `@/` alias that maps to `src/`.
+- Same-directory sibling imports (`./sibling`) are acceptable for barrel re-exports and
+  co-located components.
+- Barrel exports (`index.js`) exist at `components/ui/`, `components/trading/`,
+  `components/layout/`, `hooks/`, `components/features/Analysis/`. Use them for bulk
+  imports (e.g., `import { Card, Button, Badge } from '@/components/ui'`).
+
+### TypeScript migration (leaf-first)
+
+Convert files in this order so every conversion touches only already-typed dependencies:
+
+| Phase | What | Rationale |
+|-------|------|-----------|
+| 1 | `utils/*.ts` — pure functions, no React | Zero deps; add `: type` annotations. |
+| 2 | `hooks/*.ts` — custom React hooks | Depend on store slices; type after slices. |
+| 3 | `store/slices/*.ts` — Redux Toolkit slices | Define `interface State`, typed `PayloadAction<>`. |
+| 4 | `components/ui/*.tsx` — atomic components | Lowest component layer; no business logic. |
+| 5 | `components/*/*.tsx` — organisms, features | Depend on atoms + store. |
+| 6 | `pages/*.tsx` — Next.js pages | Depend on everything; convert last. |
+
+### Redux slice typing pattern
+
+```ts
+import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
+
+interface MyState { ... }
+const initialState: MyState = { ... };
+
+const slice = createSlice({
+  name: 'my',
+  initialState,
+  reducers: {
+    actionName: (state, action: PayloadAction<{ field: string }>) => { ... },
+  },
+});
+
+// Selectors MUST type the root state parameter:
+export const selectX = (s: { my?: MyState }) => s.my?.x;
+```
+
+### `tsconfig.json` baseline for new services
+
+```json
+{
+  "compilerOptions": {
+    "strict": true,
+    "allowJs": true,
+    "forceConsistentCasingInFileNames": true,
+    "paths": { "@/*": ["./src/*"] },
+    "baseUrl": "."
+  },
+  "include": ["**/*.ts", "**/*.tsx"],
+  "exclude": ["node_modules", ".next", "dist"]
+}
+```
+
+### Review checklist additions
+
+- [ ] No `../../` import — used `@/` alias instead.
+- [ ] New file is `.ts` or `.tsx` (not `.js`/`.jsx`).
+- [ ] `PayloadAction<T>` typed for every Redux reducer.
+- [ ] Selectors have typed `(s: RootState)` parameter.
+- [ ] Shared constant (`shared/constants.js`) searched before local declaration.
 
 ---
 

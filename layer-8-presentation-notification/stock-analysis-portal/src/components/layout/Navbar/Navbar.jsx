@@ -3,7 +3,7 @@ import PropTypes from 'prop-types';
 import { useDispatch, useSelector } from 'react-redux';
 import { setBackfillModalOpen } from '@/store/slices/systemSlice';
 import { fetchExecutionState, selectTradeMode } from '@/store/slices/executionSlice';
-import { ThemeToggle } from '../../ui';
+import { ThemeToggle } from '@/components/ui';
 import { TradeModeBadge, KillSwitchButton } from '@/components/trading';
 
 import Link from 'next/link';

@@ -47,9 +47,10 @@ class KafkaProducer {
     });
 
     this.producer = this.kafka.producer({
-      allowAutoTopicCreation: true,
-      // Removed idempotent and transactionalId - causes hangs in single-broker setup
-      // acks: 1 means leader acknowledgment only (faster, suitable for market data)
+      maxInFlightRequests: 1,  // Strict ordering per partition — prevents out-of-order ticks
+      idempotent: false,        // Disabled: single-broker dev setup has transactional issues
+      acks: 1,                  // Leader ack — speed over durability for market data
+      // allowAutoTopicCreation: false — topics must be explicitly created per contract
     });
   }
 

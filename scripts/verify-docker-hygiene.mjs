@@ -67,6 +67,24 @@ for (const ctx of buildContexts) {
     report(label, 'I-5', 'Uses deprecated npm install --only=production (use npm ci --omit=dev)');
     violations++;
   }
+
+  // --- I-6: .dockerignore must exclude .env* (rule 6: no secrets in image layers) ---
+  if (existsSync(dockerignore)) {
+    const ignoreContent = readFileSync(dockerignore, 'utf8');
+    if (!/^\.env(\*|\.\*)?$/m.test(ignoreContent)) {
+      report(label, 'I-6', '.dockerignore does not exclude .env* — secrets could be baked into a layer');
+      violations++;
+    }
+  }
+
+  // --- I-7: TLS verification must NEVER be disabled at runtime ---
+  // This shipped once. `ENV NODE_TLS_REJECT_UNAUTHORIZED=0` makes the process accept ANY
+  // certificate, so a man-in-the-middle can read and alter broker credentials and orders.
+  // A build-stage `npm config set strict-ssl false` is tolerated (corporate proxy).
+  if (/^\s*ENV\s+NODE_TLS_REJECT_UNAUTHORIZED\s*=?\s*0/mi.test(content)) {
+    report(label, 'I-7', 'Sets NODE_TLS_REJECT_UNAUTHORIZED=0 — disables TLS verification for broker traffic');
+    violations++;
+  }
 }
 
 // --- Cross-check: no /PiConnectTP references in any source file ---
@@ -80,19 +98,13 @@ for (const f of flattradeFiles) {
   if (f.includes('verify-flattrade-urls')) continue;
   if (f.includes('BROKER_LOGIN_FLOWS.md')) continue;
   if (f.endsWith('.md')) continue; // all markdown docs are documentation, not code
-  // Check if the reference is only in comments/documentation (not active code)
+
   const content = readFileSync(resolve(ROOT, f), 'utf8');
-  const activeLines = content.split('\n')
-    .filter((l) => {
-      const t = l.trim();
-      return t && !t.startsWith('//') && !t.startsWith('#') && !t.startsWith('*') && !t.startsWith('/*');
-    });
-  const inActiveCode = activeLines.some((l) => l.includes('PiConnectTP'));
-  if (!inActiveCode) {
-    console.log(`  OK    ${f.padEnd(45)} (PiConnectTP in comments only — documenting the fix)`);
+  if (!hasActiveBadUrl(content, 'PiConnectTP')) {
+    console.log(`  OK    ${f.padEnd(45)} (PiConnectTP in prose only — documenting the fix)`);
     continue;
   }
-  report(f, 'X-URL', 'Contains the invalid URL segment /PiConnectTP in active code');
+  report(f, 'X-URL', 'Contains the invalid URL segment /PiConnectTP in a string literal');
   violations++;
 }
 
@@ -112,6 +124,64 @@ if (violations > 0) {
 
 function report(label, rule, message) {
   console.log(`  ${rule}  ${label.padEnd(45)} ${message}`);
+}
+
+/**
+ * Extract the contents of real STRING LITERALS, ignoring comments.
+ *
+ * Two traps this must survive — both were hit while writing this gate:
+ *
+ *  1. You cannot strip comments by cutting at the first `//`: every URL contains `//`
+ *     (`https://…`), so that truncates real URLs and HIDES genuine violations.
+ *  2. You cannot match quotes with a regex alone: a markdown backtick inside a JSDoc
+ *     block (`` `/PiConnectTP` ``) looks exactly like a template literal, so prose gets
+ *     misreported as code.
+ *
+ * So: one pass, tracking whether we are inside a string or a comment. A quote only opens
+ * a string from `normal`; a `//` only opens a comment from `normal`.
+ */
+function extractStringLiterals(src) {
+  const out = [];
+  let i = 0;
+  const n = src.length;
+
+  while (i < n) {
+    const c = src[i];
+    const next = src[i + 1];
+
+    // comments (only start outside a string)
+    if (c === '/' && next === '/') { while (i < n && src[i] !== '\n') i++; continue; }
+    if (c === '/' && next === '*') { i += 2; while (i < n && !(src[i] === '*' && src[i + 1] === '/')) i++; i += 2; continue; }
+    if (c === '#') { while (i < n && src[i] !== '\n') i++; continue; } // python/sh
+
+    // string literals
+    if (c === "'" || c === '"' || c === '`') {
+      const quote = c;
+      i++;
+      let buf = '';
+      while (i < n) {
+        if (src[i] === '\\') { buf += src[i + 1] ?? ''; i += 2; continue; }
+        if (src[i] === quote) { i++; break; }
+        buf += src[i++];
+      }
+      out.push(buf);
+      continue;
+    }
+
+    i++;
+  }
+  return out;
+}
+
+/**
+ * Does `needle` appear inside live code (a string literal) rather than prose?
+ *
+ *   FLATTRADE: 'https://x/PiConnectAPI', // NOT /PiConnectTP   -> prose  (allowed)
+ *   //   1. URL was `.../PiConnectTP/REST/…`                    -> prose  (allowed)
+ *   this.baseUrl = 'https://x/PiConnectTP/REST/GetQuotes';      -> code   (violation)
+ */
+function hasActiveBadUrl(content, needle) {
+  return extractStringLiterals(content).some((lit) => lit.includes(needle));
 }
 
 function isNodeImage(content) {

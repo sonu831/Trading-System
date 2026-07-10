@@ -1,15 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import { useStrikePreview } from '@/hooks/useMarket';
 
 export default function StrikePreviewCard({ underlying = 'NIFTY' }) {
   const [direction, setDirection] = useState('LONG');
-  const [preview, setPreview] = useState(null);
-
-  useEffect(() => {
-    let active = true;
-    fetch(`/api/v1/execution/strike-preview?underlying=${underlying}&direction=${direction}`)
-      .then(r => r.json()).then(d => { if (active && d.success) setPreview(d.data); });
-    return () => { active = false; };
-  }, [underlying, direction]);
+  const preview = useStrikePreview(underlying, direction);
 
   const f = (n) => n != null ? Number(n).toFixed(2) : '—';
   const fC = (n) => n != null ? '₹' + Math.round(n).toLocaleString() : '—';

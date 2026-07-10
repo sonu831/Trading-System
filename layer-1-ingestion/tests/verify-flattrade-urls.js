@@ -123,6 +123,43 @@ ok('BROKER_BASE_URLS.FLATTRADE exists in shared/', !!shared.BROKER_BASE_URLS?.FL
 ok('BROKER_BASE_URLS.FLATTRADE matches FLATTRADE_BASE_URL',
    shared.BROKER_BASE_URLS.FLATTRADE === FLATTRADE_BASE_URL);
 ok('REDIS_KEYS.MARKET_REGIME_LATEST exists in shared/', !!shared.REDIS_KEYS?.MARKET_REGIME_LATEST);
+ok('PORTS.EXECUTION is 8095 (8090 is Kafka UI)', shared.PORTS?.EXECUTION === 8095);
+
+// A single source of truth that is WRONG is worse than none.
+console.log('\nSSOT correctness (a wrong constant poisons every importer)');
+ok('MSTOCK base URL is api.mstock.trade (NOT api.mstock.in)',
+   shared.BROKER_BASE_URLS.MSTOCK === 'https://api.mstock.trade');
+ok('shared FLATTRADE URL has no /PiConnectTP', !shared.BROKER_BASE_URLS.FLATTRADE.includes('/PiConnectTP'));
+ok('shared FLATTRADE URL has no /REST/', !shared.BROKER_BASE_URLS.FLATTRADE.includes('/REST/'));
+
+// ── L1-6b: expiry weekday is declared ONCE and never hardcoded ──
+console.log('\nL1-6b: expiry weekday is single-sourced, not asserted in-file');
+const istSrc = fs.readFileSync(path.join(__dirname, '..', 'src', 'utils', 'ist-time.js'), 'utf8');
+ok('ist-time no longer claims "NIFTY expires every Thursday"', !/expires every Thursday/i.test(istSrc));
+ok('shared/ declares EXPIRY_WEEKDAY_ISO', !!shared.EXPIRY_WEEKDAY_ISO?.NIFTY);
+ok('EXPIRY_WEEKDAY_ISO.NIFTY is a valid ISO weekday (1..7)',
+   Number.isInteger(shared.EXPIRY_WEEKDAY_ISO.NIFTY) && shared.EXPIRY_WEEKDAY_ISO.NIFTY >= 1 && shared.EXPIRY_WEEKDAY_ISO.NIFTY <= 7);
+
+const { isoToJsDay } = require('../src/utils/ist-time');
+ok('ISO->JS weekday: Mon 1 -> 1', isoToJsDay(1) === 1);
+ok('ISO->JS weekday: Tue 2 -> 2', isoToJsDay(2) === 2);
+ok('ISO->JS weekday: Sun 7 -> 0  (the only divergence)', isoToJsDay(7) === 0);
+
+// Injectable weekday: a caller can override, and an invalid value FAILS CLOSED.
+const tue = nextWeeklyExpiryIST('NIFTY', { expiryWeekdayIso: 2 });
+const thu = nextWeeklyExpiryIST('NIFTY', { expiryWeekdayIso: 4 });
+ok('expiry weekday is injectable (Tue vs Thu give different dates)', tue.getTime() !== thu.getTime());
+ok('Tuesday override lands on a Tuesday (IST)',
+   new Date(tue.getTime() + 330 * 60000).getUTCDay() === 2);
+ok('Thursday override lands on a Thursday (IST)',
+   new Date(thu.getTime() + 330 * 60000).getUTCDay() === 4);
+ok('invalid ISO weekday throws (fail closed)',
+   (() => { try { nextWeeklyExpiryIST('NIFTY', { expiryWeekdayIso: 9 }); return false; } catch { return true; } })());
+
+// ── L1-7: poller must pass the underlying through to expiry ──
+console.log('\nL1-7: poller uses the underlying for expiry (BANKNIFTY != NIFTY)');
+ok('poller passes `underlying` to nextWeeklyExpiryIST', /nextWeeklyExpiryIST\(underlying\)/.test(pollerSrc));
+ok('poller no longer calls nextWeeklyExpiryIST with no argument', !/nextWeeklyExpiryIST\(\)/.test(pollerSrc));
 
 // ── Summary ──
 console.log(`\n${'='.repeat(50)}`);

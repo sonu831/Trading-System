@@ -9,7 +9,10 @@ require (
 	github.com/prometheus/client_golang v1.22.0
 	github.com/sdcoffey/big v0.7.0
 	github.com/sdcoffey/techan v0.12.1
+	github.com/utkarsh-pandey/nifty50-trading-system/shared v0.0.0
 )
+
+replace github.com/utkarsh-pandey/nifty50-trading-system/shared => ../../shared
 
 require (
 	github.com/beorn7/perks v1.0.1 // indirect

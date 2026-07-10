@@ -102,7 +102,8 @@ class OptionChainPoller {
         return;
       }
 
-      const expiry = nextWeeklyExpiryIST();
+      // Pass the underlying: BANKNIFTY and NIFTY may expire on different weekdays.
+      const expiry = nextWeeklyExpiryIST(underlying);
       const strikeStep = STRIKE_STEPS[underlying] || 50;
       const atmStrike = Math.round(spot / strikeStep) * strikeStep;
 

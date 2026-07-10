@@ -7,8 +7,8 @@ const { waitForKafka } = require('/app/shared/health-check');
 const KAFKA_BROKERS = (process.env.KAFKA_BROKERS || 'localhost:9092').split(',');
 // GROUP_ID is crucial for ensuring we don't re-process old messages if the service restarts.
 // We incremented this to 'v3' after the Kafka Cluster Reset to ensure a clean slate.
-const GROUP_ID = 'layer-2-processing-group-v3'; 
-const TOPIC = process.env.KAFKA_TOPIC || 'raw-ticks'; // Aligned with Layer 1 ingestion producer
+const GROUP_ID = 'layer-2-processing-group-v4'; // Versioned — bump on breaking schema changes
+const TOPIC = process.env.KAFKA_TOPIC || 'raw-ticks';
 
 const kafka = new Kafka({
   clientId: 'layer-2-processing',
@@ -50,17 +50,16 @@ async function startConsumer(messageHandler) {
     logger.info(`Subscribed to topic: ${TOPIC}`);
 
     await consumer.run({
+      autoCommit: false, // Manual commit AFTER successful processing — prevents data loss on crash
       eachMessage: async ({ topic, partition, message }) => {
         try {
           const value = message.value.toString();
-          logger.debug({ topic, preview: value.substring(0, 100) }, 'Received message');
           const data = JSON.parse(value);
-
-          // Delegate to the business logic handler
-          // Note: Deduplication should happen in the handler or DB layer (idempotency)
           await messageHandler(data);
+          // Commit offset only after successful processing
+          await consumer.commitOffsets([{ topic, partition, offset: (Number(message.offset) + 1).toString() }]);
         } catch (err) {
-          logger.error({ err }, 'Error processing message');
+          logger.error({ err, offset: message.offset }, 'Error processing message — offset NOT committed, will retry');
         }
       },
     });

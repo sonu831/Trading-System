@@ -31,37 +31,66 @@ function startOfDayIST(year, month, day) {
 }
 
 /**
- * Compute the next weekly expiry for an index in IST.
+ * ISO weekday (1=Mon .. 7=Sun) for each underlying's weekly expiry.
  *
- * NIFTY expires every Thursday; BANKNIFTY expires every Wednesday.
- * If today IS the expiry day and the cutoff hour (12:00 IST) has passed,
- * the expiry rolls forward to the following week.
+ * ⚠️ DO NOT hardcode a weekday here. This file previously asserted "NIFTY expires every
+ * Thursday" while `layer-10-execution/config/default.js` used Tuesday — two files, two
+ * answers, one confidently wrong. The value is declared ONCE in `shared/constants.js`
+ * (`EXPIRY_WEEKDAY_ISO`) and overridable per environment, and the owner must verify it
+ * against the current NSE circular before live trading.
  *
- * @param {"NIFTY"|"BANKNIFTY"} [underlying="NIFTY"]
- * @returns {Date}  A Date whose UTC value represents the expiry date at IST 15:30.
+ * Numbering trap: JS `getDay()` is 0=Sun..6=Sat; ISO is 1=Mon..7=Sun. They coincide for
+ * Mon–Sat and differ only on Sunday — which is why a mismatch survives review.
  */
-function nextWeeklyExpiryIST(underlying) {
-  underlying = (underlying || 'NIFTY').toUpperCase();
-  const expiryDay = underlying === 'BANKNIFTY' ? 3 : 4; // Wed=3, Thu=4
-  const cutoffHour = 12;
+const DEFAULT_EXPIRY_WEEKDAY_ISO = {
+  NIFTY: Number(process.env.NIFTY_EXPIRY_WEEKDAY_ISO) || 2,
+  BANKNIFTY: Number(process.env.BANKNIFTY_EXPIRY_WEEKDAY_ISO) || 2,
+};
+
+/** ISO (1=Mon..7=Sun) -> JS getDay() (0=Sun..6=Sat) */
+const isoToJsDay = (iso) => iso % 7;
+
+/**
+ * Compute the next weekly expiry for an index, in IST.
+ *
+ * If today IS the expiry day and the cutoff hour (12:00 IST) has passed, roll to next week.
+ *
+ * @param {"NIFTY"|"BANKNIFTY"|string} [underlying="NIFTY"]
+ * @param {{expiryWeekdayIso?: number, cutoffHour?: number}} [opts]
+ * @returns {Date} A Date whose UTC epoch corresponds to 15:30 IST on the expiry date.
+ * @throws if the resolved weekday is not a valid ISO weekday (fail closed, rule 11).
+ */
+function nextWeeklyExpiryIST(underlying, opts = {}) {
+  const key = (underlying || 'NIFTY').toUpperCase();
+  const expiryIso = opts.expiryWeekdayIso ?? DEFAULT_EXPIRY_WEEKDAY_ISO[key] ?? DEFAULT_EXPIRY_WEEKDAY_ISO.NIFTY;
+
+  if (!Number.isInteger(expiryIso) || expiryIso < 1 || expiryIso > 7) {
+    throw new Error(`nextWeeklyExpiryIST: invalid ISO expiry weekday ${expiryIso} for ${key} (expected 1..7)`);
+  }
+
+  const cutoffHour = opts.cutoffHour ?? 12;
+  const expiryDay = isoToJsDay(expiryIso);
 
   const now = nowIST();
-  const dow = now.getUTCDay(); // day-of-week in IST terms (because nowIST already shifted)
+  const dow = now.getUTCDay(); // day-of-week in IST terms (nowIST is already shifted)
   const hours = now.getUTCHours();
 
-  // Days until next expiry day
   let daysUntil = (expiryDay - dow + 7) % 7;
-  if (daysUntil === 0 && hours >= cutoffHour) {
-    daysUntil = 7; // roll to next week after cutoff
-  }
+  if (daysUntil === 0 && hours >= cutoffHour) daysUntil = 7; // roll after cutoff
 
   const expiry = new Date(now);
   expiry.setUTCDate(expiry.getUTCDate() + daysUntil);
-  // Set to end-of-expiry-time (15:30 IST → 10:00 UTC)
-  expiry.setUTCHours(15, 30, 0, 0);
-  // Adjust back by offset so the UTC epoch matches the intended IST wall-clock
+  expiry.setUTCHours(15, 30, 0, 0); // 15:30 IST in the shifted frame
+
   const offsetMs = istOffsetMinutes() * 60 * 1000;
   return new Date(expiry.getTime() - offsetMs);
 }
 
-module.exports = { nowIST, startOfDayIST, nextWeeklyExpiryIST, istOffsetMinutes };
+module.exports = {
+  nowIST,
+  startOfDayIST,
+  nextWeeklyExpiryIST,
+  istOffsetMinutes,
+  isoToJsDay,
+  DEFAULT_EXPIRY_WEEKDAY_ISO,
+};

@@ -38,4 +38,29 @@ const (
 	TierT1 = "T1"
 	TierT2 = "T2"
 	TierT3 = "T3"
+
+	// ── Broker Providers ──
+	ProviderMStock    = "mstock"
+	ProviderFlatTrade = "flattrade"
+	ProviderKite      = "kite"
+	ProviderIndianAPI = "indianapi"
+
+	// ── Kafka Topics ──
+	TopicRawTicks         = "raw-ticks"
+	TopicMarketCandles    = "market_candles"
+	TopicAnalysisUpdates  = "analysis_updates"
+	TopicSentimentScores  = "sentiment_scores"
+	TopicTradeSignals     = "trade-signals"
+	TopicOptionChain      = "option-chain"
+	TopicMarketRegime     = "market-regime"
+	TopicExecutionEvents  = "execution-events"
+
+	// ── Ports ──
+	PortBackendAPI  = 4000
+	PortIngestion   = 9101
+	PortProcessing  = 3002
+	PortAnalysis    = 8081
+	PortAggregation = 8080
+	PortSignal      = 8082
+	PortExecution   = 8095
 )

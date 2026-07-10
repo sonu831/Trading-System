@@ -13,7 +13,7 @@ RUN go build -o main ./cmd/main.go
 # Run Stage
 FROM alpine:latest
 
-RUN apk add --no-cache ca-certificates tzdata && adduser -D -g '' appuser
+RUN apk add --no-cache ca-certificates tzdata tini && adduser -D -g '' appuser
 
 WORKDIR /app
 
@@ -25,4 +25,5 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
 
 USER appuser
 
+ENTRYPOINT ["/sbin/tini", "--"]
 CMD ["./main"]

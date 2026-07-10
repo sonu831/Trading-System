@@ -29,6 +29,11 @@ async function systemRoutes(fastify, options) {
     handler: systemController.getSwarmStatus,
   });
 
+  // ─────────────────────────────────────────────────────────────
+  // EXECUTION STATE
+  // ⚠️ Moved to modules/execution/routes.js -- DO NOT DUPLICATE
+  // ─────────────────────────────────────────────────────────────
+
   fastify.get('/api/v1/backfill', {
     handler: systemController.getBackfillJobs,
   });

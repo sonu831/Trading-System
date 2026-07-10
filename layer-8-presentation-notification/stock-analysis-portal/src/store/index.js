@@ -3,6 +3,8 @@ import marketReducer from './slices/marketSlice';
 import signalsReducer from './slices/signalsSlice';
 import systemReducer from './slices/systemSlice';
 import brokerReducer from './slices/brokerSlice';
+import executionReducer from './slices/executionSlice';
+import regimeReducer from './slices/regimeSlice';
 
 export const store = configureStore({
   reducer: {
@@ -10,6 +12,8 @@ export const store = configureStore({
     signals: signalsReducer,
     system: systemReducer,
     brokers: brokerReducer,
+    execution: executionReducer,
+    regime: regimeReducer,
   },
   devTools: process.env.NODE_ENV !== 'production',
 });

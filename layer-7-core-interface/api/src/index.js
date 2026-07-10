@@ -1,7 +1,7 @@
 require('dotenv').config();
 
 // Transpile TypeScript SDKs at runtime (MStock SDK)
-try { require('ts-node').register({ transpileOnly: true, ignore: [/node_modules\/(?!@mstock-mirae-asset)/] }); } catch (_) {}
+try { require('ts-node').register({ transpileOnly: true, compilerOptions: { module: 'commonjs', moduleResolution: 'node' }, ignore: [/node_modules\/(?!@mstock-mirae-asset)/] }); } catch (_) {}
 
 // Fix BigInt JSON serialization (required for Prisma BigInt fields)
 BigInt.prototype.toJSON = function() {
@@ -162,6 +162,8 @@ fastify.register(require('./modules/system/routes'));
 fastify.register(require('./modules/market/routes'));
 fastify.register(require('./modules/analysis/routes'));
 fastify.register(require('./modules/broker/routes'));
+fastify.register(require('./modules/execution/routes'));
+fastify.register(require('./modules/regime/routes'));
 
 // Suggestions Endpoint (Refactored to Prisma) -> Leaving inline as it belongs to User Domain (next phase)
 fastify.post('/api/v1/suggestions', async (req, reply) => {

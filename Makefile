@@ -59,10 +59,24 @@ help:
 	@echo "  make redis-clear    Flush all Redis cache"
 	@echo ""
 	@echo "💻 LOCAL DEV"
-	@echo "  make layer[1-7]     Run specific layer locally (npm/go)"
+	@echo "  make layer1         Run L1 Ingestion locally (Node.js)"
+	@echo "  make layer2         Run L2 Processing locally (Node.js)"
+	@echo "  make layer4         Run L4 Analysis locally (Go)"
+	@echo "  make layer5         Run L5 Aggregation locally (Go)"
+	@echo "  make layer6         Run L6 Signal locally (Node.js)"
+	@echo "  make layer7         Run L7 API locally (Fastify)"
+	@echo "  make layer8         Run L8 Dashboard locally (Next.js)"
 	@echo "  make dev            Start infrastructure for local dev"
 	@echo ""
+	@echo "🐳 DOCKER (single services)"
+	@echo "  make docker-ingestion   Start L1 Ingestion in Docker"
+	@echo "  make docker-processing   Start L2 Processing in Docker"
+	@echo "  make docker-api         Start L7 Backend API in Docker"
+	@echo "  make docker-dashboard   Start L8 Dashboard in Docker"
+	@echo "  make docker-execution   Start L10 Execution in Docker"
+	@echo ""
 	@echo "🧹 MAINTENANCE"
+	@echo "  make setup          Install node_modules for ALL layers"
 	@echo "  make logs           Tail logs"
 	@echo "  make clean          Remove build artifacts"
 	@echo "  make fix-kafka      Fix Kafka Cluster ID issues"
@@ -75,6 +89,31 @@ help:
 
 deploy: app-build ui notify-build
 	@echo "✅ Deployment complete!"
+
+# ═══════════════════════════════════════════════════════════
+# setup: Install node_modules for ALL layers (fresh install)
+# ═══════════════════════════════════════════════════════════
+LAYERS := layer-1-ingestion \
+          layer-1-tradingview \
+          layer-2-processing \
+          layer-6-signal \
+          layer-7-core-interface/api \
+          layer-8-presentation-notification/stock-analysis-portal \
+          layer-8-presentation-notification/email-service \
+          layer-8-presentation-notification/telegram-bot \
+          layer-10-execution
+
+setup:
+	@echo "📦 Installing node_modules for all layers..."
+	@for dir in $(LAYERS); do \
+		echo ""; \
+		echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; \
+		echo "📂 $$dir"; \
+		echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; \
+		cd $$dir && npm install --legacy-peer-deps; \
+	done
+	@echo ""
+	@echo "✅ All layers installed!"
 
 up: infra wait-kafka app-core ui
 	@echo "🚀 Core pipeline running!"
@@ -507,20 +546,51 @@ layer6:
 	@export $$(cat .env | grep -v '^#' | xargs) && cd layer-6-signal && npm run dev
 
 layer7-api:
-	@echo "🚀 Starting Layer 7 API (Presentation)..."
-	@export $$(cat .env | grep -v '^#' | xargs) && cd layer-7-presentation-notification/api && npm run dev
+	@echo "🚀 Starting Layer 7 API (Fastify)..."
+	@export $$(cat .env | grep -v '^#' | xargs) && cd layer-7-core-interface/api && npm run dev
 
 layer7-dashboard:
-	@echo "🚀 Starting Layer 7 Dashboard..."
-	@export $$(cat .env | grep -v '^#' | xargs) && cd layer-7-presentation-notification/stock-analysis-portal && npm run dev
+	@echo "🚀 Starting Layer 8 Dashboard (Next.js)..."
+	@export $$(cat .env | grep -v '^#' | xargs) && cd layer-8-presentation-notification/stock-analysis-portal && npm run dev
 
-layer-1-ingestion:
-	@echo "🚀 Starting Layer 1 (Ingestion)..."
-	@export $$(cat .env | grep -v '^#' | xargs) && cd layer-1-ingestion && npm run dev
+# ─── Short aliases ───
+layer7: layer7-api
+layer8: layer7-dashboard
+layer3:
+	@echo "Layer 3 is infrastructure (TimescaleDB + Redis) -- run: make infra"
 
-layer-7-backend-api:
-	@echo "🚀 Starting Backend API (Layer 7 Core Interface)..."
-	@export $$(cat .env | grep -v '^#' | xargs) && cd layer-7-core-interface/api && npm run dev
+layer9:
+	@echo "🚀 Starting Layer 9 (AI Service)..."
+	@export $$(cat .env | grep -v '^#' | xargs) && cd layer-9-ai-service && uvicorn app.main:app --reload --port 8000
+
+layer10:
+	@echo "🚀 Starting Layer 10 (Execution)..."
+	@export $$(cat .env | grep -v '^#' | xargs) && cd layer-10-execution && npm run dev
+
+# ─── Docker single-service targets ───
+docker-ingestion:
+	$(call ensure_network)
+	$(DC) -f $(COMPOSE_DIR)/docker-compose.app.yml up -d --build ingestion
+
+docker-processing:
+	$(call ensure_network)
+	$(DC) -f $(COMPOSE_DIR)/docker-compose.app.yml up -d --build processing
+
+docker-api:
+	$(call ensure_network)
+	$(DC) -f $(COMPOSE_DIR)/docker-compose.app.yml up -d --build backend-api
+
+docker-dashboard:
+	$(call ensure_network)
+	$(DC) -f $(COMPOSE_DIR)/docker-compose.ui.yml up -d --build dashboard
+
+docker-execution:
+	$(call ensure_network)
+	$(DC) -f $(COMPOSE_DIR)/docker-compose.app.yml up -d --build execution
+
+layer-1-ingestion: layer1
+
+layer-7-backend-api: layer7-api
 
 # ===========================================================
 # 7. OBSERVABILITY & LOGS

@@ -14,7 +14,9 @@ const bool = (v, d) => (v !== undefined && v !== '' ? v === 'true' : d);
 
 module.exports = {
   service: {
-    port: num(process.env.PORT, 8090),
+    // 8095 everywhere: Dockerfile EXPOSE/HEALTHCHECK, compose `PORT`, and the
+    // L7 proxy's EXECUTION_URL default all agree. Changing this breaks all three.
+    port: num(process.env.PORT, 8095),
   },
 
   tradeMode: process.env.TRADE_MODE || 'paper', // paper | shadow | live

@@ -218,19 +218,42 @@ function startExpress() {
   app.get('/state', (req, res) => {
     res.json({
       mode: config.tradeMode,
+      killSwitch: riskManager.killSwitch,
       positions: positionManager.getAllPositions(),
       risk: riskManager.getState(),
+      timestamp: new Date().toISOString(),
     });
   });
 
-  app.post('/kill', (req, res) => {
-    riskManager.setKillSwitch(true);
-    res.json({ killSwitch: true });
+  // Halting must also flatten the book — same semantics as the Redis KILL command,
+  // otherwise "kill" would silently leave live positions running.
+  app.post('/kill', async (req, res) => {
+    riskManager.setKillSwitch(true, 'api');
+    try {
+      await executor.squareOffAll('kill_switch');
+    } catch (err) {
+      logger.error({ err }, 'Kill square-off failed');
+      return res.status(500).json({
+        killSwitch: true,
+        error: 'Kill switch set, but square-off failed — check positions at the broker',
+      });
+    }
+    res.json({ killSwitch: true, positions: positionManager.getAllPositions() });
   });
 
   app.post('/resume', (req, res) => {
-    riskManager.setKillSwitch(false);
+    riskManager.setKillSwitch(false, 'api');
     res.json({ killSwitch: false });
+  });
+
+  app.post('/square-off', async (req, res) => {
+    try {
+      await executor.squareOffAll('manual_square_off');
+      res.json({ killSwitch: riskManager.killSwitch, positions: positionManager.getAllPositions() });
+    } catch (err) {
+      logger.error({ err }, 'Manual square-off failed');
+      res.status(500).json({ error: err.message });
+    }
   });
 
   app.listen(config.service.port, () => {

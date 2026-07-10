@@ -66,6 +66,14 @@ container.register({
   brokerController: asClass(require('./modules/broker/BrokerController')).singleton(),
   brokerSessionService: asClass(require('./modules/broker/BrokerSessionService')).singleton(),
 
+  // Execution (proxy onto Layer 10: positions, risk, kill switch)
+  executionService: asClass(require('./modules/execution/ExecutionService')).singleton(),
+  executionController: asClass(require('./modules/execution/ExecutionController')).singleton(),
+
+  // Regime (multi-TF market regime from L6 + breadth from L5, read via Redis)
+  regimeService: asClass(require('./modules/regime/RegimeService')).singleton(),
+  regimeController: asClass(require('./modules/regime/RegimeController')).singleton(),
+
   // MStock Specific Endpoints
 });
 

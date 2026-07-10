@@ -9,7 +9,7 @@ class BrokerController extends BaseController {
   listProviders = async (req, reply) => {
     try {
       const data = await this.brokerService.listProviders();
-      return reply.send({ success: true, data: JSON.parse(JSON.stringify(data)) });
+      return this.sendSuccess(reply, data);
     } catch (err) {
       return this.sendError(reply, err);
     }
@@ -18,7 +18,7 @@ class BrokerController extends BaseController {
   getProvider = async (req, reply) => {
     try {
       const data = await this.brokerService.getProvider(parseInt(req.params.id));
-      return reply.send({ success: true, data: JSON.parse(JSON.stringify(data)) });
+      return this.sendSuccess(reply, data);
     } catch (err) {
       return this.sendError(reply, err, err.statusCode || 500);
     }

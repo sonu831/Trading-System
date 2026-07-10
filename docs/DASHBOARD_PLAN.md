@@ -211,12 +211,38 @@ store/slices/
 
 ---
 
-## 9. Hand-off
+## 9. Status — Phase 1 BUILT (2026-07-09)
 
-- **Next (frontend):** `executionSlice` + `/trading` + `KillSwitchButton` + `TradeModeBadge` + `PositionsTable`.
-  These have real backing endpoints on L10 today (`/state`, `/kill`, `/resume`) — start there, no backend blocked.
-- **Next (backend, L7):** the proxy endpoints in §5. `/api/execution/*` first (thin passthrough to L10:8090).
+**Frontend** (`stock-analysis-portal`) — verified with `npx next build` (the `/trading` route compiles):
+
+- `store/slices/executionSlice.js`, `store/slices/regimeSlice.js`; `hooks/useStaleness.js`; trading formatters in `utils/format.js`
+- `components/trading/`: `StatTile`, `RiskMeter`, `DailyRiskCard`, `PositionsTable`, `TradeModeBadge`,
+  `KillSwitchButton`, `ConfirmDialog`, `StaleBadge`
+- `components/regime/RegimeCard.jsx`; page `pages/trading.js`
+- **Navbar** now carries `TradeModeBadge` + `KillSwitchButton` on every route (rules U1/U2)
+
+**Backend (L7)** — verified with `node tests/verify-execution-proxy.js` (13 assertions):
+
+- `modules/execution/` → `GET /api/v1/execution/state`, `POST /api/v1/execution/{kill,resume,square-off}` (proxy onto L10)
+- `modules/regime/` → `GET /api/v1/regime/latest`, `GET /api/v1/breadth/latest` (Redis read path, CQRS)
+- Registered in `container.js` + `index.js`; `EXECUTION_URL` added to `backend-api` in `docker-compose.app.yml`
+
+**Layer 10** gained `POST /square-off`; `/kill` now flattens the book (it previously only set the flag);
+`/state` now returns `killSwitch` + `timestamp`.
+
+> ⚠️ **The execution port is 8095, not 8090.** `Dockerfile` EXPOSE/HEALTHCHECK, compose `PORT`,
+> `config/default.js`, and the L7 `EXECUTION_URL` default must all agree. A mismatch silently renders
+> "ENGINE OFFLINE" with no other symptom.
+
+---
+
+## 10. Hand-off
+
+- **Next (frontend):** Phase 2 — `BreadthPanel`, `SectorHeatmap`, `/regime` page. Data is already served by
+  `GET /api/v1/breadth/latest`.
+- **Realtime:** the page polls every 3s (Navbar every 5s). Swap to socket.io rooms (`positions`, `regime`,
+  `execution-events`) when the socket plugin exposes them — both slices already have `*Pushed` reducers for it.
 - **Blocked on control plane:** `/strategies`, `/risk`, and provider enable/disable need the config store +
   registry from [`SIMPLE_ROBUST_ARCHITECTURE_PLAN.md`](SIMPLE_ROBUST_ARCHITECTURE_PLAN.md) §4.7.
 - **Do not** surface an "arm live" control until the validation roadmap passes (`PROJECT_STATE.md` §5).
-- **Not done / not pushed:** design only; no dashboard code written this session.
+- **Not pushed:** no git operations performed.

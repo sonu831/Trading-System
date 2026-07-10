@@ -8,7 +8,10 @@ const providerListSchema = {
       type: 'object',
       properties: {
         success: { type: 'boolean' },
-        data: { type: 'array', items: { type: 'object' } },
+        data: {
+          type: 'array',
+          items: { type: 'object', additionalProperties: true },
+        },
       },
     },
   },

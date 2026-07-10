@@ -97,7 +97,7 @@ T2 intraday (10–30m), T3 positional (1h–daily, overnight long-only). Lag acc
 ### Phase E — Execution Engine Layer 10 (🔨 built 2026-07-09)
 | Component | Status | Notes |
 |-----------|--------|-------|
-| Entry point + Kafka consumer | ✅ | `src/index.js` — subscribes to `trade-signals`, Express API on port 8090 |
+| Entry point + Kafka consumer | ✅ | `src/index.js` — subscribes to `trade-signals`, Express API on **port 8095** (8090 is Kafka UI). Exposes `/state`, `/kill`, `/resume`, `/square-off` |
 | FlatTrade OMS | ✅ | `src/oms/flattrade.js` — place/modify/cancel orders, order book, positions, quotes via Noren API |
 | MStock OMS | ✅ | `src/oms/mstock.js` — place/modify/cancel orders via MStock TypeB API |
 | Risk manager | ✅ | `src/risk/manager.js` — max positions, max trades/day, daily loss circuit breaker, kill switch, lot sizing |
@@ -107,7 +107,7 @@ T2 intraday (10–30m), T3 positional (1h–daily, overnight long-only). Lag acc
 | Paper executor | ✅ | `src/paper-executor.js` — TRADE_MODE=paper (simulated fills vs live LTP) + shadow mode |
 | Quote feed | ✅ | `src/quote-feed.js` — broker (FlatTrade/MStock) or synthetic random-walk for offline dev |
 | Redis commands | ✅ | Subscribes to `execution:commands` (KILL/RESUME from Telegram); reads `execution:kill_switch` |
-| Dockerfile | ✅ | Node 20-alpine, healthcheck, ports 8090 |
+| Dockerfile | ✅ | Node 20-alpine, healthcheck, port 8095 |
 | docker-compose | ✅ | Execution service added to `docker-compose.app.yml` with all env vars |
 
 ### Phase D — Backtest Harness + Optimizer (🔨 built 2026-07-09)

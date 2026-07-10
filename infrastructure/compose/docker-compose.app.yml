@@ -182,6 +182,10 @@ services:
       - TIMESCALE_URL=postgresql://${POSTGRES_USER:-trading}:${POSTGRES_PASSWORD:-trading123}@timescaledb:5432/${POSTGRES_DB:-nifty50}
       - DATABASE_URL=postgresql://${POSTGRES_USER:-trading}:${POSTGRES_PASSWORD:-trading123}@timescaledb:5432/${POSTGRES_DB:-nifty50}
       - CREDENTIAL_MASTER_KEY=${CREDENTIAL_MASTER_KEY}
+      # Layer 10 execution engine (positions, risk, kill switch). Port must match the
+      # `execution` service's PORT (8095). No depends_on: the API must start even when
+      # the engine is down and report it as offline.
+      - EXECUTION_URL=http://execution:8095
     volumes:
       - ../../layer-7-core-interface/api/src:/app/src
       - ../../shared:/app/shared:ro

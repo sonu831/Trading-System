@@ -121,8 +121,11 @@ class MStockVendor extends BaseVendor {
         logger.info(`MStockVendor: Step 2 - Verifying TOTP...`);
 
         // Generate TOTP Code
+        const clean = this.totpSecret.replace(/\s/g, '');
+        let secret;
+        try { secret = OTPAuth.Secret.fromBase32(clean); } catch (_) { secret = new OTPAuth.Secret({ buffer: Buffer.from(clean, 'utf8') }); }
         const totpGen = new OTPAuth.TOTP({
-          secret: OTPAuth.Secret.fromBase32(this.totpSecret),
+          secret,
           algorithm: 'SHA1',
           digits: 6,
           period: 30,

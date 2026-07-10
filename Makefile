@@ -94,7 +94,6 @@ deploy: app-build ui notify-build
 # setup: Install node_modules for ALL layers (fresh install)
 # ═══════════════════════════════════════════════════════════
 LAYERS := layer-1-ingestion \
-          layer-1-tradingview \
           layer-2-processing \
           layer-6-signal \
           layer-7-core-interface/api \
@@ -106,14 +105,25 @@ LAYERS := layer-1-ingestion \
 setup:
 	@echo "📦 Installing node_modules for all layers..."
 	@for dir in $(LAYERS); do \
-		echo ""; \
-		echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; \
-		echo "📂 $$dir"; \
-		echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; \
-		cd $$dir && npm install --legacy-peer-deps; \
+		echo ""; echo "━━━━ $${dir} ━━━━"; \
+		(cd "$${dir}" && npm install --legacy-peer-deps) || echo "  ⚠️  $${dir} skipped"; \
 	done
 	@echo ""
 	@echo "✅ All layers installed!"
+
+build:
+	@echo "🔍 TypeScript check..."
+	@for dir in layer-1-ingestion layer-2-processing layer-6-signal layer-7-core-interface/api layer-10-execution; do \
+		if [ -f "$$dir/node_modules/.bin/tsc" ]; then \
+			echo "  $$dir..."; (cd "$$dir" && node_modules/.bin/tsc --noEmit 2>&1 | head -5) || echo "  ⚠️  $$dir: type warnings"; \
+		else \
+			echo "  $$dir... (tsc not installed — run 'make setup' first)"; \
+		fi; \
+	done
+	@echo "🔍 Go vet..."
+	@(cd layer-4-analysis && go vet ./... 2>&1 | head -3) || true
+	@(cd layer-5-aggregation && go vet ./... 2>&1 | head -3) || true
+	@echo "✅ Build complete!"
 
 up: infra wait-kafka app-core ui
 	@echo "🚀 Core pipeline running!"

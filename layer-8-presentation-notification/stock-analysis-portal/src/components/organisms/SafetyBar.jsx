@@ -3,7 +3,6 @@ import { useSelector } from 'react-redux';
 import KillSwitchButton from '@/components/trading/KillSwitchButton';
 import TradeModeBadge from '@/components/trading/TradeModeBadge';
 import StaleBadge from '@/components/trading/StaleBadge';
-import type { Loaded, StalenessResult } from '@/shared/types';
 
 const COUNTDOWN_ENTRY_CUTOFF = { h: 15, m: 0 };  // 15:00 IST
 const COUNTDOWN_SQUAREOFF = { h: 15, m: 15 };     // 15:15 IST

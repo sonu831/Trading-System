@@ -1,12 +1,9 @@
 import React from 'react';
 
-export default function AIInsight({ analysis }) {
-  // If analysis object is structured differently, adapt here.
-  // Assuming 'ai_prediction' or similar might be in the root or 'ai' field.
-  // Fallback to existing structure if needed.
-  
+export default function AIInsight({ analysis }: { analysis: any }) {
   const reasoning = analysis?.ai_reasoning || "AI analysis pending...";
-  const confidence = analysis?.ai_confidence ? (analysis.ai_confidence * 100).toFixed(0) : 0;
+  const confidenceNum: number = analysis?.ai_confidence ? analysis.ai_confidence * 100 : 0;
+  const confidence: number = Math.round(confidenceNum);
   const model = analysis?.ai_model_version || "v1.0";
   const sentiment = analysis?.recommendation || "NEUTRAL";
 

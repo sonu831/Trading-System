@@ -33,6 +33,50 @@ async function systemRoutes(fastify, options) {
     handler: systemController.getSwarmStatus,
   });
 
+  // Push backfill status log (ingestion calls this instead of writing Redis directly)
+  fastify.post('/api/v1/system/log', {
+    schema: {
+      description: 'Push a system log entry (ingestion backfill progress, errors, etc.)',
+      tags: ['System'],
+      body: {
+        type: 'object',
+        properties: {
+          level: { type: 'string', enum: ['info', 'warn', 'error'] },
+          message: { type: 'string' },
+          data: { type: 'object' },
+        },
+        required: ['message'],
+      },
+    },
+    handler: async (req, reply) => {
+      try {
+        const { redis } = require('../../container').cradle;
+        const entry = JSON.stringify({
+          timestamp: new Date().toISOString(),
+          level: req.body.level || 'info',
+          message: req.body.message,
+          data: req.body.data || {},
+        });
+        await redis.lPush('system:layer1:logs', entry);
+        await redis.lTrim('system:layer1:logs', 0, 99);
+
+        // Also set backfill status if data contains progress info
+        if (req.body.data?.progress != null) {
+          await redis.set('system:layer1:backfill', JSON.stringify({
+            status: 1,
+            progress: req.body.data.progress,
+            details: req.body.message,
+            job_type: 'historical_backfill',
+            timestamp: Date.now(),
+          }));
+        }
+        return { success: true };
+      } catch (err: any) {
+        return reply.code(500).send({ success: false, error: err.message });
+      }
+    },
+  });
+
   // ─────────────────────────────────────────────────────────────
   // SESSION CLOCK — cockpit safety bar
   // ─────────────────────────────────────────────────────────────

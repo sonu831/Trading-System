@@ -126,6 +126,28 @@ async function brokerRoutes(fastify, options) {
     handler: brokerController.deleteProvider,
   });
 
+  /**
+   * Get the active JWT session token + decrypted credentials for a provider.
+   * The ingestion layer reads this (NOT Redis directly) for MStock WebSocket + REST auth.
+   */
+  fastify.get('/api/v1/providers/:provider/session', {
+    schema: {
+      description: 'Return session token + decrypted credentials for ingestion',
+      tags: ['Providers'],
+    },
+    handler: async (req, reply) => {
+      try {
+        const { provider } = req.params as { provider: string };
+        const brokerService = require('../../container').resolve('brokerService') as any;
+        const token = await brokerService.getSessionToken(provider);
+        const creds = await brokerService.getDecryptedCredentials(provider);
+        return { success: true, data: { session_token: token, credentials: creds } };
+      } catch (err: any) {
+        return reply.code(500).send({ success: false, error: err.message });
+      }
+    },
+  });
+
   fastify.post('/api/v1/providers/:provider/test', {
     schema: {
       description: 'Test broker connection (login + TOTP / OTP / request_token)',

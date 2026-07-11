@@ -17,3 +17,9 @@
 # Docker
 - Always use `--project-name trading-system` on every `docker compose` command to prevent project name splits that cause port/network conflicts. Prefer `make` targets (which already include it) over raw docker commands. Confidence: 0.85
 
+# Typescript
+- Write ingestion layer scripts in TypeScript (.ts) not plain JavaScript (.js). Confidence: 0.75
+
+# Charting
+- For dashboard: Use TradingView charting library exclusively (not lightweight-charts) for all chart components — price charts, indicators, and any other visualizations. Confidence: 0.75
+

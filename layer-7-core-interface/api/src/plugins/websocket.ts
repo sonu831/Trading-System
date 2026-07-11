@@ -72,7 +72,25 @@ async function socketPlugin(fastify, options) {
       catch (err) { fastify.log.warn({ err, channel: 'execution:state' }, 'WS push: failed to emit positions'); }
     });
 
-    fastify.log.info('WebSocket real-time publishers active');
+    // Execution mode/kill: Redis channel "execution-events" → socket room "execution"
+    subClient.subscribe('execution-events', (message) => {
+      try { const data = typeof message === 'string' ? JSON.parse(message) : message; io.to('execution').emit('execution', data); }
+      catch (err) { fastify.log.warn({ err, channel: 'execution-events' }, 'WS push: failed to emit execution'); }
+    });
+
+    // Alerts: Redis channel "notifications" → socket room "alerts"
+    subClient.subscribe('notifications', (message) => {
+      try { const data = typeof message === 'string' ? JSON.parse(message) : message; io.to('alerts').emit('alert', data); }
+      catch (err) { fastify.log.warn({ err, channel: 'notifications' }, 'WS push: failed to emit alert'); }
+    });
+
+    // Breadth: Redis channel "sentiment_scores" → socket room "breadth"
+    subClient.subscribe('sentiment_scores', (message) => {
+      try { const data = typeof message === 'string' ? JSON.parse(message) : message; io.to('breadth').emit('breadth', data); }
+      catch (err) { fastify.log.warn({ err, channel: 'sentiment_scores' }, 'WS push: failed to emit breadth'); }
+    });
+
+    fastify.log.info('WebSocket real-time publishers active (9 channels)');
   });
 }
 

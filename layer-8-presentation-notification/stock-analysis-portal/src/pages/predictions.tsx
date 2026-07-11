@@ -1,12 +1,31 @@
 // @ts-nocheck
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import AppShell from '@/components/layout/AppShell/AppShell';
 import PredictionGauge from '@/components/organisms/PredictionGauge';
 import FeatureContributions from '@/components/organisms/FeatureContributions';
 
 export default function PredictionsPage() {
   const [horizon, setHorizon] = useState('scalp');
-  const pct = horizon === 'scalp' ? 64 : 71;
+  const [prediction, setPrediction] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchPred = async () => {
+      try {
+        const res = await fetch(`/api/v1/predict?underlying=NIFTY&horizon=${horizon}`);
+        const data = await res.json();
+        if (data.success && data.data && data.data.status !== 'abstain') {
+          setPrediction(data.data);
+        } else {
+          setPrediction(null); // abstain — model not ready
+        }
+      } catch (_) { setPrediction(null); }
+      setLoading(false);
+    };
+    fetchPred();
+  }, [horizon]);
+
+  const pct = prediction?.probability ? Math.round(prediction.probability * 100) : null;
   const label = horizon === 'scalp' ? 'SCALP · 1–5m' : 'POSITIONAL · hrs–days';
 
   return (
@@ -25,10 +44,30 @@ export default function PredictionsPage() {
           </button>
         </div>
       </div>
-      <div className="grid gap-3.5" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))' }}>
-        <PredictionGauge pct={pct} horizon={label} />
-        <FeatureContributions />
-      </div>
+      {loading ? (
+        <div className="card text-center py-10 text-text-tertiary">Loading prediction model...</div>
+      ) : prediction ? (
+        <div className="grid gap-3.5" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))' }}>
+          <PredictionGauge
+            pct={pct}
+            horizon={label}
+            direction={prediction.direction || 'UP'}
+            confidence={prediction.confidence || 0}
+            model={prediction.model_version || 'lstm-breadth v0.3'}
+          />
+          <FeatureContributions features={prediction.features || []} />
+        </div>
+      ) : (
+        <div className="card text-center py-12">
+          <div className="text-3xl mb-3">🧠</div>
+          <p className="text-text-secondary font-semibold mb-1">Prediction model abstaining</p>
+          <p className="text-xs text-text-tertiary max-w-md mx-auto">
+            The breadth-based LSTM model has not completed its Phase-0 validation study.
+            Predictions will appear here once the model demonstrates a post-cost edge.
+            Until then, the cockpit renders the abstain state — never a fabricated number.
+          </p>
+        </div>
+      )}
     </AppShell>
   );
 }

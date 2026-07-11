@@ -14,3 +14,6 @@
 - For Cockpit app: Build with reusable atomic components (StatTile, Badge, Meter, Card, Gauge, SignalRow, etc.) composed into screen layouts. Extract shared UI patterns into components rather than repeating markup. Confidence: 0.70
 - For Cockpit app: Encapsulate non-visual logic in custom hooks (e.g., useTheme, useKillSwitch, useClock, useScreenNavigation). Keep components focused on rendering, hooks on behavior. Confidence: 0.70
 
+# Docker
+- Always use `--project-name trading-system` on every `docker compose` command to prevent project name splits that cause port/network conflicts. Prefer `make` targets (which already include it) over raw docker commands. Confidence: 0.85
+

@@ -21,6 +21,8 @@ export default function useBackfillManager() {
   const [backfillInProgress, setBackfillInProgress] = useState({});
   const [message, setMessage] = useState(null);
   const [sortConfig, setSortConfig] = useState({ key: 'total_candles', direction: 'asc' });
+  const [activeJobId, setActiveJobId] = useState(null);
+  const [jobStatus, setJobStatus] = useState(null);
 
   // Fetch data availability
   const fetchCoverage = useCallback(async () => {
@@ -83,6 +85,29 @@ export default function useBackfillManager() {
   // Get lagging symbols (< HEALTHY threshold)
   const laggingSymbols = symbols.filter((s) => s.status !== 'healthy');
 
+  // Poll active job status every 2s
+  useEffect(() => {
+    if (!activeJobId) return;
+    const poll = async () => {
+      try {
+        const res = await fetch(`${API_URL}/api/v1/backfill/${activeJobId}`);
+        const data = await res.json();
+        if (data.success || data.data) {
+          setJobStatus(data.data || data);
+          if (data.data?.status === 'COMPLETED' || data.data?.status === 'FAILED') {
+            setActiveJobId(null);
+            setMessage({ type: data.data.status === 'COMPLETED' ? 'success' : 'error', text: data.data.status === 'COMPLETED' ? `✅ Backfill done · ${(data.data.processed || 0).toLocaleString()} records` : `❌ Failed · ${data.data.errors?.[0] || 'unknown error'}` });
+            setBackfillInProgress({});
+            fetchCoverage();
+          }
+        }
+      } catch (_) {}
+    };
+    poll();
+    const id = setInterval(poll, 2000);
+    return () => clearInterval(id);
+  }, [activeJobId]);
+
   // Trigger backfill for a single symbol
   const triggerBackfill = async (symbol, fromDate, toDate) => {
     setBackfillInProgress((prev) => ({ ...prev, [symbol]: true }));
@@ -102,12 +127,12 @@ export default function useBackfillManager() {
       const data = await res.json();
 
       if (res.ok) {
+        const jobId = data.data?.jobId;
+        if (jobId) setActiveJobId(jobId);
         setMessage({
           type: 'success',
-          text: `✅ Backfill started for ${symbol}! Job ID: ${data.data?.jobId || 'N/A'}`,
+          text: `✅ Backfill started for ${symbol}! Monitoring progress...`,
         });
-        // Refresh after a delay
-        setTimeout(fetchCoverage, 5000);
       } else {
         throw new Error(data.error || 'Failed to trigger backfill');
       }
@@ -154,11 +179,12 @@ export default function useBackfillManager() {
       const data = await res.json();
 
       if (res.ok) {
+        const jobId = data.data?.jobId;
+        if (jobId) setActiveJobId(jobId);
         setMessage({
           type: 'success',
-          text: `✅ Bulk backfill started for ${lagging.length} lagging symbols! Job ID: ${data.data?.jobId || 'N/A'}`,
+          text: `✅ Bulk backfill started for ${lagging.length} lagging symbols! Monitoring...`,
         });
-        setTimeout(fetchCoverage, 10000);
       } else {
         throw new Error(data.error || 'Failed to trigger bulk backfill');
       }
@@ -205,6 +231,8 @@ export default function useBackfillManager() {
     backfillInProgress,
     message,
     sortConfig,
+    activeJobId,
+    jobStatus,
     handleSort,
     fetchCoverage,
     triggerBackfill,

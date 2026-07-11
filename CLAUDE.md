@@ -66,6 +66,22 @@ This project uses a hub-and-spoke AI configuration system. The canonical source 
 
 ### Active Knowledge State
 
+#### 2026-07-11 — Cockpit Backend Integration + DB-Backed Credentials (DONE)
+- **Tool/agent:** CommandCode
+- **Source:** `docs/COCKPIT_BACKEND_PLAN.md`, `docs/design/FULL_COCKPIT_DESIGN_PROMPT.md`
+- **Why:** Moved all broker credentials from `.env` to encrypted DB. Wired 17-tab cockpit to L7 API surface. Closed 8 backend gaps. Unified Docker project.
+- **Major changes:**
+  - **Credential architecture**: All broker secrets in `broker_credentials` (AES-256-GCM). `.env` stripped of `MSTOCK_*`/`FLATTRADE_*`/`ZERODHA_*`. L1/L10 auto-discover from L7 API via `CredentialProvider`/`CredentialStore`.
+  - **Direct TOTP login**: MStock strategy now accepts user-provided 6-digit code via `completeSession({ totp })`. Uses SDK's one-step `client.login({ totp })`.
+  - **New L7 endpoints**: `GET /execution/orders`, `POST /backtest`, `GET /alerts`, `DEL /providers/:id/credentials`, `POST /providers/:id/credentials/bulk`, `GET /providers/:provider/credentials/decrypted`.
+  - **Socket.io widened**: 5 rooms now — `market-stream` (tick+breadth), `signals-stream` (signal), `regime-stream` (regime), `exec-stream` (execution), `alerts-stream` (alert). Previously only tick+signal.
+  - **Frontend pages**: `/orders`, `/internals`, `/regime`, `/alerts` with API adapters + Redux slices.
+  - **Unified BrokerForm**: Single `Save All Settings` button replacing BrokerConfig + CredentialForm.
+  - **Shared**: `BROKER_PROVIDERS`, `BROKER_FORM_FIELDS`, `BROKER_CREDENTIAL_FIELDS` enums in `shared/constants.js`. `shared/auth-logger.js` for color-coded auth tracing.
+  - **Docker**: All 11 containers under unified `trading-system` project name. Updated `.ai/skills/docker.md`.
+  - **Docs**: `docs/COCKPIT_INTEGRATION_AUDIT.md` — 17-tab screen-to-API mapping.
+- **DO NOT REDO**: Credential vault is complete. Cockpit backend is 85% ready. Remaining: predictions (gated), heavyweight contributions (L5 Go), strategies detail page, settings page, dashboard Docker build fix.
+
 #### 2026-07-09 — Broker Credential Vault & Provider Registry (DONE)
 - **Tool/agent:** Claude Code (system-architect + ingestion-specialist + api-gateway-engineer)
 - **Files touched:**

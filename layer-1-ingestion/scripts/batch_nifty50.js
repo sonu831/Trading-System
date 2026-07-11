@@ -1,21 +1,22 @@
 const path = require('path');
-// Register ts-node for the SDK
-require('ts-node').register({
-  transpileOnly: true,
-  ignore: [/node_modules\/(?!@mstock-mirae-asset)/],
-  compilerOptions: {
-    module: "commonjs",
-    allowJs: true
-  }
-});
+require('dotenv').config({ path: path.resolve(__dirname, '../../.env') });
 
 const fs = require('fs');
-// const path = require('path'); // already imported
-require('dotenv').config({ path: path.resolve(__dirname, '../../.env') });
-console.log("DEBUG: Script initialized. Loading libs...");
 
 const { DateTime } = require('luxon');
 const { MStockVendor } = require('../src/vendors/mstock');
+
+// Fetch decrypted credentials from L7 API (reads broker_credentials table)
+async function fetchProviderCredentials(provider) {
+  try {
+    const resp = await axios.get(`${BACKEND_API_URL}/api/v1/providers/${provider}/credentials/decrypted`, { timeout: 5000 });
+    if (resp.data?.success && resp.data.data?.credentials) {
+      return resp.data.data.credentials;
+    }
+    return {};
+  } catch (e) { console.warn(`Credentials fetch failed for ${provider}: ${e.message}`); return {}; }
+}
+
 // Load master map - works in both local and Docker environments
 const vendorPath = path.resolve(__dirname, '..', 'vendor', 'nifty50_shared.json');
 const masterMap = require(vendorPath);
@@ -277,12 +278,50 @@ async function main() {
     });
   };
 
-  const vendor = new MStockVendor({ redisClient: redisClient }); // Pass Redis Client for Swarm
+  const vendor = new MStockVendor({ redisClient: redisClient });
+
+  // Step 1: Fetch decrypted credentials from L7 API (common source of truth)
+  console.log('🔑 Loading credentials from Backend API...');
+  try {
+    const creds = await fetchProviderCredentials('mstock');
+    if (creds.api_key) {
+      vendor.apiKey = creds.api_key;
+      vendor.client = new (require('@mstock-mirae-asset/nodetradingapi-typeb').MConnect)('https://api.mstock.trade', vendor.apiKey);
+      console.log('  ✅ api_key loaded from database');
+    }
+    // Also set client_code/password — used by the vendor for login
+    if (creds.client_code) vendor.clientCode = creds.client_code;
+    if (creds.password) vendor.password = creds.password;
+  } catch (e) { console.warn(`  ⚠️ api_key fetch failed: ${e.message}`); }
+
+  // Step 2: Pull session token from Redis (set by L7 BrokerSessionService after dashboard auth)
+  try {
+    if (redisClient) {
+      const raw = await redisClient.get('broker:session:mstock');
+      if (raw) {
+        const cached = typeof raw === 'string' ? JSON.parse(raw) : raw;
+        if (cached?.token) {
+          vendor.setAccessToken(cached.token);
+          console.log('  ✅ session token loaded from Redis');
+        }
+      }
+    }
+  } catch (e) { console.warn(`  ⚠️ Redis token fetch failed: ${e.message}`); }
+
+  if (!vendor.apiKey) {
+    console.error('❌ No MStock API key. Configure via Dashboard → Brokers, then authenticate.');
+    await sendNotification('ERROR', { error: 'MSTOCK_API_KEY not configured' });
+    if (redisClient) await redisClient.quit();
+    process.exit(1);
+  }
+
+  // Step 3: If no session token yet, the vendor will authenticate using login + TOTP/OTP
+  // This allows backfill to work even without a pre-cached token in Redis
   try {
     await vendor.connect();
-    console.log('✅ Authenticated with MStock.');
+    console.log('✅ Connected to MStock');
   } catch (e) {
-    console.error('❌ Auth Failed:', e.message);
+    console.error('❌ MStock Auth Failed:', e.message);
     await sendNotification('ERROR', { error: e.message });
     if (redisClient) await redisClient.quit();
     process.exit(1);

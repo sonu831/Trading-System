@@ -2,6 +2,40 @@
 
 > **For infrastructure changes, adding services, or modifying deployment config.**
 
+## 🚨 CRITICAL — ALWAYS use `--project-name trading-system`
+
+Every `docker compose` command MUST include `--project-name trading-system`. Without it, Docker Compose derives the project name from the directory name, creating a **second project** (`compose`) whose containers cannot communicate with `trading-system` containers and cause port conflicts, name conflicts, and orphan warnings.
+
+```bash
+# ✅ CORRECT
+docker compose --project-name trading-system --env-file .env -f infrastructure/compose/docker-compose.infra.yml up -d
+docker compose --project-name trading-system --env-file .env -f infrastructure/compose/docker-compose.app.yml up -d --build backend-api
+
+# ❌ WRONG — uses implicit project name from directory, never matches
+docker compose -f infrastructure/compose/docker-compose.infra.yml up -d
+docker compose -f infrastructure/compose/docker-compose.app.yml up backend-api
+```
+
+**After ANY code change that affects a container:**
+```bash
+# 1. Stop + remove old container (docker compose down doesn't always work cross-project)
+docker stop <container-name> 2>/dev/null; docker rm <container-name> 2>/dev/null
+
+# 2. Rebuild with project name
+docker compose --project-name trading-system --env-file .env -f infrastructure/compose/<file>.yml up -d --build <service>
+
+# 3. Verify all containers are under the SAME project
+docker ps --format "table {{.Names}}\t{{.Label \"com.docker.compose.project\"}}\t{{.Status}}"
+```
+
+**The Makefile already uses `--project-name trading-system`.** Prefer `make` targets over raw docker commands:
+```bash
+make infra        # Start data stores
+make app-core     # Start L1 + L7 + L10
+make up           # Full stack
+make restart-ingestion   # Rebuild + restart ingestion with .env
+```
+
 ## ⚠️ Use shared/ PORTS — Never Hardcode
 
 ```js

@@ -18,6 +18,10 @@ async function systemRoutes(fastify, options) {
   });
 
   // ─────────────────────────────────────────────────────────────
+  // ALERTS — notification feed from Kafka/Redis
+  // ─────────────────────────────────────────────────────────────
+
+  // ─────────────────────────────────────────────────────────────
   // BACKFILL MANAGEMENT
   // ─────────────────────────────────────────────────────────────
   fastify.post('/api/v1/system/backfill/trigger', {
@@ -394,8 +398,45 @@ async function systemRoutes(fastify, options) {
   });
 
   // ─────────────────────────────────────────────────────────────
-  // ALERTS — notification feed from Kafka/Redis
+  // PREDICT PROXY — proxy to L9 AI service (returns abstain if unavailable)
   // ─────────────────────────────────────────────────────────────
+  fastify.get('/api/v1/predict', {
+    schema: {
+      description: 'Get AI prediction — returns abstain state when model is not ready',
+      tags: ['AI'],
+      querystring: {
+        type: 'object',
+        properties: {
+          underlying: { type: 'string', default: 'NIFTY' },
+          horizon: { type: 'string', default: 'scalp' },
+        },
+      },
+    },
+    handler: async (req, reply) => {
+      try {
+        const axios = require('axios');
+        const aiUrl = process.env.AI_URL || 'http://ai-inference:8000';
+        const resp = await axios.get(`${aiUrl}/predict`, {
+          params: { underlying: req.query.underlying, horizon: req.query.horizon },
+          timeout: 10000,
+        });
+        return { success: true, data: resp.data };
+      } catch (err) {
+        // Return abstain — never fabricate a prediction
+        return {
+          success: true,
+          data: {
+            status: 'abstain',
+            direction: null,
+            probability: null,
+            confidence: null,
+            model_version: null,
+            reason: err.response?.data?.detail || err.message || 'AI service unavailable',
+          },
+        };
+      }
+    },
+  });
   fastify.get('/api/v1/alerts', {
     schema: {
       description: 'Notification feed — kill-switch trips, NO-STOP warnings, fills, rejects',

@@ -7,12 +7,71 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 🚀 Added — Cockpit Backend Integration (2026-07-10/11)
+
+- **DB-Backed Credential Architecture** (Phase 1–5):
+  - Eliminated `.env` broker credentials entirely. All secrets now managed via Dashboard → `broker_credentials` table (AES-256-GCM encrypted).
+  - Added `deleteCredential` + `saveCredentialsBulk` endpoints (L7 API) with full CRUD via dashboard.
+  - Added `GET /api/v1/providers/:provider/credentials/decrypted` — internal endpoint for L1/L10 to fetch live decrypted credentials.
+  - Created `CredentialProvider` module in L10 execution — fetches providers + decrypted creds from L7 API, session tokens from Redis, subscribes to `providers-changed` for hot reload. **No `process.env` cred reads remain in L10.**
+  - Refactored `MStockOMS` + `FlatTradeOMS` constructors to accept `CredentialProvider` — lazy credential resolution at `connect()` time.
+  - Removed `MSTOCK_*`/`FLATTRADE_*`/`ZERODHA_*` env vars from all docker-compose files + `.env` + `.env.example`.
+  - Session JWT now persisted to `broker_credentials.access_token` (encrypted) on every successful auth — survives Redis restarts.
+
+- **Direct TOTP Login Flow** (MStock SDK):
+  - Added `directLogin()` to mstock auth strategy — accepts user-provided 6-digit TOTP code via dashboard input, passes to `client.login({ totp })` in one step. No Base32 secret required for interactive auth.
+  - Updated `completeSession` route schema to accept `totp` field. Dashboard test button now shows TOTP code input.
+  - Auth status (`CONNECTED`/`ERROR`) + `last_tested_at` now written to `broker_providers` table on every auth attempt.
+
+- **Unified Broker Form** (Dashboard):
+  - Replaced `BrokerConfig` + `CredentialForm` with single `BrokerForm` component — role, priority, and all credential fields in one page with one **Save All Settings** button.
+  - Added `api_secret` + `access_token` to credential dropdown. Added credential delete (×) button per field.
+  - `MStockAuthFlow` → `BrokerAuthTest` — parameterized to work with any broker provider.
+  - BrokerForm fetches decrypted credentials from L7 API on load (pre-fills real values, not masked).
+  - Added `deleteBroker` + `deleteCredential` Redux thunks with optimistic state updates.
+
+- **Shared Enums** (`shared/constants.js`):
+  - `BROKER_CREDENTIAL_FIELDS`, `BROKER_REQUIRED_FIELDS`, `BROKER_FORM_FIELDS`, `BROKER_PROVIDERS` — single source of truth for provider metadata.
+  - `REDIS_KEYS.ALERTS_FEED`, `REDIS_KEYS.STRATEGIES_CONFIG`, `REDIS_KEYS.RISK_CONFIG`, `REDIS_KEYS.SYSTEM_COMMANDS`, `REDIS_KEYS.PROVIDERS_CHANGED`.
+
+- **Shared Auth Logger** (`shared/auth-logger.js`):
+  - Color-coded structured auth tracing usable from any layer: `authLog.mstock.start/step/ok/fail/warn/data`.
+
+- **Cockpit Backend Gaps Closed** (COCKPIT_BACKEND_PLAN.md):
+  - `GET /api/v1/execution/orders` — L7 proxy to L10 journal (`order_log` hypertable). L10 added `GET /orders` Express route + `TradeJournal.getAll()`.
+  - `POST /api/v1/backtest` — L7 proxy to L9 AI service.
+  - `GET /api/v1/alerts` — notification feed from Redis `alerts:feed` list (filterable by severity).
+  - `GET /api/v1/broker-strategies` now returns `meta` with providers, roles, credentialFields, formFields.
+
+- **Socket.io Realtime Widened** (SocketService.ts):
+  - 4 new rooms: `regime-stream` (L6 → market-regime), `exec-stream` (L10 → execution-events), `alerts-stream` (L8 → notifications), `breadth` on `market-stream` (L5 → market_view).
+  - Previously only `tick` + `signal` were pushed.
+
+- **Cockpit Frontend Integration**:
+  - New API adapters: `OrdersApi`, `AlertsApi`, `BacktestApi`, `MarketViewApi`, `SystemApi` in `src/api/index.ts`.
+  - New pages: `/orders` (Orders & Execution table with status badges), `/internals` (Market Internals — A/D meter, breadth metrics), `/regime` (trend, volatility, phase, confidence, tier enable/disable), `/alerts` (notification feed with severity filtering).
+  - `cockpitSlice` extended: `execution`, `alerts`, `breadth` state + realtime WS handlers.
+  - `useSocket.ts` wired for `execution`, `alert`, `breadth` events.
+
+- **System Status Enhancement**:
+  - `GET /api/v1/system-status` now returns `brokers` array (enabled providers with role + status + last_tested_at).
+
+- **Docker Infrastructure**:
+  - Unified all containers under single `trading-system` project name. Updated `.ai/skills/docker.md` with mandatory `--project-name` rule.
+  - Removed broker credential env vars from all docker-compose services (execution + ingestion).
+  - Fixed `pnpm-workspace.yaml` + `.npmrc` copy in dashboard Dockerfile.
+
 ### 🛠 Changed
 
-- **L8 Dashboard — Phase 1 primitive dedup (frontend restructure)**:
-  - Removed the dead duplicate `src/components/atoms/` (Button, Card, Badge) — it had **zero importers**; every caller already uses the `@/components/ui` barrel.
-  - Promoted the better-typed implementations (with `ButtonProps`/`CardProps`/`BadgeProps` interfaces) from the deleted `atoms/` into the canonical `ui/` primitives. Behavior is byte-identical (same class strings/logic), so no runtime change and no import site touched.
-  - Establishes **one source of truth** for Button/Card/Badge (contract rule 14). First step of the atomic-design restructure documented in the [dashboard restructure proposal](https://claude.ai/code/artifact/7d9b368f-62b7-4b34-b6bb-9b269ce74a37).
+- **L10 Config** (`config/default.ts`): Removed `mstock.apiKey`, `mstock.accessToken`, `mstock.clientCode`, `flattrade.userId`, `flattrade.accountId`, `flattrade.apiKey`, `flattrade.token` — kept only `baseUrl` + `endpoints`.
+- **L1 Vendors**: `KiteVendor` now accepts `options.apiKey` + `options.sessionToken` constructor params. `CredentialStore` fetches decrypted static credentials from L7 in addition to Redis session tokens.
+- **BrokerService**: Added `saveAccessToken()` (persist JWT to encrypted `access_token` credential) + `saveCredentials()` (bulk upsert) + `deleteCredential()`.
+- **BrokerSessionService**: `applyResult()` now updates `broker_providers.status` + `last_tested_at` on every auth attempt. Generates `token_length` for dashboard (UI never sees raw token).
+- **Piscina worker fix**: Copied `indicator.processor.ts` → `indicator.processor.js` on host to satisfy Piscina's `.js` requirement in Docker volume mount.
+
+### 📚 Documentation
+
+- Created `docs/COCKPIT_INTEGRATION_AUDIT.md` — 17-tab screen-to-API mapping with status per screen.
 
 ## [0.8.0] - 2026-01-25
 

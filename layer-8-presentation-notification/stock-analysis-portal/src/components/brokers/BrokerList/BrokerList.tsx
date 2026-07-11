@@ -20,16 +20,16 @@ const BrokerList = ({ onAddClick }) => {
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-white">Broker Credentials</h1>
-        <button onClick={onAddClick} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition">
+        <h1 className="text-[22px] font-extrabold tracking-tight text-text-primary">Broker Credentials</h1>
+        <button onClick={onAddClick} className="btn-primary text-xs">
           + Add Broker
         </button>
       </div>
 
       {loading && brokers.length === 0 ? (
-        <div className="text-center py-12 text-gray-400">Loading brokers...</div>
+        <div className="text-center py-12 text-text-tertiary">Loading brokers...</div>
       ) : brokers.length === 0 ? (
-        <div className="text-center py-12 text-gray-400">
+        <div className="text-center py-12 text-text-tertiary">
           <p className="text-lg mb-2">No brokers configured</p>
           <p className="text-sm">Add a broker provider to get started with market data and trading</p>
         </div>

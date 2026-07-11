@@ -1,0 +1,79 @@
+/* Color tokens — lifted verbatim from stock-analysis-portal/src/styles/globals.css
+   (Slate neutrals + Blue/Emerald/Violet brand, RGB triplets in source; kept as hex here). */
+
+:root {
+  /* ---- Base palette (light) ---- */
+  --slate-50:  #F8FAFC;
+  --slate-100: #F1F5F9;
+  --slate-200: #E2E8F0;
+  --slate-400: #94A3B8;
+  --slate-500: #64748B;
+  --slate-600: #475569;
+  --slate-700: #334155;
+  --slate-800: #1E293B;
+  --slate-900: #0F172A;
+
+  --blue-400: #60A5FA;
+  --blue-500: #3B82F6;
+  --blue-600: #2563EB;
+  --emerald-400: #34D399;
+  --emerald-500: #10B981;
+  --emerald-600: #059669;
+  --violet-400: #A78BFA;
+  --violet-500: #8B5CF6;
+  --red-400: #F87171;
+  --red-500: #EF4444;
+  --red-600: #DC2626;
+  --amber-400: #FBBF24;
+  --amber-500: #F59E0B;
+
+  /* ---- Semantic tokens (light theme, default) ---- */
+  --color-background: var(--slate-50);
+  --color-surface: #FFFFFF;
+  --color-surface-hover: var(--slate-100);
+
+  --color-text-primary: var(--slate-900);
+  --color-text-secondary: var(--slate-600);
+  --color-text-tertiary: var(--slate-400);
+
+  --color-border: var(--slate-200);
+
+  --color-primary: var(--blue-500);
+  --color-primary-hover: var(--blue-600);
+
+  --color-secondary: var(--emerald-500);
+  --color-secondary-hover: var(--emerald-600);
+
+  --color-accent: var(--violet-500);
+
+  --color-success: var(--emerald-500);
+  --color-error: var(--red-500);
+  --color-warning: var(--amber-500);
+  --color-info: var(--blue-500);
+}
+
+/* ---- Dark theme (Premium Finance Dark Mode) ---- */
+[data-theme="dark"] {
+  --color-background: var(--slate-900);
+  --color-surface: var(--slate-800);
+  --color-surface-hover: var(--slate-700);
+
+  --color-text-primary: var(--slate-100, #F1F5F9);
+  --color-text-secondary: var(--slate-400);
+  --color-text-tertiary: var(--slate-500);
+
+  --color-border: var(--slate-700);
+
+  --color-primary: var(--blue-400);
+  --color-primary-hover: var(--blue-500);
+
+  --color-secondary: var(--emerald-400);
+  --color-secondary-hover: var(--emerald-500);
+
+  --color-accent: var(--violet-400);
+
+  --color-success: var(--emerald-400);
+  --color-error: var(--red-400);
+  --color-warning: var(--amber-400);
+  --color-info: var(--blue-400);
+}

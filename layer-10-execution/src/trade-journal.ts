@@ -101,6 +101,21 @@ class TradeJournal {
   }
 
   async close(): Promise<void> { await this.pool.end(); }
+
+  async getAll(): Promise<OrderRecord[]> {
+    try {
+      const result = await this.pool.query(
+        `SELECT time, order_id AS "orderId", trade_id AS "tradeId", symbol, action, order_type AS "orderType",
+                quantity, price, trigger_price AS "triggerPrice", status, broker, latency_ms AS "latencyMs",
+                error, raw_response AS "rawResponse"
+         FROM order_log ORDER BY time DESC LIMIT 500`
+      );
+      return result.rows;
+    } catch (err: any) {
+      logger.error({ err }, 'Trade journal: getAll failed');
+      return [];
+    }
+  }
 }
 
 export = { TradeJournal };

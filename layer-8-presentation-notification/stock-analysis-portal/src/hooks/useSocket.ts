@@ -2,7 +2,8 @@ import type { Socket } from 'socket.io-client';
 import { useEffect, useRef, useCallback } from 'react';
 import { useDispatch } from 'react-redux';
 import { io } from 'socket.io-client';
-import { cockpitTickPushed, cockpitChainPushed, cockpitRegimePushed, cockpitPositionPushed } from '@/store/slices/cockpitSlice';
+import { cockpitTickPushed, cockpitChainPushed, cockpitRegimePushed, cockpitPositionPushed,
+  cockpitExecutionPushed, cockpitAlertPushed, cockpitBreadthPushed } from '@/store/slices/cockpitSlice';
 
 const SOCKET_URL = (process.env.NEXT_PUBLIC_WS_URL as string) || '/';
 
@@ -37,9 +38,13 @@ export function useSocket() {
     socket.on('chain', (data) => dispatch(cockpitChainPushed(data)));
     socket.on('regime', (data) => dispatch(cockpitRegimePushed(data)));
     socket.on('positions', (data) => dispatch(cockpitPositionPushed(data)));
+    socket.on('execution', (data) => dispatch(cockpitExecutionPushed(data)));
+    socket.on('alert', (data) => dispatch(cockpitAlertPushed(data)));
+    socket.on('breadth', (data) => dispatch(cockpitBreadthPushed(data)));
 
     return () => {
       socket.off('tick'); socket.off('chain'); socket.off('regime'); socket.off('positions');
+      socket.off('execution'); socket.off('alert'); socket.off('breadth');
     };
   }, [dispatch, socket]);
 

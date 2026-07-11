@@ -297,6 +297,84 @@ sessions while the regime persists, exited when `tfAlignment` or breadth breaks.
 - **Safety rail:** optimization and shadow promotion are automatic; **promotion to live is always human-approved.**
   We never let an auto-tuner change what trades real money without sign-off.
 
+### 3.11 Predictive Model — Breadth-Based Index-Move Prediction (Layer 9)
+
+> **What it is:** a *predictive* layer that forecasts the **next NIFTY / BANKNIFTY move** from (a) the live
+> movement of the **50 constituents** (breadth, sector rotation, heavyweight contribution) and (b) **historical
+> patterns** — *"when the index and its internals looked like this before, here is what happened next."*
+> Industry names: **Predictive Analytics / Breadth-Based Index Prediction** (the bottom-up, constituent side) +
+> **Analog Forecasting / Sequence Modelling** (the historical-pattern side). One model family, two heads — a
+> short-horizon head for scalps, a long-horizon head for positional.
+
+**It is a confluence input, never a standalone trigger.** The prediction raises or lowers *conviction and
+sizing* on top of the mechanical momentum rules (§3.6) and the regime gate (§3.9). A model score never fires a
+trade by itself — long-premium entry still requires the breadth-confirmed momentum trigger. This keeps the
+system explainable and fail-safe, and means a bad model degrades sizing, not safety.
+
+**What it predicts (per horizon):**
+
+| Head | Horizon | Feeds |
+|---|---|---|
+| Scalp head | next 1–5 min direction + magnitude | T1 confluence / sizing |
+| Positional head | next N hours–sessions trend probability | T3 tier-enable + conviction |
+
+Output = calibrated probability of **UP / DOWN / FLAT** + expected move size + confidence, tagged with the
+horizon and the top contributing features (for `trade-signals.reasons[]`).
+
+**Feature set (the moat — the 50 stocks + internals, not just index price):**
+
+- Index (NIFTY/BANKNIFTY) OHLCV + RSI/MACD/EMA/VWAP/ATR on 5m / 15m / 1h.
+- **Breadth:** A/D ratio, %aboveVWAP, %aboveEMA20, breadth thrust (Δ) — from `breadth.go`.
+- **Sector momentum:** the top-4 weighted sectors' state — from `aggregator.go`.
+- **Heavyweight contribution:** index-points push of the top ~10 constituents (weight × %move).
+- **Options:** PCR, change-in-OI at ATM±N, IV — from the `option-chain` topic.
+- **Volatility / regime:** India VIX, ATR percentile, `RegimeState` (§3.9), `tfAlignment`.
+- **Sequence window:** the last *N* candles of the above (an LSTM consumes a time series, not a single row).
+
+**Label:** forward index return over the horizon, bucketed UP/DOWN/FLAT (plus an optional magnitude head),
+computed with strict **no-lookahead** and IST session/expiry handling.
+
+**Edge reality & data traps (research review 2026-07-11) — read before trusting any backtest:**
+
+- **Survivorship bias is the #1 trap.** NIFTY-50 membership rotates ~every 6 months (~20+ names over 10y).
+  Breadth features MUST be computed from **point-in-time constituent lists + historical free-float weights**
+  (NSE reconstitution announcements / a point-in-time membership vendor). Today's 50 names against old index
+  data = fiction.
+- **Breadth is contemporaneous, not predictive.** When NIFTY moves 1%, breadth tells you the *quality* of that
+  move, not tomorrow's direction. The forecasting power lives almost entirely in **index-vs-internals
+  divergences** and is modest — think ~52–55% hit rate, regime-dependent, not a crystal ball.
+- **Positional first; scalp is hard.** Breadth's real edge is **positional** (days–weeks): e.g. index at a new
+  high while %above-50DMA is falling → a decent swing signal. At second-to-minute scalp horizons breadth is too
+  slow — short-horizon index price is driven by **order flow, futures basis, and the option chain (ΔOI, IV
+  skew)**, which the FlatTrade option-chain poller already ingests. Treat the scalp head as a stretch goal, not v1.
+- **Options costs eat weak edges.** STT + bid-ask + slippage + theta can exceed a 0.1% directional edge. Every
+  backtest must be **net of realistic option round-trip cost**, or it is meaningless.
+
+**Honest current status (verified in code 2026-07-11, not assumed): SCAFFOLDED, NOT FUNCTIONAL.**
+
+| Piece | State |
+|---|---|
+| `POST /predict` API + engine abstraction (`BaseEngine`) | ✅ exists — `layer-9-ai-service/app/main.py`, `.../core/engine.py` |
+| `FeatureVector` | ⚠️ only 6 technical fields (rsi, macd, ema50, ema200, close, volume) — **no breadth / constituents / options / regime** |
+| `LSTMModel` | ⚠️ declares `input_size=14` but `FeatureVector` supplies 6 (**contract mismatch**); **untrained** — `predict()` returns a hardcoded `0.65` dummy (`v1.0.0-lstm-untrained`) |
+| Training data / pipeline / weights | ❌ none — no labeled dataset, no training loop, no saved `.pth` |
+| Wiring into L6 strategy / regime | ❌ none — the prediction is not consumed anywhere |
+
+**Build phases (new — none built yet):**
+
+0. **Prove the edge cheaply first — before any ML.** A daily-bar breadth study on **point-in-time constituents**: compute 4–5 breadth features, test one rule (*fade narrow 1% moves / follow broad ones*) over ~10y **net of realistic costs**, **walk-forward** (never a single random split). Proceed to the ML pipeline below only if a small, stable, post-cost edge survives. Skipping this — training an LSTM on survivorship-biased data — is exactly how you get a beautiful backtest that dies live (rule 12).
+1. **Feature contract** in `shared/` — expand `FeatureVector` to the set above; make it the single source of truth; fix `input_size` to match.
+2. **Dataset + labels** — build (feature-window → forward-return) samples from stored candles + breadth history + option-chain snapshots (L3 TimescaleDB).
+3. **Training** — LSTM **and** a simple baseline (logistic / gradient-boost), walk-forward, **per-regime buckets** (§3.10); save versioned weights + scaler + feature manifest. Score on **trading expectancy**, not just accuracy.
+4. **Serving** — real `PyTorchEngine.predict`: load weights, transform features, output calibrated prob + magnitude + horizon; **fail-closed** on feature/model mismatch (rule 11) — abstain, never emit a fabricated score (rule 13).
+5. **Integrate** — L6 fetches the score and uses it as a confluence/sizing input to §3.6 and a tier-confidence input to §3.9; tag it in `reasons[]`; surface it in `AIPredictionPanel`.
+6. **Validate before it counts** — must beat a naive baseline and show positive expectancy in backtest/paper **before** it influences sizing; promotion to live is human-gated (§3.10); decay auto-demotes it.
+
+> **Reality check:** a predictive model is an *edge amplifier*, not a crystal ball. On noisy index data a good
+> model nudges win-rate and sizing by a few points — valuable compounded, dangerous if trusted blindly. That is
+> why it gates *conviction*, not the *trigger*, and why it must pass the same validation roadmap (§12) as any
+> strategy before it touches live sizing.
+
 ---
 
 ## 4. What Already Exists vs What We Build
@@ -325,6 +403,7 @@ Grounded in the knowledge graph (graphify) — not assumptions.
 | **Layer 10 execution — finish + positional profile** | `layer-10-execution/src/**` | Scaffold exists; implement OMS/risk/strike/position-manager (FlatTrade-first), add a positional profile (ATR stop, overnight handling) |
 | **Execution schema (TimescaleDB)** | `layer-3-storage/.../migrations/005_execution_schema.sql` | `trades`, `order_log`, `pnl_snapshots`, `option_chain_snapshots` hypertables |
 | **Backtest harness (2-stage)** | `scripts/` + `layer-9-ai-service` | Signal backtest on index+breadth; option-leg backtest (BS model + cost layer); feeds the optimizer (§3.10) |
+| **Breadth-based Predictive Model (L9)** | `layer-9-ai-service/app/**` + `shared/` | Expand `FeatureVector` (breadth+sectors+options+regime), build labeled dataset, train LSTM+baseline per regime, serve real inference; consumed by L6 as a confluence/sizing input (§3.11). **Currently scaffolded only — untrained dummy** |
 
 ---
 
@@ -552,6 +631,7 @@ Run **two** tick sources for the scalp hot path and treat them as primary/backup
 | 2026-07-09 | Build a first-class multi-TF Regime Engine (§3.9) | Owner: "understand the market moment on major timeframes" — regime gates tiers, routes strategies, enables positional |
 | 2026-07-09 | Adaptation loop optimizes params per regime; live promotion is human-gated (§3.10) | Adapt to changing markets safely — auto-tune + auto-shadow, but never auto-change what trades real money |
 | 2026-07-09 | Lag acceptable → all tiers default to the candle-close event pipeline; hot path is optional | Owner accepts lag; we capture 1m–multi-hour moves, not tick edges → simpler v1, hot path a later upgrade |
+| 2026-07-11 | Add a breadth-based predictive model (L9) as a confluence input, **not** a trigger (§3.11) | Predict the index move from the 50 constituents + historical patterns to raise/lower conviction & sizing; never fires trades alone → stays explainable and fail-safe; must pass §12 validation before it influences live |
 
 ---
 

@@ -25,6 +25,23 @@ class SocketService {
         this.broadcastSignal(message);
       });
 
+      // Cockpit realtime: regime changes, breadth updates, execution events, alerts
+      await this.redisSubscriber.subscribe('market-regime', (message) => {
+        try { this.io.to('regime-stream').emit('regime', JSON.parse(message)); } catch (_) {}
+      });
+
+      await this.redisSubscriber.subscribe('market_view', (message) => {
+        try { this.io.to('market-stream').emit('breadth', JSON.parse(message)); } catch (_) {}
+      });
+
+      await this.redisSubscriber.subscribe('execution-events', (message) => {
+        try { this.io.to('exec-stream').emit('execution', JSON.parse(message)); } catch (_) {}
+      });
+
+      await this.redisSubscriber.subscribe('notifications', (message) => {
+        try { this.io.to('alerts-stream').emit('alert', JSON.parse(message)); } catch (_) {}
+      });
+
       console.log('✅ SocketService: Subscribed to Redis channels');
     } catch (err) {
       console.error('❌ SocketService Error:', err);

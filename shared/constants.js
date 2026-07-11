@@ -166,6 +166,11 @@ const REDIS_KEYS = {
   BROKER_SESSION: (provider) => `broker:session:${provider}`,
   EXECUTION_PREFIX: 'execution:',
   OPTION_CHAIN: (underlying) => `option-chain:${underlying}`,
+  ALERTS_FEED: 'alerts:feed',        // Redis list — notification feed for cockpit
+  STRATEGIES_CONFIG: 'strategies:config', // Redis key — L6 strategy registry
+  RISK_CONFIG: 'risk:config',         // Redis key — risk envelope settings
+  SYSTEM_COMMANDS: 'system:commands', // Redis pub/sub — trigger backfill etc.
+  PROVIDERS_CHANGED: 'providers-changed', // Redis pub/sub — provider hot-reload
 };
 
 // ── Kafka Topic Names (single source of truth — §4) ──

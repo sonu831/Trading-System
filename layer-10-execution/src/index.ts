@@ -257,6 +257,16 @@ function startExpress() {
     });
   });
 
+  // Order book from the journal
+  app.get('/orders', async (req, res) => {
+    try {
+      const orders = journal ? await journal.getAll() : [];
+      res.json(orders);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // Halting must also flatten the book — same semantics as the Redis KILL command,
   // otherwise "kill" would silently leave live positions running.
   app.post('/kill', async (req, res) => {

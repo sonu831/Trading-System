@@ -362,6 +362,86 @@ async function systemRoutes(fastify, options) {
       } catch (err) { return { success: false, error: err.message }; }
     },
   });
+
+  // ─────────────────────────────────────────────────────────────
+  // BACKTEST PROXY — proxy to L9 AI service
+  // ─────────────────────────────────────────────────────────────
+  fastify.post('/api/v1/backtest', {
+    schema: {
+      description: 'Run a backtest via L9 AI service',
+      tags: ['Backtest'],
+      body: {
+        type: 'object',
+        properties: {
+          strategy: { type: 'string' },
+          fromDate: { type: 'string' },
+          toDate: { type: 'string' },
+          capital: { type: 'number' },
+          regimeBucket: { type: 'string' },
+        },
+      },
+    },
+    handler: async (req, reply) => {
+      try {
+        const axios = require('axios');
+        const aiUrl = process.env.AI_URL || 'http://ai-inference:8000';
+        const resp = await axios.post(`${aiUrl}/backtest`, req.body, { timeout: 30000 });
+        return { success: true, data: resp.data };
+      } catch (err) {
+        return { success: false, error: err.response?.data?.detail || err.message };
+      }
+    },
+  });
+
+  // ─────────────────────────────────────────────────────────────
+  // ALERTS — notification feed from Kafka/Redis
+  // ─────────────────────────────────────────────────────────────
+  fastify.get('/api/v1/alerts', {
+    schema: {
+      description: 'Notification feed — kill-switch trips, NO-STOP warnings, fills, rejects',
+      tags: ['Alerts'],
+      querystring: {
+        type: 'object',
+        properties: {
+          severity: { type: 'string', enum: ['info', 'warn', 'error', 'critical'] },
+          limit: { type: 'integer', default: 50 },
+        },
+      },
+    },
+    handler: async (req, reply) => {
+      try {
+        const { redis } = require('../../container').cradle;
+        const limit = Math.min(req.query.limit || 50, 200);
+        const severity = req.query.severity;
+        // Alerts pushed to Redis list `alerts:feed` by L8 notification service
+        const raw = await redis.lRange('alerts:feed', 0, limit - 1);
+        let alerts = raw.map(r => typeof r === 'string' ? JSON.parse(r) : r);
+        if (severity) alerts = alerts.filter(a => a.severity === severity);
+        return { success: true, data: { alerts, count: alerts.length } };
+      } catch (err) {
+        return { success: true, data: { alerts: [], count: 0 } };
+      }
+    },
+  });
+
+  // ─────────────────────────────────────────────────────────────
+  // OPTIONS EXPIRIES — (moved up, duplicate guard)
+  // ─────────────────────────────────────────────────────────────
+  fastify.get('/api/v1/options/expiries-v2', {
+    handler: async (req, reply) => {
+      const u = (req.query.underlying || 'NIFTY').toUpperCase();
+      const IST = 5.5 * 3600000;
+      const n = new Date(Date.now() + IST);
+      const today = new Date(n.getUTCFullYear(), n.getUTCMonth(), n.getUTCDate());
+      const out = [];
+      for (let i = 0; i < 8; i++) {
+        const d = new Date(today);
+        d.setDate(d.getDate() + (4 - d.getDay() + 7) % 7 + i * 7);
+        if (d > today) { out.push({ date: d.toISOString().split('T')[0], dte: Math.ceil((d - today) / 86400000), type: d.getDate() > 22 ? 'monthly' : 'weekly' }); if (out.length >= 4) break; }
+      }
+      return { success: true, data: { underlying: u, expiries: out } };
+    },
+  });
 }
 
 module.exports = systemRoutes;

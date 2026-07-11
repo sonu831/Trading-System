@@ -68,6 +68,59 @@
   }
 }
 
+/* ── Utility classes for cockpit components ── */
+@layer components {
+  .card {
+    @apply bg-surface border border-border rounded-xl p-4;
+  }
+  .card.hoverable {
+    @apply transition cursor-pointer hover:-translate-y-0.5 hover:shadow-lg hover:border-primary;
+  }
+  .kv {
+    @apply flex justify-between py-1.5 border-b border-border text-xs;
+  }
+  .kv:last-child { border-bottom: none; }
+  .stat .k {
+    @apply text-[11px] uppercase tracking-wider text-text-tertiary;
+  }
+  .stat .v {
+    @apply text-2xl font-extrabold tracking-tight mt-0.5;
+  }
+  .stat .d {
+    @apply text-xs font-semibold mt-1 flex items-center gap-1;
+  }
+
+  /* Badge variants */
+  .badge {
+    @apply inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full border;
+  }
+  .badge-ok  { @apply border-[rgba(52,211,153,0.3)] bg-[rgba(52,211,153,0.15)] text-[rgb(var(--color-success))]; }
+  .badge-err { @apply border-[rgba(248,113,113,0.3)] bg-[rgba(248,113,113,0.15)] text-[rgb(var(--color-error))]; }
+  .badge-warn { @apply border-[rgba(251,191,36,0.3)] bg-[rgba(251,191,36,0.15)] text-[rgb(var(--color-warning))]; }
+  .badge-paper { @apply border-[rgba(96,165,250,0.3)] bg-[rgba(96,165,250,0.15)] text-[rgb(var(--color-info))]; }
+  .badge-accent { @apply border-[rgba(167,139,250,0.3)] bg-[rgba(167,139,250,0.15)] text-[rgb(var(--color-accent))]; }
+  .badge-neutral { @apply bg-[rgb(var(--color-surface-hover))] border-[rgb(var(--color-border))] text-[rgb(var(--color-text-secondary))]; }
+
+  .banner {
+    @apply border border-warning/40 bg-warning/10 rounded-xl p-3 text-xs text-text-primary flex gap-2 items-start;
+  }
+  .btn-primary {
+    @apply inline-flex items-center text-sm font-semibold px-4 py-2 rounded-lg border-none cursor-pointer transition;
+    background: linear-gradient(135deg, rgb(var(--color-primary)), rgb(var(--color-accent)));
+    color: #fff;
+  }
+  .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(96,165,250,0.3); }
+  .btn-kill {
+    @apply px-3.5 py-1.5 rounded-lg text-white font-extrabold text-xs tracking-wider border-none cursor-pointer transition;
+    background: rgb(var(--color-error));
+  }
+  .btn-kill:hover { filter: brightness(1.1); }
+
+  /* Tabular numbers & mono */
+  .tabular-nums { font-variant-numeric: tabular-nums; }
+  .mono { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace; }
+}
+
 /* Custom scrollbar for webkit */
 ::-webkit-scrollbar {
   width: 8px;

@@ -83,3 +83,4 @@ graphify-out/
 # "what version is installed", and the one nothing reads always wins the argument.
 package-lock.json
 **/package-lock.json
+*storybook.log

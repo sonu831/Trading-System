@@ -241,26 +241,45 @@ async function initialize() {
     await logToRedis('✅ Normalizer initialized');
 
     // Load Subscription List from Global Shared Map
+    // Repository-root vendor/nifty50_shared.json is the DEFINITIVE MStock token source.
+    // Must resolve from repo root (workspace), not the L1 subdirectory.
     let subscriptionList = [];
-    try {
-      // In Docker: /app/src/index.js -> ../vendor = /app/vendor (mounted)
-      // Locally: layer-1-ingestion/src/index.js -> ../vendor = layer-1-ingestion/vendor (symlink)
-      const mapPath = path.resolve(__dirname, '../vendor/nifty50_shared.json');
-      const masterMap = require(mapPath);
-
-      // Map to MStock Format: "NSE:Token"
-      // Filter out items without mstock token
-      subscriptionList = masterMap
-        .filter((item) => item.tokens && item.tokens.mstock)
-        .map((item) => `NSE:${item.tokens.mstock}`);
-
-      logger.info(`📋 Loaded ${subscriptionList.length} Symbols from Global Map for Subscription.`);
-    } catch (e) {
-      logger.warn(
-        `⚠️ Failed to load Global Map: ${e.message}. Falling back to config/symbols.json (Legacy)`
-      );
-      // Fallback or Empty
-      subscriptionList = symbols.nifty50.map((s) => `NSE:${s.token}`); // Legacy fallback (might be Kite tokens!)
+    let vendorTokenMaps: Record<string, string[]> = {}; // provider → tokens[NSE:TOKEN]
+    const vendorMapPaths = [
+      path.resolve(__dirname, '../../vendor/nifty50_shared.json'), // local workspace root
+      '/app/vendor/nifty50_shared.json',                          // Docker mount
+    ];
+    let masterMap = null;
+    for (const p of vendorMapPaths) {
+      try { masterMap = require(p); console.log(`✅ Loaded Global Map: ${p}`); break; } catch (_) {}
+    }
+    if (masterMap) {
+      // Build per-vendor token lists from the unified map
+      for (const item of masterMap) {
+        if (item.tokens?.mstock) {
+          vendorTokenMaps.mstock = vendorTokenMaps.mstock || [];
+          vendorTokenMaps.mstock.push(`NSE:${item.tokens.mstock}`);
+        }
+        if (item.tokens?.kite) {
+          vendorTokenMaps.kite = vendorTokenMaps.kite || [];
+          vendorTokenMaps.kite.push(`NSE:${item.tokens.kite}`);
+        }
+        if (item.tokens?.flattrade) {
+          vendorTokenMaps.flattrade = vendorTokenMaps.flattrade || [];
+          vendorTokenMaps.flattrade.push(`NSE:${item.tokens.flattrade}`);
+        }
+      }
+      subscriptionList = vendorTokenMaps.mstock || [];
+      console.log(`📋 Loaded ${subscriptionList.length} MStock tokens.`);
+      for (const [v, tokens] of Object.entries(vendorTokenMaps)) {
+        console.log(`   ${v}: ${tokens.length} instruments`);
+      }
+    }
+    if (!masterMap || subscriptionList.length === 0) {
+      // Fail closed — never substitute another broker's tokens silently
+      console.error(`❌ FATAL: Could not load ${vendorMapPaths.join(' or ')}, and 0 MStock tokens found.`);
+      console.error(`   A wrong token set produces zero ticks with no error (silent failure). Exiting.`);
+      process.exit(1);
     }
 
     // Initialize Market Hours (MUST be before VendorManager for status checks)
@@ -485,7 +504,13 @@ let isBackfilling = false;
  */
 const runScriptWithIPC = (scriptPath, args = []) => {
   return new Promise((resolve, reject) => {
-    const child = fork(scriptPath, args, { stdio: 'inherit' });
+    // The batch scripts are TypeScript. A bare fork() runs them under plain Node, which cannot
+    // parse TS — that is how every backfill used to die on `SyntaxError: Unexpected token '?'`.
+    // tsx is the project's TS loader (rule 15: tsx, never ts-node).
+    const child = fork(scriptPath, args, {
+      stdio: 'inherit',
+      execArgv: ['--import', 'tsx'],
+    });
 
     child.on('message', (msg) => {
       if (msg.type === 'metric') {
@@ -584,7 +609,7 @@ const runBackfill = async (startParams = {}) => {
     await updateBackfillStatus(1, 10, 'Fetching Data...');
     
     // Scripts path relative to __dirname (which is src/)
-    const batchScript = path.resolve(__dirname, '../scripts/batch_streaming.js');
+    const batchScript = path.resolve(__dirname, '../scripts/backfill-runner.ts');
     const scriptArgs = [];
     if (symbol) scriptArgs.push('--symbol', symbol);
     if (fromDate && toDate) scriptArgs.push('--from', fromDate, '--to', toDate);
@@ -642,9 +667,16 @@ const runBackfill = async (startParams = {}) => {
     const countMsg = `🕯️ DB Total: ${finalCount.toLocaleString()} candles`;
     await logToRedis(`✅ Backfill Complete: ${symbolMsg}. ${countMsg}`);
     
-  } catch (err) {
+  } catch (err: any) {
+    // Record WHY. The job used to be marked FAILED with no reason, so the dashboard showed a
+    // dead job and the operator had to go read container logs to learn the script had crashed.
     await updateBackfillStatus(3, 0, err.message);
-    if (jobId) await backendApi.updateBackfillJob(jobId, { status: 'FAILED' }).catch(() => {});
+    if (jobId) {
+      await backendApi
+        .updateBackfillJob(jobId, { status: 'FAILED', details: err.message, error: err.message })
+        .catch(() => {});
+    }
+    await logToRedis(`❌ Backfill Failed: ${err.message}`);
     logger.error(`❌ Backfill Failed: ${err.message}`);
   } finally {
     isBackfilling = false;

@@ -1,2 +1,3 @@
 // @ts-nocheck
-export { default } from './BackfillManager.tsx'
+export { default as BackfillManager } from './BackfillManager';
+export { default as SwarmMonitor } from './SwarmMonitor';

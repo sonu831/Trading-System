@@ -94,9 +94,31 @@ fastify.get('/swagger/index.html', async (req, reply) => {
 const redis = require('./redis/client');
 // const db = require('./db/client'); // REMOVED Legacy DB client
 
-// Register CORS
+// ── Security boot guard — fail closed (rule 11) ────────────────────────────────
+// This control plane can hand out decrypted broker credentials and halt live trading.
+// Without a service key there is no way to authenticate the dashboard / L1 / L10, and the
+// only alternative would be to serve them unauthenticated — the exact bug being fixed here.
+// Refuse to start rather than degrade to open access.
+if (!process.env.INTERNAL_API_KEY) {
+  throw new Error(
+    'INTERNAL_API_KEY is not set — refusing to start (the API would be unauthenticated). ' +
+      'Generate one, put it in .env, and pass it to backend-api, dashboard, ingestion and execution:\n' +
+      '  node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'hex\'))"',
+  );
+}
+
+// ── CORS ───────────────────────────────────────────────────────────────────────
+// Was `origin: true`, which reflects ANY origin. Combined with the auth bypass above, any
+// website the operator visited could drive the trading API from their browser. Allow-list
+// the dashboard origin(s) only.
+const ALLOWED_ORIGINS = (process.env.DASHBOARD_ORIGINS || 'http://localhost:3000')
+  .split(',')
+  .map((o) => o.trim())
+  .filter(Boolean);
+
 fastify.register(require('@fastify/cors'), {
-  origin: true,
+  origin: ALLOWED_ORIGINS,
+  credentials: true,
 });
 
 // Register WebSocket Plugin (Real-Time)
@@ -106,15 +128,30 @@ fastify.register(require('./plugins/websocket'));
 fastify.register(require('./middleware/AuthMiddleware'));
 fastify.register(require('./plugins/logging'));
 
-// Global Auth Hook
-fastify.addHook('onRequest', async (req, reply) => {
-  if (req.url === '/health' || req.url === '/' || req.url.startsWith('/documentation')) return;
+// ── Global Auth Hook — DEFAULT DENY ────────────────────────────────────────────
+//
+// This hook used to authenticate ONLY when an x-api-key header happened to be present:
+//
+//     if (req.headers['x-api-key']) { await fastify.authenticate(req, reply); }
+//
+// so a caller that simply OMITTED the header was served unauthenticated. Every route was
+// open, including GET /api/v1/providers/:provider/credentials/decrypted (plaintext broker
+// api_key / password / totp_secret) and POST /api/v1/execution/kill. It also only covered
+// /api/v1, leaving /api/market/* unguarded entirely.
+//
+// Now: everything outside PUBLIC_API_ROUTES requires a valid key. IP allow-listing is NOT
+// used on purpose — Docker SNATs published-port traffic to the bridge gateway, so an
+// internet client and the dashboard both arrive as 172.x and are indistinguishable.
+const { PUBLIC_API_ROUTES } = require('/app/shared/constants');
 
-  if (req.url.startsWith('/api/v1')) {
-    if (req.headers['x-api-key']) {
-      await fastify.authenticate(req, reply);
-    }
-  }
+const isPublicRoute = (url) => {
+  const path = url.split('?')[0];
+  return PUBLIC_API_ROUTES.some((p) => path === p || (p !== '/' && path.startsWith(`${p}/`)));
+};
+
+fastify.addHook('onRequest', async (req, reply) => {
+  if (isPublicRoute(req.url)) return;
+  await fastify.authenticate(req, reply);
 });
 
 const PORT = process.env.PORT || 4000;

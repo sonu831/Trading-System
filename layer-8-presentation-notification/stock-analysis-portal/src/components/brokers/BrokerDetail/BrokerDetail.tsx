@@ -2,8 +2,8 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import { useSelector, useDispatch } from 'react-redux';
-import BrokerForm from './BrokerForm';
-import BrokerAuthTest from './MStockAuthFlow';
+import BrokerForm from '@/components/brokers/BrokerDetail/BrokerForm';
+import BrokerAuthTest from '@/components/brokers/BrokerDetail/MStockAuthFlow';
 import BrokerStatusBadge from '@/components/brokers/BrokerList/BrokerStatusBadge';
 import { fetchBrokers, enableBroker, disableBroker, selectBrokers } from '@/store/slices/brokerSlice';
 

@@ -7,7 +7,26 @@
 import type { BrokerAuthStrategy, StrategyDeps, AuthContext, AuthResult } from './base';
 import { secondsUntilNextISTHour } from './base';
 
-const AUTH_API = 'https://authapi.flattrade.in/trade/apitoken';
+/* eslint-disable @typescript-eslint/no-var-requires */
+// URLs come from shared/constants.js (rule 3/14) — this file previously hardcoded
+// `/PiConnectTP`, which the shared constant explicitly flags as WRONG (`/PiConnectAPI`).
+// Fail closed: an unresolvable constant must refuse to construct, never fall back to a guess.
+let BROKER_BASE_URLS: Record<string, string> | null = null;
+try { BROKER_BASE_URLS = require('/app/shared/constants').BROKER_BASE_URLS; } catch (_) {
+  try { BROKER_BASE_URLS = require('../../../../../../shared/constants').BROKER_BASE_URLS; } catch (_e) { BROKER_BASE_URLS = null; }
+}
+if (!BROKER_BASE_URLS?.FLATTRADE || !BROKER_BASE_URLS?.FLATTRADE_AUTH || !BROKER_BASE_URLS?.FLATTRADE_PORTAL) {
+  throw new Error('shared/constants.js BROKER_BASE_URLS.FLATTRADE* not resolvable — FlatTrade strategy cannot start');
+}
+const API_BASE = BROKER_BASE_URLS.FLATTRADE;        // https://piconnect.flattrade.in/PiConnectAPI
+const AUTH_API = BROKER_BASE_URLS.FLATTRADE_AUTH;   // https://authapi.flattrade.in/trade/apitoken
+const PORTAL = BROKER_BASE_URLS.FLATTRADE_PORTAL;   // https://auth.flattrade.in
+
+// FlatTrade tokens live ~24h and the broker clears them between 05:00-06:00 IST.
+// Cache until the next 06:00 IST — NOT the next clock hour. FlatTrade cannot re-authenticate
+// unattended (canAuthenticateUnattended === false), so an hourly TTL silently forced the
+// operator to redo the browser login every hour of the trading day.
+const TOKEN_RESET_HOUR_IST = 6;
 
 const strategy: BrokerAuthStrategy = {
   id: 'flattrade', label: 'FlatTrade (Pi Connect)',
@@ -15,7 +34,7 @@ const strategy: BrokerAuthStrategy = {
   interactiveInputs: ['request_code'],
   capabilities: { data: true, execution: true, restingStop: true, orderStatus: true },
 
-  ttlSeconds: secondsUntilNextISTHour,
+  ttlSeconds: (now: Date) => secondsUntilNextISTHour(TOKEN_RESET_HOUR_IST, now || new Date()),
 
   canAuthenticateUnattended(): boolean { return false; },
 
@@ -26,7 +45,7 @@ const strategy: BrokerAuthStrategy = {
     // Pre-generated jKey — validate it, no browser step needed
     if (access_token) {
       try {
-        const resp = await http.post('https://piconnect.flattrade.in/PiConnectTP/UserDetails', {
+        const resp = await http.post(`${API_BASE}/UserDetails`, {
           uid: client_code || '', actid: client_code || '', susertoken: access_token, source: 'API',
         }, { timeout: 10000 });
         if (resp.data?.stat === 'Ok') {
@@ -48,7 +67,7 @@ const strategy: BrokerAuthStrategy = {
     const requestCode = ctx.input?.request_code as string;
     if (!requestCode) {
       return { success: false, status: 'needs_input', stage: 'needs_request_code',
-        error: 'Open https://auth.flattrade.in/?app_key=' + api_key + ' and provide the request_code.',
+        error: `Open ${PORTAL}/?app_key=${api_key} and provide the request_code.`,
         pending: { provider: 'flattrade' }, pendingTtlSeconds: 300 };
     }
 

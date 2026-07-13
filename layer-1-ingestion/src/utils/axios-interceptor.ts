@@ -12,6 +12,9 @@ const axios = require('axios');
 const { metrics } = require('./metrics');
 const logger = require('./logger');
 
+// Single source of truth for the L7 service-key header (shared with the forked batch scripts).
+const { API_KEY_HEADER, isBackendUrl } = require('./internal-auth');
+
 let isSetup = false;
 
 /**
@@ -85,6 +88,16 @@ function setupGlobalInterceptor() {
         vendor: extractVendor(config.url),
         endpoint: extractEndpoint(config.url),
       };
+
+      // L7 is default-deny, so internal calls must carry the service key.
+      // Scoped to the backend host ON PURPOSE: a blanket axios default header would ship
+      // our internal key to every broker API this process talks to (MStock, FlatTrade...).
+      const internalKey = process.env.INTERNAL_API_KEY || '';
+      if (isBackendUrl(config.url) && internalKey) {
+        config.headers = config.headers || {};
+        config.headers[API_KEY_HEADER] = internalKey;
+      }
+
       return config;
     },
     (error) => Promise.reject(error)

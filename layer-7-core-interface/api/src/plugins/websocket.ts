@@ -31,8 +31,15 @@ async function socketPlugin(fastify, options) {
   const appSub = pubClient.duplicate();
   await appSub.connect();
 
+  // `origin: '*'` let any website open a live socket onto the trading stream.
+  // Same allow-list as the REST CORS in index.ts.
+  const ALLOWED_ORIGINS = (process.env.DASHBOARD_ORIGINS || 'http://localhost:3000')
+    .split(',')
+    .map((o) => o.trim())
+    .filter(Boolean);
+
   fastify.register(socketio, {
-    cors: { origin: '*', methods: ['GET', 'POST'] },
+    cors: { origin: ALLOWED_ORIGINS, methods: ['GET', 'POST'], credentials: true },
     adapter: createAdapter(pubClient, subClient),
   });
 

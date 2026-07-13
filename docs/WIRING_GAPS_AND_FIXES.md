@@ -28,12 +28,12 @@
 | C2 | `risk-changed` published, consumed by NO ONE (L10 keeps stale limits) | §3 FIX-C | 🟣 |
 | D1 | Frontend joins legacy room names; needs canonical set | §3 GAP-D | 🔴 |
 | D2 | Pushed payloads lack timestamps → StaleBadge can't fire | §3 GAP-D | 🔴 |
-| E1 | NO broker session refresh loop (promised in code header, absent) | §9 FIX-E1 | 🔴 |
-| E2 | Session expiry is silent — no alert published | §9 FIX-E1 | 🔴 |
-| E3 | Provider status = token exists, not token WORKS (false green) | §9 FIX-E2 | 🟠 |
-| E4 | No single-flight lock on auth (double-login invalidates tokens) | §9 FIX-E3 | 🔴 |
+| E1 | NO broker session refresh loop (promised in code header, absent) | §9 FIX-E1 | ✅ |
+| E2 | Session expiry is silent — no alert published | §9 FIX-E1 | ✅ |
+| E3 | Provider status = token exists, not token WORKS (false green) | §9 FIX-E2 | ✅ |
+| E4 | No single-flight lock on auth (double-login invalidates tokens) | §9 FIX-E3 | ✅ |
 | E5 | Kite daily interactive `request_token` flow missing end-to-end | §9 FIX-E4 | 🟠 |
-| E6 | No server-time check before TOTP generation | §9 FIX-E5 | 🔴 |
+| E6 | No server-time check before TOTP generation | §9 FIX-E5 | ✅ |
 | F1 | Dual schema authority: SQL migrations vs Prisma (drift/destruction risk) | §10 F1 | 🔴 |
 | F2 | `index_membership` exists but population + consumption unverified | §10 F2 | 🟠 |
 | F3 | Control-plane tables missing: alerts, strategy_registry, backtest_runs, prediction_log | §10 F3 | 🟠 |
@@ -56,6 +56,29 @@
 | P5 | Prediction not consumed by L6 (correct until validated — keep gated) | build prompt Phase 5–6 | ⏸ by design |
 | P6 | `contributions[]` (heavyweight index-points) missing from L5 `market_view` — `/internals` heavyweight panel + P features starve | `COCKPIT_BACKEND_PLAN.md` §4 #2 | 🔴 |
 | H1 | MStock index tokens (NIFTY/BANKNIFTY/VIX) unverified in `vendor/nifty50_shared.json` | `MOMENTUM_TRADING_ARCHITECTURE.md` §6 | ⚪ owner |
+| **I1** | **Session token NEVER reaches a running vendor after dashboard login → MStock streams nothing until L1 restarts** | §11 FIX-I1 | ✅ |
+| **I2** | **Silent fallback feeds MStock the WRONG BROKER'S instrument tokens (Kite) → WS connects, subscribes, streams zero ticks** | §11 FIX-I2 | 🔴 |
+| I3 | Subscription list is MStock-token-specific but broadcast to ALL vendors (Kite/FlatTrade get MStock tokens) | §11 FIX-I3 | 🔴 |
+| I4 | MStock SDK version drift: installed `subscribe(tokens[])` vs documented `subscribe(exchange, tokens[], mode)`; no feed MODE selected | §11 FIX-I4 | 🟠 |
+| I5 | `maxReconnectionAttempts: 0` is falsy → SDK silently uses 5 | §11 FIX-I5 | 🟡 |
+| I6 | `mstock.js` monkey-patches global `console.error`/`console.log` at import (process-wide) | §11 FIX-I6 | 🟡 |
+| ~~J1~~ | ~~AUTH BYPASS: auth ran only when an `x-api-key` header was present ⇒ omitting it served EVERY route unauthenticated (incl. decrypted broker credentials, kill switch)~~ → **FIXED 2026-07-13**: default-deny (only `PUBLIC_API_ROUTES` open); `INTERNAL_API_KEY` service key for dashboard-proxy/L1/L10; L7 refuses to boot without it; L7 port re-bound to `127.0.0.1`. Guarded by `tests/verify-api-auth.js` (20 asserts) | §13 FIX-J1 | ✅ |
+| J2 | No TLS: API + dashboard served over plain HTTP; broker redirect URIs and credentials would transit in clear | §13 FIX-J2 | 🟣 |
+| J3 | No broker OAuth callback route exists (`/redirect`, `/callback`, `/auth/*` — none registered). FlatTrade/Kite require a registered redirect URI; current flow is manual paste of `request_code` | §13 FIX-J3 (= E5) | 🔴 |
+| ~~J4~~ | ~~CORS `origin: '*'` on REST + socket.io — any website could drive the trading API from the operator's browser~~ → **FIXED 2026-07-13**: allow-list from `DASHBOARD_ORIGINS`. Guarded by `J4:` assertions | §13 FIX-J4 | ✅ |
+| ~~K1~~ | ~~FlatTrade L7 strategy calls the WRONG base URL `/PiConnectTP`~~ → **FIXED 2026-07-13**: all 3 URLs now import from `shared/constants.js` (fail-closed if unresolvable). Guarded by `K1:` assertions in `tests/verify-broker-auth.js` | §14 FIX-K1 | ✅ |
+| ~~K2~~ | ~~FlatTrade session TTL expired EVERY HOUR, forcing hourly browser re-login~~ → **FIXED 2026-07-13**: TTL now runs to the broker's 06:00 IST token reset (`secondsUntilNextISTHour(6, now)`). Guarded by `K2:` assertions | §14 FIX-K2 | ✅ |
+| K3 | No **Postback/webhook** endpoint exists — FlatTrade registration requires a Postback URL for order updates; without it, fills/rejects are never pushed to us | §14 FIX-K3 | 🔴 |
+| K4 | FlatTrade token exchange **only succeeds from the registered static Primary IP** — L7's egress IP must equal it (undocumented in deployment) | §14 FIX-K4 | 🟠 |
+| K5 | `docs/BROKER_LOGIN_FLOWS.md` FlatTrade section is **stale/wrong** (documents `/PiConnectTP` and "no separate login step — API key is the credential"; the real flow is 3-legged browser auth) | §14 FIX-K5 | 🟡 |
+| **L1** | **🔥 BACKFILL IS DEAD: `scripts/backfill-runner.js` is TypeScript source with a `.js` extension → `SyntaxError: Unexpected token '?'` on every run.** Verified by executing it in the live container. Every dashboard backfill dies at step 1 | `BACKFILL_SYSTEM_PLAN.md` §1 | 🔥 |
+| **L2** | **Fabricated success: L1 returns `{success:true}` BEFORE the child process parses; the crash is `.catch`-logged and dropped.** Dashboard shows green for a job that never ran (rule 13) | plan §5 step 2 | 🟣 |
+| L3 | `batch_streaming.js` fails `node --check` too (same TS-in-`.js` class); `ts-node` is installed in L1 (rule 15 forbids it); `runScriptWithIPC` uses bare `fork()` which cannot run TS | plan §5 step 1 | 🔴 |
+| L4 | `no-ts-js-twins` gate has a blind spot: it only catches a file existing as BOTH `.ts` and `.js` — not TS *content* in a `.js` file | plan §5 step 3 | 🔴 |
+| L5 | Two competing trigger paths: L7→L1 **direct HTTP** (`ingestion:9101`, violates rule 4) vs Redis `system:commands` (Telegram) | plan §5 step 4 | 🔴 |
+| L6 | No range fan-out: cannot backfill **NIFTY + BANKNIFTY + 50 constituents** for a date range (owner's core requirement); `isBackfilling` boolean = no queue/resume | plan §5 step 7 | 🔴 |
+| L7 | `data_availability` (the coverage map table) is **never populated** — because no backfill has ever succeeded | plan §5 step 9 | 🔴 |
+| L8 | Candle inserts lack an asserted `ON CONFLICT DO NOTHING` (rule 5) → re-running a range may duplicate bars | plan §5 step 8 | 🟠 |
 | R1–R14 | Robustness/troubleshooting enhancements (correlation IDs … chaos drill) | §8 | 🔵 recommended |
 
 ## 0.2 GAP-G6 detail — frontend pages show dummy data (🟣 SAFETY) + fix prompt
@@ -348,12 +371,12 @@ in Redis `broker:session:{provider}` with TTL to IST midnight and persisted encr
 
 | # | Gap (verified unless marked) | Consequence |
 |---|---|---|
-| E1 | **No proactive refresh/re-auth loop exists.** The service header says "one refresh loop" — none is implemented in the file. Tokens expire at IST midnight and nothing re-authenticates. | Every morning the session is dead until a human opens the dashboard and re-enters a TOTP. Feeds/OMS start the day broken. |
-| E2 | **Expiry is silent.** No alert is published when a token expires or auth fails (and the `notifications` wire is dead anyway — GAP-B4). | Operator discovers a dead broker only when the chart freezes or an order fails. |
-| E3 | **Status = "token exists", not "token works"** (verify: `/providers/:provider/status` handler). A cached JWT can be revoked/invalid at the broker while the UI shows CONNECTED. | False-green status; failures surface at the worst moment (order placement). |
-| E4 | **No single-flight lock on auth.** Two concurrent `test`/auth calls can double-login; some brokers invalidate the first token when a second login lands. | "It connected, then immediately disconnected" mysteries. |
+| E1 | ✅ **FIXED 2026-07-13:** Session monitor runs every 60s, adapts threshold to actual token lifespan (not policy TTL), handles cold-start (no token → re-auth), handles expired tokens (key outlives token so monitor can detect), and uses the auth lock to prevent race conditions with manual dashboard login. | — |
+| E2 | ✅ **FIXED 2026-07-13:** Monitor publishes alerts on auth failure via `REDIS_CHANNELS.ALERTS` (`notifications`), and logs all state transitions with timestamps. | — |
+| E3 | ✅ **FIXED 2026-07-13:** `/providers/:provider/status` now runs `probeLiveness()` (MStock: `/profile`, FlatTrade: `UserDetails`) before returning CONNECTED. Returns EXPIRED/DISCONNECTED on failed probe. | — |
+| E4 | ✅ **FIXED 2026-07-13:** `withAuthLock()` — in-process Map + Redis `broker:authlock:{provider}` `SETNX` with 30s TTL. Monitor and dashboard Test Connection both use it. | — |
 | E5 | **Kite (Zerodha) needs a daily interactive `request_token` redirect** — unattended login is impossible by design (verify kite.ts completeness). No morning-connect flow exists in the UI. | Kite provider effectively unusable day-to-day. |
-| E6 | **TOTP clock-skew is only a hint string.** No server-time check before generating the code. | Wrong-code failures with a misleading error. |
+| E6 | ✅ **FIXED 2026-07-13:** `mstock.ts authenticate()` now calls `GET https://api.mstock.trade/api/server-time` before TOTP generation. Refuses + explains on >30s skew. | — |
 
 **FIX-E (ordered):**
 1. **Session monitor loop (L7)** — a scheduler (e.g. every 5 min) per enabled provider: check Redis TTL remaining; at T−30 min: if `canAuthenticateUnattended` → re-auth automatically; else publish an actionable alert ("MStock session expires 23:59 IST — tap to re-enter TOTP") to the alerts channel + Telegram. On failure: alert with the strategy's staged error. *This closes E1+E2 and is the single biggest fix.*
@@ -385,7 +408,240 @@ hypertables as typed models.
 | F7 | **Background-job health invisible.** Compression/retention/aggregate refresh jobs can silently fail. | Expose `timescaledb_information.jobs` failures via `/health/detailed` + alert channel (pairs with §8 R2). |
 | F8 | **Restore is untested.** `make backup`/`restore` exist; a backup that's never restored is a hope, not a backup. | Quarterly (or CI-nightly on scratch) restore drill target: `make restore-drill` restores latest dump to a temp container and runs row-count/spot-check asserts. Consider WAL archiving for PITR before live trading. |
 
-## 11. Hand-off
+## 11. GAP-I — Ingestion (L1) ↔ Broker session: why MStock fetches NO DATA
+
+**Symptom:** MStock authenticates on the dashboard, the WebSocket connects, but **zero ticks arrive**.
+**Diagnosis (verified in code 2026-07-11, graphify-first):** three *independent* blockers, each sufficient on its own.
+
+### I1 🟣 — The session token never reaches a running vendor (login on dashboard ⇒ L1 still deaf)
+
+Evidence chain:
+
+1. `layer-7-core-interface/api/src/modules/broker/BrokerService.ts` L80–85 — `saveSessionToken()` writes the
+   token to Redis (`broker:session:{provider}` = `{token, expiresAt}`) and the DB, **and publishes NOTHING.**
+   (The only broker publish in the repo is `BrokerRepository.publishConfigChange()` → `providers-changed`,
+   which fires on *config* changes, not on a new session token.)
+2. `layer-1-ingestion/src/vendors/CredentialStore.ts` L55–58 — `refreshProviders()` calls `loadTokens()` **only
+   if `detectChanges()` is true**, and `detectChanges()` compares the *provider list* (`provider:enabled` set).
+   A brand-new token with an unchanged provider list ⇒ **`loadTokens()` is skipped**.
+3. `layer-1-ingestion/src/vendors/manager.ts` L45–46 — the token is read **once, at vendor construction**
+   (`credentialStore.getToken(name)` → `sessionToken`). **Nothing ever calls `vendor.setAccessToken()`** —
+   `MStockVendor.setAccessToken()` (mstock.js L61) is **dead code**, and the comment at mstock.js L189
+   ("the CredentialStore will eventually push a new one via setAccessToken()") is **false**.
+
+⇒ If L1 boots before the user authenticates (the normal case), `MStockVendor` is constructed with **no token**,
+`connect()` logs *"no session token — waiting for dashboard auth"* and returns. The user then logs in… and L1 is
+never told. It stays deaf **until L1 restarts**.
+
+**FIX-I1:** (a) L7 `saveSessionToken()` publishes `REDIS_CHANNELS.BROKER_SESSION_CHANGED` (add to `shared/constants.js`)
+with `{provider, expiresAt}`. (b) L1 `CredentialStore` subscribes to it → `loadTokens()` **unconditionally**
+(and decouple `loadTokens()` from `detectChanges()` — a token change is not a provider change). (c) On token
+arrival, `VendorManager` calls `vendor.setAccessToken(token)` and re-`connect()`s the vendor (or recreates it).
+(d) Regression test: with L1 running and no token, write a session token → assert the vendor connects within N seconds.
+
+### I2 🔴 — Silent fallback feeds MStock the WRONG BROKER'S instrument tokens
+
+`layer-1-ingestion/src/index.ts` L248–264:
+
+```js
+const mapPath = path.resolve(__dirname, '../vendor/nifty50_shared.json');   // L1/vendor/...
+const masterMap = require(mapPath);
+subscriptionList = masterMap.filter(i => i.tokens?.mstock).map(i => `NSE:${i.tokens.mstock}`);
+} catch (e) {
+  logger.warn(`⚠️ Failed to load Global Map: ${e.message}. Falling back to config/symbols.json (Legacy)`);
+  subscriptionList = symbols.nifty50.map(s => `NSE:${s.token}`);  // ← "might be Kite tokens!" (its own comment)
+}
+```
+
+- `layer-1-ingestion/vendor` **does not exist** (the symlink is deleted — it is in the staged deletions).
+  The real map is at repo-root `vendor/nifty50_shared.json`.
+- So the `require` throws → the catch fires → `config/symbols.json` is used, which holds **KITE** tokens.
+
+| Symbol | `config/symbols.json` (used) | `vendor/nifty50_shared.json` (correct) | MStock SDK sample |
+|---|---|---|---|
+| RELIANCE | **256265** ← Kite | `kite: 256265`, **`mstock: 2885`** | `subscribe("NSE", ["2885"])` ✅ |
+
+MStock's WS accepts a subscribe for unknown tokens and simply **streams nothing** ⇒ exactly the reported symptom.
+Docker masks this (`docker-compose.app.yml` mounts `../../vendor:/app/vendor:ro`, so `/app/vendor` resolves);
+**local dev is broken.** Note `layer-1-ingestion/config/symbols_mstock.json` **already exists with the correct
+MStock tokens** and is never used.
+
+**FIX-I2:** (a) **Fail closed** — a missing instrument map must ABORT ingestion with a named error, never
+silently substitute another broker's tokens (rule 11; a wrong single-source-of-truth is worse than none — rule 14).
+(b) Restore `layer-1-ingestion/vendor` → repo-root `vendor/` (symlink or path fix) so local == Docker; better,
+resolve the map from ONE canonical path exported by `shared/`. (c) Delete or clearly quarantine the Kite-token
+`config/symbols.json` fallback. (d) Regression test: assert the loaded MStock subscription list contains 2885 for
+RELIANCE and NOT 256265.
+
+### I3 🔴 — One MStock-specific list is broadcast to every vendor
+
+`index.ts` builds the list from `item.tokens.mstock` only, and `manager.ts` L73 pushes **the same list to every
+vendor**. A Kite or FlatTrade vendor therefore receives **MStock tokens** and fetches nothing.
+**FIX-I3:** build the subscription list **per vendor** from `nifty50_shared.json` (`tokens[vendorName]`);
+`VendorManager.subscribe()` maps symbol → per-vendor token. Fail loud if a vendor lacks a token for a symbol.
+
+### I4 🟠 — MStock SDK version drift (silent breakage on upgrade)
+
+Installed `@mstock-mirae-asset/nodetradingapi-typeb` exposes `subscribe(tokens: number[])` (lib/ticker.ts L257) —
+our call matches. But the **vendor's own docs** describe `subscribe(exchange, tokens[], mode)` with
+`MODE_LTP/QUOTE/SNAP`. An SDK upgrade will silently change the contract, and today **no feed mode is chosen**.
+**FIX-I4:** pin the SDK version, add a startup assertion on `ticker.subscribe.length` (arity), and select the feed
+mode explicitly once on the newer API.
+
+### I5 🟡 — `maxReconnectionAttempts: 0` silently becomes 5
+SDK does `config.maxReconnectionAttempts || 5` — `0` is falsy. Intent ("never auto-reconnect, we manage it") is
+silently inverted, so SDK reconnects race our own `reconnectWS()`. **FIX:** pass an explicit sentinel the SDK
+honors, or drop our custom reconnect and use the SDK's.
+
+### I6 🟡 — Process-wide console monkey-patch
+`mstock.js` L24–27 reassigns global `console.error`/`console.log` at import — affecting **every** module in L1,
+despite the comment claiming it doesn't. **FIX:** filter inside the SDK's own logger/handlers, never globally.
+
+> **Also blocking the dashboard even after I1–I3 are fixed:** ticks that DO arrive are only `SET` to Redis keys —
+> they are never `PUBLISH`ed (GAP-B1), so the cockpit's WebSocket still shows nothing. I1–I3 restore the *feed*;
+> B1 restores the *push*.
+
+**Suggested order:** I2 (fail-closed + correct tokens) → I1 (token delivery + hot reconnect) → B1 (publish ticks)
+→ I3 → I4–I6.
+
+## 13. GAP-J — Security: the API is effectively UNAUTHENTICATED (blocks any public exposure)
+
+**Context:** the owner has a static IP (`122.176.106.109`) with port `3029` open and intends to register a broker
+redirect URL against it. **Public exposure is unsafe until J1/J2/J4 are fixed.**
+
+### J1 🟣 — Authentication bypass (verified)
+
+`layer-7-core-interface/api/src/index.ts` L110–118:
+
+```js
+fastify.addHook('onRequest', async (req, reply) => {
+  if (req.url === '/health' || req.url === '/' || req.url.startsWith('/documentation')) return;
+  if (req.url.startsWith('/api/v1')) {
+    if (req.headers['x-api-key']) {        // ⚠️ auth runs ONLY if a key is offered
+      await fastify.authenticate(req, reply);
+    }
+  }
+});
+```
+
+`AuthMiddleware.authenticate()` *does* correctly 401 on a missing key — but it is **never invoked** when the
+header is absent. So a request with **no** `x-api-key` is served **unauthenticated**. Reachable without any
+credential today:
+
+- `GET /api/v1/providers/:provider/credentials/decrypted` → **plaintext api_key / password / totp_secret**
+- `POST /api/v1/execution/kill` · `/resume` · `/square-off` → halt/resume live trading
+- every market/signal/regime/order/strategy/risk route (read **and** PATCH)
+
+**FIX-J1:** invert the gate — authenticate **every** `/api/v1/*` request by default, with an explicit allow-list
+for public routes (`/health`, `/metrics`, `/documentation`). Fail closed (rule 11). Add a regression test:
+a request with **no** `x-api-key` to `/api/v1/execution/state` MUST return 401. Additionally, the
+`credentials/decrypted` route is an **internal** L1/L10 endpoint — bind it to a service-only key/network, never
+expose it on the public listener.
+
+### J2 🟣 — No TLS
+API (4000) and dashboard (3000) are plain HTTP. Broker credentials, session JWTs and redirect codes would
+transit in clear over the internet. **FIX-J2:** terminate TLS at a reverse proxy (Caddy/nginx) with a real
+certificate; never expose the raw container ports. (A raw-IP `http://` redirect URI is also commonly *rejected*
+by brokers.)
+
+### J3 🔴 — No broker OAuth callback route (= GAP-E5)
+No `/redirect`, `/callback` or `/auth/*` route is registered anywhere in L7. FlatTrade/Kite both require a
+**registered redirect URI**; today's `flattrade.ts` strategy is a **manual-paste** flow
+(`needs_request_code` → user copies `request_code` from the browser address bar).
+
+**FIX-J3 / guidance for registering a redirect URL:**
+
+| Broker | Redirect needed? | Note |
+|---|---|---|
+| MStock | ❌ No | TOTP flow (`login` → `verifyTOTP`); no redirect leg exists |
+| FlatTrade | ✅ Yes | `https://auth.flattrade.in/?app_key=<api_key>` → returns `request_code` |
+| Zerodha Kite | ✅ Yes | OAuth → returns `request_token` (daily; unattended login impossible by design) |
+
+**Recommended today: register `http://127.0.0.1:3029/redirect` (localhost), NOT the public IP.** The manual-paste
+flow works identically (the code is visible in the address bar), nothing is exposed, and brokers generally accept
+localhost while rejecting plain-HTTP public IPs. Note `3029` is not in `shared/constants.js` `PORTS`
+(BACKEND_API=4000, DASHBOARD=3000) — any real exposure needs an explicit mapping.
+To automate the callback later: add `GET /api/v1/broker/:provider/callback` that captures `code`/`request_token`,
+completes the token exchange via the existing strategy, and stores the session — then register that URL. Only
+after J1/J2/J4.
+
+### J4 🟣 — CORS `origin: '*'`
+`index.ts` (CORS) and `plugins/websocket.ts` (socket.io) both allow any origin. Combined with J1, **any website a
+logged-in operator visits could drive the trading API from their browser.** **FIX-J4:** restrict to the dashboard
+origin(s); no wildcard in any deployed environment.
+
+> **Bottom line:** J1 + J4 together mean the trading control plane is currently open to anyone who can reach the
+> port. Keep it on localhost/LAN until fixed.
+
+## 14. GAP-K — FlatTrade Pi Connect: spec conformance (verified against official docs v2.0, 31-Mar-2026)
+
+Official facts that drive this section: base URL `https://piconnect.flattrade.in/PiConnectAPI`; 3-legged browser
+auth (`https://auth.flattrade.in/?app_key=<API_KEY>` → redirect with **`?request_code=`**) → POST
+`https://authapi.flattrade.in/trade/apitoken` with `api_secret = SHA256(api_key + request_code + api_secret)`;
+**token valid 24h, cleared 05:00–06:00 IST (regenerate after 06:00)**; **token is returned ONLY if the request
+originates from the registered static Primary IP**; registration requires **both a Redirect URL and a Postback URL**.
+
+### K1 🔴 — Wrong base URL in the L7 strategy (and it bypasses `shared/`)
+
+`layer-7-core-interface/api/src/modules/broker/strategies/flattrade.ts` L29 hardcodes:
+`https://piconnect.flattrade.in/PiConnectTP/UserDetails` — but `shared/constants.js` states
+`FLATTRADE: 'https://piconnect.flattrade.in/PiConnectAPI'  // NOT /PiConnectTP, no /REST/`.
+L1's `flattrade.js` was corrected to `/PiConnectAPI` during the P0 pass; **L7's strategy was never fixed** — the
+exact failure mode rule 14 exists to prevent (one truth, fixed in one place only). Effect: validating a
+pre-generated `access_token` (jKey) hits a dead path.
+
+**FIX-K1:** import `BROKER_BASE_URLS.FLATTRADE` / `.FLATTRADE_AUTH` / `.FLATTRADE_PORTAL` from `shared/constants.js`
+in `flattrade.ts`; delete all three hardcoded URLs (`AUTH_API`, the `UserDetails` URL, the `auth.flattrade.in`
+string). Regression test: assert no literal `piconnect.flattrade.in` / `authapi.flattrade.in` string exists
+outside `shared/`, and that the strategy's URLs equal the shared constants.
+
+### K2 🟣 — Session token cache expires EVERY HOUR (forces hourly manual re-login)
+
+`flattrade.ts` L18: `ttlSeconds: secondsUntilNextISTHour`. With no target hour, `base.ts` L78 computes
+`nextHour = currentHour + 1` ⇒ **TTL ≈ minutes-to-the-next-hour boundary**. Meanwhile
+`canAuthenticateUnattended(): false` (L20) — FlatTrade *cannot* re-authenticate without a human browser step.
+
+⇒ Every hour the Redis `broker:session:flattrade` key expires, L1/L10 lose the token, and the operator must
+re-do the browser login **mid-trading-day**. The broker's token is actually valid for **24h** (cleared 05:00–06:00 IST).
+
+**FIX-K2:** `ttlSeconds: (now) => secondsUntilNextISTHour(6, now)` — the helper already supports the
+`(hour, now)` signature, so this is a one-line change giving a session that lives until the next 06:00 IST reset
+(with the existing 120s safety margin). Regression test: TTL computed at 10:00 IST must be > 15 hours, not < 1.
+Pair with the §9 session-monitor loop (alert the operator before the 06:00 expiry, don't discover it at 09:15).
+
+### K3 🔴 — No Postback (webhook) endpoint
+
+FlatTrade's app registration requires a **Postback URL** — "URL to which you will be receiving order updates for
+the orders placed through API" (§9 POSTBACK/WEBHOOK in their docs). **No such route exists in L7.** Without it,
+order fills/rejects are only discoverable by polling; the cockpit's live order/position updates stay blind.
+
+**FIX-K3:** add `POST /api/v1/broker/flattrade/postback` — validate the payload, normalize to the
+`execution-events` contract, publish on `REDIS_CHANNELS.EXECUTION_EVENTS` (closes part of GAP-B5) and journal it.
+Must be **publicly reachable** (FlatTrade's servers call it) ⇒ see the exposure constraints in §13.
+
+### K4 🟠 — Static-IP binding is undocumented in deployment
+
+"Token will be returned only if the request originates from the **registered private static IP** for the API key."
+⇒ the **egress IP of the L7 container** (not the browser) must equal the registered Primary IP. If L7 runs behind
+NAT/VPN/cloud with a different egress, token exchange fails with a confusing error.
+**FIX-K4:** document the required egress IP in `DEPLOYMENT.md`; add a startup/self-test that reports L7's public
+egress IP and warns loudly if it differs from a configured `FLATTRADE_REGISTERED_IP`. Also note: separate API keys
+are required for PROD vs TEST if their redirect URLs differ.
+
+### K5 🟡 — `docs/BROKER_LOGIN_FLOWS.md` FlatTrade section is stale
+It documents base `/PiConnectTP` and claims "No separate login step — the API key is used as the credential" —
+contradicted by the official 3-legged flow (and by `flattrade.ts`'s own header: *"Not 'API key is the token' — that
+was wrong"*). **FIX-K5:** rewrite that section from the official docs; mark it 🟢 in `docs/INDEX.md` once corrected.
+
+### Registration cheat-sheet (what to enter in the FlatTrade Wall form)
+
+| Field | Value | Note |
+|---|---|---|
+| Primary IP | your static IP | must be **L7's egress IP** — token exchange is IP-bound (K4) |
+| Redirect URL | `…/redirect` | browser lands here with `?request_code=…`; a **localhost** URL works for today's manual-paste flow |
+| Postback URL | `…/postback` | **must be publicly reachable** (K3) — this is the one that forces public exposure |
+
+## 12. Hand-off
 
 - **For the implementing AI:** work §4 in order; treat §6 as the done-bar; every fix imports names from
   `shared/constants.js`; never leave both relays alive; encode each dead wire from §3 as an assertion in

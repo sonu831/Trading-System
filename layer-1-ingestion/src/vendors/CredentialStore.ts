@@ -124,7 +124,20 @@ class CredentialStore {
     }).catch((err: any) => {
       logger.warn(`CredentialStore: Redis subscribe failed: ${err.message}`);
     });
-    logger.info('CredentialStore: Subscribed to providers-changed');
+
+    // Subscribe to session token updates — L7 publishes when a new token is generated
+    this.subscriber.subscribe('broker-session-changed', async (message: string) => {
+      try {
+        const data = JSON.parse(message);
+        logger.info(`CredentialStore: broker-session-changed for ${data.provider}`);
+        await this.loadTokens(); // reload ALL tokens (a login may create a token for any provider)
+        if (this.onChange) this.onChange(this.providers);
+      } catch (e: any) { logger.warn('CredentialStore: parse failed for broker-session-changed'); }
+    }).catch((err: any) => {
+      logger.warn(`CredentialStore: Redis subscribe for broker-session-changed failed: ${err.message}`);
+    });
+
+    logger.info('CredentialStore: Subscribed to providers-changed + broker-session-changed');
   }
 
   getEnabledProviderNames(): string[] {

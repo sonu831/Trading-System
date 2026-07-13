@@ -1,5 +1,5 @@
 // @ts-nocheck
-import BrokerStatusBadge from './BrokerStatusBadge';
+import BrokerStatusBadge from '@/components/brokers/BrokerList/BrokerStatusBadge';
 
 const BROKER_CONFIG = {
   mstock:    { color: 'border-l-blue-500', bg: 'bg-info/10', text: 'text-info', icon: '📊' },

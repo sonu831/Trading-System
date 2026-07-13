@@ -54,8 +54,20 @@ class VendorManager {
     for (const name of current) { if (!providerNames.includes(name)) { try { await this.vendors.get(name)?.disconnect(); } catch (_) {} this.vendors.delete(name); } }
     for (const name of providerNames) {
       if (!current.has(name)) {
-        try { const token = this.credentialStore?.getToken(name); this.vendors.set(name, VendorFactory.createVendor({ ...this.options, onTick: (t: any) => this.handleTick(t), sessionToken: token }, name) as any); }
-        catch (e: any) { logger.error(`VendorManager: failed '${name}': ${e.message}`); }
+        try {
+          const token = this.credentialStore?.getToken(name);
+          const vendor = VendorFactory.createVendor({ ...this.options, onTick: (t: any) => this.handleTick(t), sessionToken: token }, name);
+          if (vendor) this.vendors.set(name, vendor as any);
+        } catch (e: any) { logger.error(`VendorManager: failed '${name}': ${e.message}`); }
+      } else {
+        // Token may have changed — push it to the running vendor (I1 fix)
+        try {
+          const token = this.credentialStore?.getToken(name);
+          const vendor = this.vendors.get(name);
+          if (token && vendor && typeof (vendor as any).setAccessToken === 'function') {
+            (vendor as any).setAccessToken(token);
+          }
+        } catch (_) {}
       }
     }
   }
@@ -70,7 +82,21 @@ class VendorManager {
 
   handleTick(tick: any): void { if (this.onTick) this.onTick(tick); }
   getVendor(name: string): Vendor | undefined { return this.vendors.get(name.toLowerCase()); }
-  subscribe(symbols: string[]): void { this.vendors.forEach(v => { try { v.subscribe(symbols); } catch (_) {} }); }
+  subscribe(symbols: string[]): void {
+    this.vendors.forEach(v => { try { v.subscribe(symbols); } catch (_) {} });
+  }
+  /** Subscribe per-vendor token lists (I3 fix — one list per vendor, not broadcast) */
+  subscribePerVendor(tokenMaps: Record<string, string[]>): void {
+    this.vendors.forEach((v, name) => {
+      const tokens = tokenMaps[name];
+      if (tokens && tokens.length > 0) {
+        try { v.subscribe(tokens); } catch (_) {}
+        console.log(`VendorManager: ${name} subscribed to ${tokens.length} instruments`);
+      } else {
+        console.warn(`VendorManager: ${name} has no instrument tokens — skipping subscribe`);
+      }
+    });
+  }
   isConnected(): boolean { for (const v of this.vendors.values()) { if (v.isConnected()) return true; } return false; }
 }
 

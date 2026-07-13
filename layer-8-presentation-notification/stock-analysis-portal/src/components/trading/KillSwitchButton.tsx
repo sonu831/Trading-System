@@ -9,7 +9,7 @@ import {
   selectKillSwitch,
   selectExecution,
 } from '@/store/slices/executionSlice';
-import ConfirmDialog from './ConfirmDialog';
+import ConfirmDialog from '@/components/trading/ConfirmDialog';
 
 /**
  * Dashboard rule U1: the kill switch is always one click away.

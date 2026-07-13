@@ -192,6 +192,7 @@ const REDIS_CHANNELS = {
   STRATEGIES_CHANGED: 'strategies-changed',
   RISK_CHANGED: 'risk-changed',
   SYSTEM_COMMANDS: 'system:commands',
+  BROKER_SESSION_CHANGED: 'broker-session-changed', // L7 → L1: new session token available
 };
 
 // ── Kafka Topic Names (single source of truth — §4) ──
@@ -245,10 +246,27 @@ const PORTS = {
   EMAIL_SERVICE: 7001,
 };
 
+// ── API auth (L7 gateway) ───────────────────────────
+//
+// The header every internal caller (dashboard proxy, L1, L10) must present to L7.
+// Declared once here because it crosses four layers — a mismatch between the sender and
+// the verifier is a silent 401 storm, not a compile error.
+//
+// L7 previously authenticated ONLY when this header happened to be present, so a request
+// that simply omitted it was served unauthenticated — including the endpoint that returns
+// DECRYPTED broker credentials. Auth is now default-deny; these are the only open routes.
+
+const API_KEY_HEADER = 'x-api-key';
+
+// Unauthenticated by design: liveness/metrics/docs. Everything else requires a key.
+// Matched as exact path or path prefix (`/documentation/...`).
+const PUBLIC_API_ROUTES = ['/', '/health', '/metrics', '/documentation', '/swagger'];
+
 module.exports = {
   REGIME_TREND, REGIME_SENTIMENT, REGIME_VOLATILITY, REGIME_PHASE,
   SIGNAL_DIRECTION, SIGNAL_ACTION, SIGNAL_TIER, OPTION_TYPE,
   SECTOR_MOMENTUM, TRADE_MODE, PROVIDER_ROLE,
   BROKER_CREDENTIAL_FIELDS, BROKER_REQUIRED_FIELDS, BROKER_FORM_FIELDS, BROKER_PROVIDERS,
   BROKER_BASE_URLS, EXPIRY_WEEKDAY_ISO, REDIS_KEYS, REDIS_CHANNELS, PORTS, KAFKA_TOPICS, KAFKA_GROUPS,
+  API_KEY_HEADER, PUBLIC_API_ROUTES,
 };

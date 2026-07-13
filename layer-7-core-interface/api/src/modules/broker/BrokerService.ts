@@ -77,11 +77,16 @@ class BrokerService extends BaseService {
     return s?.token && s?.expiresAt > Date.now() ? s.token : null;
   }
 
-  async saveSessionToken(provider: string, token: string, ttlSeconds: number): Promise<void> {
+  async saveSessionToken(provider: string, token: string, tokenTtlSeconds: number, cacheTtlSeconds?: number): Promise<void> {
     const key = `broker:session:${provider}`;
-    await this.brokerRepository.redis.publisher.set(key, JSON.stringify({ token, expiresAt: Date.now() + ttlSeconds * 1000 }), { EX: ttlSeconds });
+    const now = Date.now();
+    const expiresAt = now + tokenTtlSeconds * 1000;
+    const redisTtl = cacheTtlSeconds ?? tokenTtlSeconds;
+    await this.brokerRepository.redis.publisher.set(key, JSON.stringify({ token, expiresAt, createdAt: now }), { EX: redisTtl });
     const crypto = require('crypto');
-    await this.brokerRepository.saveSession(provider, crypto.createHash('sha256').update(token).digest('hex'), 'CONNECTED', new Date(Date.now() + ttlSeconds * 1000));
+    await this.brokerRepository.saveSession(provider, crypto.createHash('sha256').update(token).digest('hex'), 'CONNECTED', new Date(expiresAt));
+    // Publish session change so L1 VendorManager can hot-reload the token (GAP-I1)
+    try { await this.brokerRepository.redis.publisher.publish('broker-session-changed', JSON.stringify({ provider, expiresAt })); } catch (_) {}
   }
 
   async getProviderStatus(providerName: string): Promise<Record<string, unknown>> {

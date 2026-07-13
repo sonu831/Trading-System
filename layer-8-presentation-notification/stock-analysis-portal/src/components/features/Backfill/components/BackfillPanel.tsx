@@ -4,7 +4,7 @@ import { useSelector } from 'react-redux';
 import { Card, Input, Button, Badge } from '@/components/ui';
 import { Table } from '@/components/molecules';
 import { selectPipelineStatus } from '@/store/slices/systemSlice';
-import BackfillProgress from './BackfillProgress';
+import BackfillProgress from '@/components/features/Backfill/components/BackfillProgress';
 
 const API_URL = ''; // Proxy handling
 const MAX_DAYS = 30;

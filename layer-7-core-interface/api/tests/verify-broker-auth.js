@@ -332,6 +332,62 @@ const VERIFY_OK = { status: true, data: { ClientId: 'C123', ClientName: 'TEST', 
     ok('no api_secret and no jKey -> clear error', r.success === false && r.stage === 'credentials');
   }
 
+  console.log('\nF2. FlatTrade regressions — GAP-K1 (base URL) + GAP-K2 (session TTL)');
+  {
+    // K1: the strategy hardcoded the /PiConnectTP base, which shared/constants.js explicitly
+    // flags as WRONG (/PiConnectAPI). Every jKey validation silently hit a dead path.
+    const { svc, calls } = makeService({
+      creds: { api_key: 'ftkey', client_code: 'FT01', access_token: 'stored-jkey' },
+      routes: { '/UserDetails': { stat: 'Ok', uname: 'Trader' } },
+    });
+    await svc.testConnection('flattrade');
+    const ud = calls.find((c) => c.url.includes('/UserDetails'));
+    ok('K1: UserDetails uses the /PiConnectAPI base', !!ud && ud.url.includes('/PiConnectAPI/UserDetails'), ud && ud.url);
+    ok('K1: the wrong /PiConnectTP base is gone', !calls.some((c) => c.url.includes('/PiConnectTP')));
+  }
+  {
+    // K2: FlatTrade cannot authenticate unattended, so its session must outlive the trading
+    // day. The TTL used to run only to the next CLOCK HOUR, silently forcing the operator to
+    // redo the browser login every hour. It must now run to the broker's 06:00 IST token reset.
+    const ft = getStrategy('flattrade');
+    const IST = 5.5 * 3600000;
+    const istWallClock = (h, m) => {
+      const ist = new Date(Date.now() + IST);
+      return new Date(Date.UTC(ist.getUTCFullYear(), ist.getUTCMonth(), ist.getUTCDate(), h, m, 0) - IST);
+    };
+    const hrs = (s) => `${(s / 3600).toFixed(1)}h`;
+    const at0930 = ft.ttlSeconds(istWallClock(9, 30));
+    const at1400 = ft.ttlSeconds(istWallClock(14, 0));
+    const at0300 = ft.ttlSeconds(istWallClock(3, 0));
+    ok('K2: 09:30 IST session survives the trading day (>15h)', at0930 > 15 * 3600, hrs(at0930));
+    ok('K2: 14:00 IST session survives the trading day (>12h)', at1400 > 12 * 3600, hrs(at1400));
+    ok('K2: 03:00 IST expires at the 06:00 broker reset (~3h)', at0300 > 2 * 3600 && at0300 < 4 * 3600, hrs(at0300));
+    ok('K2: TTL is no longer the next clock hour', at0930 > 3600 && at1400 > 3600);
+  }
+
+  console.log('\nF3. Session TTL never outlives the token itself (GAP-M1)');
+  {
+    // MStock issues JWTs that live 300s, but the strategy policy cached them until IST midnight
+    // (~12h). For almost their entire cached life we served a token the broker had already
+    // killed — every call came back 401, and MStock "could not fetch data" at all.
+    const jwt = (expSecondsFromNow) => {
+      const claims = Buffer.from(JSON.stringify({ exp: Math.floor(Date.now() / 1000) + expSecondsFromNow })).toString('base64');
+      return `eyJhbGciOiJIUzI1NiJ9.${claims}.sig`;
+    };
+
+    const short = jwt(300); // what MStock actually issues
+    const { svc, store } = makeService({ creds: { api_key: 'k' }, routes: {} });
+
+    await svc.saveToken('mstock', short, 43200); // policy asks for 12h
+    ok('M1: TTL clamped to the JWT exp, not the 12h policy', store.ttl <= 300 && store.ttl > 200, `ttl=${store.ttl}`);
+
+    await svc.saveToken('mstock', jwt(-60), 43200); // already-dead token
+    ok('M1: an already-expired token is not cached as valid', store.ttl <= 1, `ttl=${store.ttl}`);
+
+    await svc.saveToken('flattrade', 'opaque-jkey-not-a-jwt', 3600);
+    ok('M1: opaque (non-JWT) tokens keep the policy TTL', store.ttl === 3600, `ttl=${store.ttl}`);
+  }
+
   console.log('\nG. IndianAPI — no auth, nothing cached');
   {
     const { svc, store } = makeService({ creds: {}, routes: {} });

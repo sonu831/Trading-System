@@ -1,7 +1,7 @@
 // @ts-nocheck
 import React, { useState, useMemo } from 'react';
 import PropTypes from 'prop-types';
-import Table from './Table';
+import Table from '@/components/molecules/Table/Table';
 import { Input, Button } from '@/components/ui';
 
 const DataTable = ({

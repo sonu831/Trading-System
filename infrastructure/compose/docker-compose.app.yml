@@ -18,6 +18,7 @@ services:
       - KAFKA_TOPIC_RAW_TICKS=raw-ticks
       - REDIS_URL=redis://redis:6379
       - BACKEND_API_URL=http://backend-api:4000
+      - INTERNAL_API_KEY=${INTERNAL_API_KEY}
       - MARKET_DATA_PROVIDER=${MARKET_DATA_PROVIDER:-kite}
       - SKIP_HISTORICAL_SYNC=false
       - SWARM_CONCURRENCY=${SWARM_CONCURRENCY:-12}
@@ -189,14 +190,20 @@ services:
       context: ../../layer-7-core-interface/api
       dockerfile: Dockerfile
     container_name: backend-api
-    # Ports exposed only internally to Gateway (or debugging)
+    # Bound to loopback ON PURPOSE. This API can return decrypted broker credentials and
+    # halt live trading; '4000:4000' published it on every host interface (LAN + any port
+    # forward). Containers still reach it as backend-api:4000 over trading-network.
+    # To expose it publicly, front it with a TLS reverse proxy — never bind 0.0.0.0 here.
     ports:
-      - '4000:4000'
+      - '127.0.0.1:4000:4000'
     environment:
       - REDIS_URL=redis://redis:6379
       - TIMESCALE_URL=postgresql://${POSTGRES_USER:-trading}:${POSTGRES_PASSWORD:-trading123}@timescaledb:5432/${POSTGRES_DB:-nifty50}
       - DATABASE_URL=postgresql://${POSTGRES_USER:-trading}:${POSTGRES_PASSWORD:-trading123}@timescaledb:5432/${POSTGRES_DB:-nifty50}
       - CREDENTIAL_MASTER_KEY=${CREDENTIAL_MASTER_KEY}
+      # API is default-deny; L7 refuses to start without this key.
+      - INTERNAL_API_KEY=${INTERNAL_API_KEY}
+      - DASHBOARD_ORIGINS=${DASHBOARD_ORIGINS:-http://localhost:3000}
       # Layer 10 execution engine (positions, risk, kill switch). Port must match the
       # `execution` service's PORT (8095). No depends_on: the API must start even when
       # the engine is down and report it as offline.
@@ -275,6 +282,7 @@ services:
       - REDIS_URL=redis://redis:6379
       - TIMESCALE_URL=postgresql://${POSTGRES_USER:-trading}:${POSTGRES_PASSWORD:-trading123}@timescaledb:5432/${POSTGRES_DB:-nifty50}
       - BACKEND_API_URL=http://backend-api:4000
+      - INTERNAL_API_KEY=${INTERNAL_API_KEY}
       - UNDERLYING=${UNDERLYING:-NIFTY}
       - MAX_LOTS=${MAX_LOTS:-1}
       - MAX_CONCURRENT_POSITIONS=1
@@ -327,6 +335,9 @@ services:
     environment:
       - NEXT_PUBLIC_API_URL=/api/v1
       - NEXT_PUBLIC_WS_URL=/
+      # Server-side only (NOT NEXT_PUBLIC_*): src/middleware.ts injects this into the
+      # proxied /api/* requests. Exposing it to the browser would hand over the control plane.
+      - INTERNAL_API_KEY=${INTERNAL_API_KEY}
     networks:
       - trading-network
     depends_on:

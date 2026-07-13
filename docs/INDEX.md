@@ -40,6 +40,7 @@
 | 4 | `docs/design/FULL_COCKPIT_DESIGN_PROMPT.md` | Frontend design spec (17 tabs, laws, components, states) | 🟢 |
 | 5 | `docs/design/mockups/cockpit-app.html` | Interactive visual reference (open in browser) | 🟢 |
 | 6 | `docs/PREDICTIVE_MODEL_BUILD_PROMPT.md` | ML build phases 0–6 (P0 edge-study GATE first) | 🟢 |
+| 7 | **`docs/BACKFILL_SYSTEM_PLAN.md`** | Backfill/swarm: root cause (TS-in-`.js` SyntaxError kills every run) + redesign (range fan-out NIFTY+BANKNIFTY+50, coverage map, live progress) | 🟢 |
 
 ## 3. Domain & architecture (open when the phase touches them)
 

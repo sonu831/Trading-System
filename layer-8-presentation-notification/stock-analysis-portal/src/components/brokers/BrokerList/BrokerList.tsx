@@ -2,7 +2,7 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { useSelector, useDispatch } from 'react-redux';
-import BrokerCard from './BrokerCard';
+import BrokerCard from '@/components/brokers/BrokerList/BrokerCard';
 import { fetchBrokers, enableBroker, disableBroker, selectBrokers, selectBrokersLoading } from '@/store/slices/brokerSlice';
 
 const BrokerList = ({ onAddClick }) => {

@@ -1,7 +1,7 @@
 // @ts-nocheck
 import React from 'react';
 import PropTypes from 'prop-types';
-import BackfillPanel from './components/BackfillPanel';
+import BackfillPanel from '@/components/features/Backfill/components/BackfillPanel';
 import { Modal } from '@/components/molecules';
 
 const BackfillModal = ({ isOpen, onClose }) => {

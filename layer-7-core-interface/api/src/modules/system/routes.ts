@@ -1,5 +1,10 @@
 const { systemStatusSchema, backfillTriggerSchema } = require('./schemas');
 
+let REDIS_CHANNELS: any;
+try { REDIS_CHANNELS = require('/app/shared/constants').REDIS_CHANNELS; } catch (_) {
+  try { REDIS_CHANNELS = require('../../../../shared/constants').REDIS_CHANNELS; } catch (_) {}
+}
+
 /**
  * System Routes
  * @param {FastifyInstance} fastify
@@ -345,7 +350,7 @@ async function systemRoutes(fastify, options) {
         if (idx < 0) return { success: false, error: 'Strategy not found' };
         config[idx] = { ...config[idx], ...req.body };
         await redis.set('strategies:config', JSON.stringify(config));
-        await redis.publish('strategies-changed', JSON.stringify({ id, action: 'updated' }));
+        await redis.publish(REDIS_CHANNELS?.STRATEGIES_CHANGED || 'strategies-changed', JSON.stringify({ id, action: 'updated' }));
         return { success: true, data: config[idx] };
       } catch (err) { return { success: false, error: err.message }; }
     },
@@ -377,7 +382,7 @@ async function systemRoutes(fastify, options) {
         const current = raw ? (typeof raw === 'string' ? JSON.parse(raw) : raw) : {};
         const updated = { ...current, ...req.body };
         await redis.set('risk:config', JSON.stringify(updated));
-        await redis.publish('risk-changed', JSON.stringify(updated));
+        await redis.publish(REDIS_CHANNELS?.RISK_CHANGED || 'risk-changed', JSON.stringify(updated));
         return { success: true, data: updated };
       } catch (err) { return { success: false, error: err.message }; }
     },

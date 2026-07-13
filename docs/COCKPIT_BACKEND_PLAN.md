@@ -1,5 +1,10 @@
 # Cockpit Backend Plan — Wiring the 9-Layer System to `cockpit-app`
 
+> ⚠️ **PARTIALLY STALE (2026-07-11, same day):** most 🔴 gaps below (§4 #1, 3, 5, 6, 7, 8) were built by a
+> concurrent integration pass — options/orders/backtest/strategies/alerts/risk routes now exist in L7. The
+> realtime section (§5) is **superseded by [`WIRING_GAPS_AND_FIXES.md`](WIRING_GAPS_AND_FIXES.md)**, which is
+> the code-verified, active wiring plan. Keep this doc for the layer/data-source map (§1–§3).
+
 > **Purpose:** the definitive map from every screen/panel in
 > [`docs/design/mockups/cockpit-app.html`](design/mockups/cockpit-app.html) to the **backend layer, endpoint,
 > topic, or Redis key** that must feed it — what already exists, what is partial, and exactly what to build.

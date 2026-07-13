@@ -166,11 +166,32 @@ const REDIS_KEYS = {
   BROKER_SESSION: (provider) => `broker:session:${provider}`,
   EXECUTION_PREFIX: 'execution:',
   OPTION_CHAIN: (underlying) => `option-chain:${underlying}`,
-  ALERTS_FEED: 'alerts:feed',        // Redis list — notification feed for cockpit
-  STRATEGIES_CONFIG: 'strategies:config', // Redis key — L6 strategy registry
-  RISK_CONFIG: 'risk:config',         // Redis key — risk envelope settings
-  SYSTEM_COMMANDS: 'system:commands', // Redis pub/sub — trigger backfill etc.
-  PROVIDERS_CHANGED: 'providers-changed', // Redis pub/sub — provider hot-reload
+  ALERTS_FEED: 'alerts:feed',
+  STRATEGIES_CONFIG: 'strategies:config',
+  RISK_CONFIG: 'risk:config',
+  SYSTEM_COMMANDS: 'system:commands',
+  PROVIDERS_CHANGED: 'providers-changed',
+  LOGS: 'system:layer1:logs',
+  BACKFILL_STATUS: 'system:layer1:backfill',
+  SWARM_STATUS: 'system:layer1:swarm_status',
+  HEARTBEAT_PREFIX: 'heartbeat:',
+};
+
+// ── Redis pub/sub channels (single source of truth — rule 3/14) ──
+
+const REDIS_CHANNELS = {
+  TICKS: 'market_ticks',
+  SIGNALS: 'signals:trade',              // matches L6 existing publisher
+  REGIME: 'market-regime',
+  BREADTH: 'market_view',               // matches L5 existing publisher
+  OPTION_CHAIN: 'option_chain_updates',
+  EXECUTION_STATE: 'execution:state',
+  EXECUTION_EVENTS: 'execution-events',
+  ALERTS: 'notifications',              // payload carries `source` field
+  PROVIDERS_CHANGED: 'providers-changed',
+  STRATEGIES_CHANGED: 'strategies-changed',
+  RISK_CHANGED: 'risk-changed',
+  SYSTEM_COMMANDS: 'system:commands',
 };
 
 // ── Kafka Topic Names (single source of truth — §4) ──
@@ -229,5 +250,5 @@ module.exports = {
   SIGNAL_DIRECTION, SIGNAL_ACTION, SIGNAL_TIER, OPTION_TYPE,
   SECTOR_MOMENTUM, TRADE_MODE, PROVIDER_ROLE,
   BROKER_CREDENTIAL_FIELDS, BROKER_REQUIRED_FIELDS, BROKER_FORM_FIELDS, BROKER_PROVIDERS,
-  BROKER_BASE_URLS, EXPIRY_WEEKDAY_ISO, REDIS_KEYS, PORTS, KAFKA_TOPICS, KAFKA_GROUPS,
+  BROKER_BASE_URLS, EXPIRY_WEEKDAY_ISO, REDIS_KEYS, REDIS_CHANNELS, PORTS, KAFKA_TOPICS, KAFKA_GROUPS,
 };

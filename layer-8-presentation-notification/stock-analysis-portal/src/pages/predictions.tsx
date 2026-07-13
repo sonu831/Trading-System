@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import AppShell from '@/components/layout/AppShell/AppShell';
 import PredictionGauge from '@/components/organisms/PredictionGauge';
 import FeatureContributions from '@/components/organisms/FeatureContributions';
+import { PredictApi } from '@/api';
 
 export default function PredictionsPage() {
   const [horizon, setHorizon] = useState('scalp');
@@ -10,19 +11,22 @@ export default function PredictionsPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let active = true;
     const fetchPred = async () => {
       try {
-        const res = await fetch(`/api/v1/predict?underlying=NIFTY&horizon=${horizon}`);
-        const data = await res.json();
-        if (data.success && data.data && data.data.status !== 'abstain') {
-          setPrediction(data.data);
+        const data = await PredictApi.get('NIFTY', horizon);
+        if (data && data.status !== 'abstain' && data.status !== 'not_trained') {
+          if (active) setPrediction(data);
         } else {
-          setPrediction(null); // abstain — model not ready
+          if (active) setPrediction(null);
         }
-      } catch (_) { setPrediction(null); }
-      setLoading(false);
+      } catch (_) {
+        if (active) setPrediction(null);
+      }
+      if (active) setLoading(false);
     };
     fetchPred();
+    return () => { active = false; };
   }, [horizon]);
 
   const pct = prediction?.probability ? Math.round(prediction.probability * 100) : null;
@@ -51,8 +55,8 @@ export default function PredictionsPage() {
           <PredictionGauge
             pct={pct}
             horizon={label}
-            direction={prediction.direction || 'UP'}
-            confidence={prediction.confidence || 0}
+            direction={prediction.direction}
+            confidence={prediction.confidence ?? null}
             model={prediction.model_version || 'lstm-breadth v0.3'}
           />
           <FeatureContributions features={prediction.features || []} />

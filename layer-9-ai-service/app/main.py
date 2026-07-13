@@ -76,12 +76,13 @@ class PredictionRequest(BaseModel):
 
 class PredictionResponse(BaseModel):
     symbol: str
-    prediction: float
-    confidence: float
+    prediction: Optional[float] = None
+    confidence: Optional[float] = None
+    status: str = "ok"
     reasoning: str = ""
     model_version: str
-    prompt_tokens: int
-    completion_tokens: int
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
 
 class MarketAnalysisRequest(BaseModel):
     summaries: List[dict]
@@ -127,6 +128,7 @@ def predict(request: PredictionRequest):
             "symbol": request.symbol,
             "prediction": result.prediction,
             "confidence": result.confidence,
+            "status": getattr(result, 'status', 'ok'),
             "reasoning": result.reasoning,
             "model_version": result.model_version,
             "prompt_tokens": result.prompt_tokens,

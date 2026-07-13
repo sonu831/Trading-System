@@ -13,6 +13,11 @@ const { StrikeSelector } = require('./strike-selector');
 const { TradeJournal } = require('./trade-journal');
 const { SyntheticQuoteFeed, BrokerQuoteFeed } = require('./quote-feed');
 const { PaperExecutor } = require('./paper-executor');
+
+let REDIS_CHANNELS;
+try { REDIS_CHANNELS = require('/app/shared/constants').REDIS_CHANNELS; } catch (_) {
+  try { REDIS_CHANNELS = require('../../../shared/constants').REDIS_CHANNELS; } catch (_) {}
+}
 const { LiveExecutor } = require('./live-executor');
 
 const app = express();
@@ -193,9 +198,9 @@ async function reconcile() {
     const state = riskManager.getState();
     pnlGauge.set({ type: 'daily' }, state.dailyState.totalPnl ?? 0);
 
-    // Publish state to Redis
+    // Publish state to Redis for realtime dashboard
     if (redisClient) {
-      await redisClient.set(config.redis.keys.state, JSON.stringify({
+      const statePayload = {
         timestamp: new Date().toISOString(),
         mode: config.tradeMode,
         positions: positionManager.getAllPositions().map(p => ({
@@ -203,17 +208,31 @@ async function reconcile() {
           pnl: p.pnl, status: p.status,
         })),
         risk: riskManager.getState(),
-      }));
+      };
+      await redisClient.set(config.redis.keys.state, JSON.stringify(statePayload));
 
-      // Publish notifications to Redis for Layer 8
+      // Execution state push (positions room)
+      if (REDIS_CHANNELS?.EXECUTION_STATE) {
+        await redisClient.publish(REDIS_CHANNELS.EXECUTION_STATE, JSON.stringify({
+          ...statePayload,
+          killSwitch: riskManager.killSwitch,
+          dailyPnl: riskManager.getState().dailyState?.totalPnl ?? 0,
+        }));
+      }
+
+      // Publish alerts/notifications
       const openCount = positionManager.getOpenPositions().length;
       if (openCount > 0) {
-        await redisClient.publish(config.redis.channels.notifications || 'notifications:execution', JSON.stringify({
+        const alertChannel = REDIS_CHANNELS?.ALERTS || config.redis.channels.notifications || 'notifications:execution';
+        await redisClient.publish(alertChannel, JSON.stringify({
+          severity: 'info',
+          message: `${openCount} open position${openCount === 1 ? '' : 's'}`,
           type: 'execution_update',
           mode: config.tradeMode,
           positions: openCount,
           dailyPnl: riskManager.getState().dailyState?.totalPnl ?? 0,
           killSwitch: riskManager.killSwitch,
+          source: 'execution-engine',
           timestamp: new Date().toISOString(),
         }));
       }

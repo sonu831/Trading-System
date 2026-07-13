@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import AppShell from '@/components/layout/AppShell/AppShell';
 import SignalCard from '@/components/organisms/SignalCard';
+import { SignalsApi } from '@/api';
 
 export default function SignalsPage() {
   const [filter, setFilter] = useState('All');
@@ -9,28 +10,30 @@ export default function SignalsPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let active = true;
     const fetchSignals = async () => {
       try {
-        const res = await fetch('/api/v1/signals');
-        const data = await res.json();
-        if (data.success && data.data) {
-          setSignals(data.data.map((s, i) => ({
+        const raw = await SignalsApi.list();
+        if (active) {
+          setSignals(raw.map((s, i) => ({
             id: s.id || i,
             dir: s.action === 'BUY' ? 'BUY CE' : s.action === 'SELL' ? 'BUY PE' : 'NO TRADE',
             strategy: s.strategy || '—',
             tier: s.tier || '—',
             strike: s.price ? `₹${s.price}` : '—',
-            time: s.timestamp ? new Date(s.timestamp).toLocaleTimeString() : '—',
+            time: s.timestamp ? new Date(s.timestamp).toLocaleTimeString() : null,
             reasons: [s.reason || `confidence: ${s.confidence || '—'}`],
             tone: s.action === 'BUY' ? 'pos' : s.action === 'SELL' ? 'neg' : 'neutral',
           })));
         }
-      } catch (_) {}
-      setLoading(false);
+      } catch (_) {
+        if (active) setSignals([]);
+      }
+      if (active) setLoading(false);
     };
     fetchSignals();
     const id = setInterval(fetchSignals, 5000);
-    return () => clearInterval(id);
+    return () => { active = false; clearInterval(id); };
   }, []);
 
   const filtered = filter === 'All' ? signals : signals.filter(s => s.tier?.toLowerCase().includes(filter.toLowerCase()));

@@ -25,11 +25,8 @@
  */
 
 const path = require('path');
-require('ts-node').register({
-  transpileOnly: true,
-  ignore: [/node_modules\/(?!@mstock-mirae-asset)/],
-  compilerOptions: { module: 'commonjs', allowJs: true },
-});
+// Register tsx for the MStock SDK's .ts files (instead of ts-node)
+require('tsx/cjs');
 
 require('dotenv').config({ path: path.resolve(__dirname, '../../.env') });
 
@@ -39,9 +36,11 @@ const redis = require('redis');
 const axios = require('axios');
 const { MStockVendor } = require('../src/vendors/mstock');
 
-// Load master symbol map
-const vendorPath = path.resolve(__dirname, '..', 'vendor', 'nifty50_shared.json');
-const masterMap = require(vendorPath);
+// Load master symbol map — try vendor/, fallback to config/symbols_mstock.json
+let masterMap = [];
+try { masterMap = require(path.resolve(__dirname, '..', 'vendor', 'nifty50_shared.json')); }
+catch (e1) { try { masterMap = require(path.resolve(__dirname, '..', '..', 'vendor', 'nifty50_shared.json')); }
+catch (e2) { masterMap = require(path.resolve(__dirname, '..', 'config', 'symbols_mstock.json')); } }
 
 // ═══════════════════════════════════════════════════════════════
 // Configuration
@@ -436,8 +435,15 @@ async function main() {
   console.log(`   Resume:     ${CONFIG.RESUME}`);
   console.log(`   Job ID:     ${CONFIG.JOB_ID}`);
 
-  // Filter symbols
-  let processList = masterMap.filter(item => item.tokens?.mstock);
+  // Filter symbols — supports both token map formats
+  let processList = masterMap.filter(item => item.tokens?.mstock || item.mstock_token);
+  // Handle `symbols_mstock.json` fallback (flat mstock_token field)
+  if (processList.length > 0 && !processList[0].tokens) {
+    processList = processList.map(item => ({
+      ...item,
+      tokens: item.tokens || { mstock: item.mstock_token },
+    }));
+  }
   if (CONFIG.TARGET_SYMBOL) {
     processList = processList.filter(item => item.symbol === CONFIG.TARGET_SYMBOL);
   }
@@ -470,15 +476,92 @@ async function main() {
     process.exit(1);
   }
 
-  // Initialize vendor
+  // Initialize vendor — backfill uses REST API only (skip WebSocket/marketHours)
   const vendor = new MStockVendor();
+  console.log('🔑 Loading MStock credentials from Backend API...');
+  try { const r1=await axios.get(`${CONFIG.BACKEND_API_URL}/api/v1/providers/mstock/credentials/decrypted`,{timeout:5000});const creds=r1.data?.data?.credentials||{};if(creds.api_key){vendor.apiKey=creds.api_key;vendor.client=new(require('@mstock-mirae-asset/nodetradingapi-typeb').MConnect)('https://api.mstock.trade',vendor.apiKey);console.log('  ✅ api_key');}const r2=await axios.get(`${CONFIG.BACKEND_API_URL}/api/v1/providers/mstock/session`,{timeout:5000});const tok=r2.data?.data?.session_token;if(tok){vendor.token=tok;vendor.setAccessToken(tok);console.log('  ✅ session_token');}}catch(e){console.warn(`  ⚠️ ${e.message}`);}
+  // Initialize vendor — backfill uses REST API only (bypass WebSocket, fetchData, marketHours)
+  const vendorObj = { apiKey: '', client: null };
+  console.log('🔑 Loading MStock credentials from Backend API...');
   try {
-    await vendor.connect();
-    console.log('✅ Authenticated with MStock');
-  } catch (e) {
-    console.error('❌ MStock auth failed:', e.message);
-    process.exit(1);
-  }
+    const r1 = await axios.get(`${CONFIG.BACKEND_API_URL}/api/v1/providers/mstock/credentials/decrypted`, { timeout: 5000 });
+    const creds = r1.data?.data?.credentials || {};
+    const r2 = await axios.get(`${CONFIG.BACKEND_API_URL}/api/v1/providers/mstock/session`, { timeout: 5000 });
+    const tok = r2.data?.data?.session_token;
+    if (creds.api_key) {
+      vendorObj.apiKey = creds.api_key;
+      vendorObj.client = new (require('@mstock-mirae-asset/nodetradingapi-typeb').MConnect)('https://api.mstock.trade', creds.api_key);
+      if (tok) vendorObj.client.setAccessToken(tok);
+      console.log('  ✅ MStock client ready');
+    } else {
+      console.error('  ❌ No api_key');
+      process.exit(1);
+    }
+  } catch (e) { console.error(`  ❌ Credential fetch: ${e.message}`); process.exit(1); }
+
+  // Use raw axios call to MStock SDK — the SDK itself is missing the required X-Mirae-Version header
+  vendorObj.fetchData = async (params) => {
+    const rawAxios = require('axios');
+    const resp = await rawAxios.post('https://api.mstock.trade/openapi/typeb/instruments/historical', {
+      exchange: 'NSE', symboltoken: String(params.symboltoken), interval: CONFIG.INTERVAL,
+      fromdate: params.fromdate, todate: params.todate,
+    }, {
+      headers: {
+        'X-PrivateKey': vendorObj.apiKey,
+        'Authorization': 'Bearer ' + vendorObj.token,
+        'X-Mirae-Version': '1',
+        'Content-Type': 'application/json',
+      },
+      timeout: 30000,
+    });
+    if (resp.data?.data?.candles) return { status: true, data: { candles: resp.data.data.candles } };
+    return { status: false, data: { candles: [] } };
+  };
+
+    let rangesToFetch = [{ from: params.fromdate, to: params.todate }];
+    if (!CONFIG.FORCE_REFETCH) {
+      const existing = await backendApi.getDataAvailability(symbol);
+      if (existing) {
+        rangesToFetch = calculateMissingRanges(params.fromdate, params.todate, existing);
+        if (rangesToFetch.length === 0) { console.log(`   ⏭️ ${symbol} covered`); stats.skippedCount++; return { symbol, status: 'skipped', reason: 'data_exists' }; }
+      }
+    }
+
+    let totalCandles = 0;
+    const allDates = [];
+    for (const range of rangesToFetch) {
+      try {
+        const data = await vendorObj.client.getHistoricalData({
+          exchange: 'NSE', symboltoken: String(token), interval: CONFIG.INTERVAL,
+          fromdate: range.from, todate: range.to,
+        });
+        if (data?.data?.candles && Array.isArray(data.data.candles)) {
+          const candles = data.data.candles.map(c => {
+            const [t, o, h, l, cl, v] = Array.isArray(c) ? c : [c];
+            const dt = require('luxon').DateTime;
+            let timeStr = typeof t === 'number' ? dt.fromMillis(t).toFormat('yyyy-MM-dd HH:mm') : String(t);
+            return [timeStr, parseFloat(o), parseFloat(h), parseFloat(l), parseFloat(cl), parseInt(v)];
+          });
+          const sent = await streamToKafka(symbol, candles, CONFIG.INTERVAL);
+          totalCandles += sent;
+          candles.forEach(c => allDates.push(c[0].split(' ')[0]));
+          console.log(`   📤 ${symbol}: ${sent} candles (${range.from}-${range.to})`);
+        }
+        await new Promise(r => setTimeout(r, CONFIG.RATE_LIMIT_DELAY));
+      } catch (err) { console.error(`   ❌ ${symbol}: ${err.message}`); }
+    }
+
+    if (totalCandles > 0 && allDates.length > 0) {
+      allDates.sort();
+      await backendApi.updateDataAvailability({ symbol, timeframe: CONFIG.INTERVAL, firstDate: allDates[0], lastDate: allDates[allDates.length - 1], recordCount: totalCandles });
+    }
+    stats.totalCandles += totalCandles;
+    stats.successCount++;
+    return { symbol, status: 'completed', candles: totalCandles };
+  };
+
+  // Fake vendor for the worker pool (processSymbol uses vendorObj.client directly now)
+  const fakeVendor = { fetchData: async (p) => { throw new Error('use processSymbol override'); } };
 
   // Get checkpoints for resume
   const checkpoints = CONFIG.RESUME ? await progressTracker.getCheckpoints(CONFIG.JOB_ID) : {};
@@ -519,7 +602,7 @@ async function main() {
   console.log('✅ Cleanup complete. Exiting.');
 }
 
-main().catch((err) => {
+(async () => { await main(); })().catch((err) => {
   console.error('❌ Fatal error:', err);
   process.exit(1);
 });

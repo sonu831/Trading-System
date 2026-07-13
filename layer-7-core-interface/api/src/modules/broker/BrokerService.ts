@@ -89,7 +89,28 @@ class BrokerService extends BaseService {
     if (!p) return { status: 'NOT_CONFIGURED' };
     if (!p.enabled) return { status: 'DISABLED' };
     const s = await this.brokerRepository.findSession(providerName);
-    return { status: s?.status || p.status || 'DISCONNECTED', last_tested_at: p.last_tested_at, expires_at: s?.expires_at, last_error: s?.last_error };
+
+    // GAP-E3: run liveness probe when a token exists — presence ≠ liveness
+    let liveness = null;
+    if (s?.status === 'CONNECTED' && this.brokerSessionService) {
+      try {
+        liveness = await this.brokerSessionService.probeLiveness(providerName);
+      } catch (_) { /* probe best-effort */ }
+    }
+
+    const status = liveness?.ok === false
+      ? 'EXPIRED'
+      : liveness?.ok === true
+        ? 'CONNECTED'
+        : (s?.status || p.status || 'DISCONNECTED');
+
+    return {
+      status,
+      last_tested_at: p.last_tested_at,
+      last_validated_at: liveness?.lastValidatedAt || null,
+      expires_at: s?.expires_at,
+      last_error: liveness?.error || s?.last_error,
+    };
   }
 
   async deleteProvider(id: number): Promise<any> {

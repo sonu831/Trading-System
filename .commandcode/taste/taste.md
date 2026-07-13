@@ -23,3 +23,6 @@
 # Charting
 - For dashboard: Use TradingView charting library exclusively (not lightweight-charts) for all chart components — price charts, indicators, and any other visualizations. Confidence: 0.75
 
+# Workflow
+- Before triggering a backfill, re-authenticate the mstock broker via Dashboard → Brokers → Test Connection to ensure a fresh JWT session token is stored in Redis. Confidence: 0.65
+

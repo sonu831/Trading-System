@@ -9,12 +9,16 @@
 
 ### Read order -- every session, every tool
 
-1. `CLAUDE.md`
-2. `.ai/MEMORY.md`
-3. `MEMORY.md`
-4. `.ai/CONTRACT.md`
-5. `.ai/skills/<task-relevant>.md`
-6. `graphify-out/ (knowledge graph)`
+1. `VISION.md (what the system is for)`
+2. `ARCHITECTURE.md (the three planes)`
+3. `CLAUDE.md`
+4. `.ai/MEMORY.md`
+5. `MEMORY.md`
+6. `docs/INDEX.md (document map — every doc, trust level, active work order)`
+7. `.ai/CONTRACT.md`
+8. `.ai/skills/<task-relevant>.md`
+9. `.ai/handoffs/ (latest running state)`
+10. `graphify-out/ (knowledge graph)`
 
 ### Non-negotiable rules
 
@@ -46,6 +50,7 @@
 | Skill: Graphify Knowledge Graph — ABSOLUTE MANDATE | `.ai/skills/graphify.md` |
 | Skill: Kafka Event Patterns | `.ai/skills/kafka-patterns.md` |
 | Skill: TradingView MCP Chart Analysis | `.ai/skills/tradingview.md` |
+| Skill: Wiring Gaps Work Order — ACTIVE (2026-07-11) | `.ai/skills/wiring-gaps.md` |
 
 ### Agents: 13 specialist docs in `.ai/agents/` (see `.ai/CONTRACT.md` for the roster + coordination playbook)
 

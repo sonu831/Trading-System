@@ -247,6 +247,19 @@ class OptionChainPoller {
   }
 
   async publishSnapshot(snapshot) {
+    // Redis pub/sub for realtime dashboard
+    if (this.redisClient) {
+      try {
+        let REDIS_CHANNELS;
+        try { REDIS_CHANNELS = require('/app/shared/constants').REDIS_CHANNELS; } catch (_) {
+          try { REDIS_CHANNELS = require('../../../shared/constants').REDIS_CHANNELS; } catch (_) {}
+        }
+        if (REDIS_CHANNELS?.OPTION_CHAIN) {
+          await this.redisClient.publish(REDIS_CHANNELS.OPTION_CHAIN, JSON.stringify(snapshot));
+        }
+      } catch (_) { /* best effort */ }
+    }
+    // Kafka for downstream processing
     if (!this.kafkaProducer || !this.kafkaTopic) return;
     try {
       await this.kafkaProducer.send({

@@ -27,6 +27,21 @@
 9. **No git writes** -- don't commit/push without explicit owner instruction
 10. **Hand-off on exit** -- every report ends with `## Hand-off` section
 
+## ⚡ ACTIVE WORK ORDER (2026-07-11) — Wiring Gaps
+
+**`docs/WIRING_GAPS_AND_FIXES.md` is the active, code-verified work order** for the realtime plane, command
+fan-out, broker sessions, and DB schema. Every tool touching those areas MUST read it first and follow
+`.ai/skills/wiring-gaps.md` **strictly**: graphify for every codebase query; channel/room/topic names only from
+`shared/constants.js` (add `REDIS_CHANNELS` first); ONE WebSocket relay only; every fixed gap becomes a named
+assertion in `scripts/verify-wiring.js`. Key verified facts: REST plane complete (~20 endpoints live); realtime
+push mostly dead (2 competing relays; `market_ticks`/`option_chain_updates`/`execution:state`/`execution-events`
+have no Redis publishers; `signals`≠`signals:trade`, `notifications`≠`notifications:execution`; only
+`market-regime` live); `strategies-changed`/`risk-changed` have no consumers; broker sessions have no refresh
+loop and expire silently at IST midnight; DB has dual schema authority (SQL = DDL owner, Prisma = introspect-only).
+Trust map: old PROJECT_STATE.md retired; CHANGELOG.md = project state; `COCKPIT_BACKEND_PLAN.md` §4–§5 superseded.
+**Document map: `docs/INDEX.md`** (every doc + trust level). **Session baton: `.ai/handoffs/` (newest file)** —
+write one at every session end. **Execution entry point: `docs/MASTER_EXECUTION_PROMPT.md` → PHASE 0.**
+
 ## Kafka Topics
 
 | Topic | Producer | Consumer | Schema |

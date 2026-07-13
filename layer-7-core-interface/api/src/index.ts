@@ -240,6 +240,12 @@ const start = async () => {
 
     await fastify.listen({ port: PORT, host: '0.0.0.0' });
     fastify.log.info(`Server listening on ${fastify.server.address().port}`);
+
+    // Start broker session monitor — auto re-auth for unattended providers
+    try {
+      const brokerSessionService = container.resolve('brokerSessionService');
+      brokerSessionService.startSessionMonitor();
+    } catch (e) { fastify.log.warn(`Session monitor failed to start: ${e.message}`); }
   } catch (err) {
     fastify.log.error(err);
     process.exit(1);

@@ -101,6 +101,17 @@ async function loginAndVerify(
 
   // Step 2a — TOTP (unattended)
   if (totp_secret) {
+    // E6: Check clock skew before generating TOTP (30s tolerance)
+    try {
+      const serverStart = Date.now();
+      const serverResp = await deps.http.get('https://api.mstock.trade/api/server-time', { timeout: 3000 });
+      const serverTimeMs = serverResp?.data?.time ? new Date(serverResp.data.time).getTime() : serverStart;
+      const skew = Math.abs(serverTimeMs - serverStart);
+      if (skew > 30000) {
+        log('fail', `Clock skew detected: ${(skew/1000).toFixed(1)}s`, { local: new Date(serverStart).toISOString(), server: new Date(serverTimeMs).toISOString() });
+        return { success: false, error: `System clock is ${(skew/1000).toFixed(0)}s off broker time — TOTP code would be wrong. Sync system time.`, stage: 'clock_skew', serverTimeUtc: new Date(serverTimeMs).toISOString() };
+      }
+    } catch (_) { /* time check best-effort — proceed with local clock */ }
     log('step', 'Step 2a: TOTP path — generating code');
     let totp: string;
     try {

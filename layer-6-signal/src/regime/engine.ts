@@ -3,6 +3,11 @@ const { Kafka } = require('kafkajs');
 const { detectTrend, detectVolatility, detectPhase, computeTFAlignment, ATR } = require('./indicators');
 const logger = require('../utils/logger');
 
+let REDIS_CHANNELS: any;
+try { REDIS_CHANNELS = require('/app/shared/constants').REDIS_CHANNELS; } catch (_) {
+  try { REDIS_CHANNELS = require('../../../shared/constants').REDIS_CHANNELS; } catch (_) {}
+}
+
 const INDEX_SYMBOLS = ['NIFTY', 'BANKNIFTY'];
 
 class RegimeEngine {
@@ -272,7 +277,7 @@ class RegimeEngine {
     if (this.redis) {
       try {
         await this.redis.set('market-regime:latest', regime, { EX: 120 }); // 2 min TTL — stale regime must expire
-        await this.redis.publish('market-regime', regime);
+        await this.redis.publish(REDIS_CHANNELS?.REGIME || 'market-regime', regime);
       } catch (err) {
         logger.error({ err }, 'RegimeEngine: Redis publish failed');
       }

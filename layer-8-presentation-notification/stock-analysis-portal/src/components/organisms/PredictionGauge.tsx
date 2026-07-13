@@ -1,6 +1,18 @@
 // @ts-nocheck
-export default function PredictionGauge({ pct = 64, label = 'prob. UP', direction = 'UP', confidence = 0.70, model = 'lstm-breadth v0.3', horizon = 'SCALP · 1–5m' }) {
-  const circumference = 314; // 2 * π * 50
+export default function PredictionGauge({ pct = null, label = 'prob. UP', direction = null, confidence = null, model = 'lstm-breadth v0.3', horizon = null }) {
+  if (pct === null || direction === null) {
+    return (
+      <div className="card">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-sm font-bold">Next NIFTY move</h2>
+          {horizon ? <span className="badge badge-neutral text-xs font-bold px-2.5 py-1 rounded-full border border-border bg-surface-hover text-text-secondary">{horizon}</span> : null}
+        </div>
+        <div className="flex items-center justify-center py-8 text-xs text-text-tertiary">— Model abstaining · no prediction available</div>
+      </div>
+    );
+  }
+
+  const circumference = 314;
   const offset = circumference - (circumference * pct / 100);
   const isUp = direction === 'UP';
   const tone = isUp ? 'var(--color-success)' : 'var(--color-error)';
@@ -9,7 +21,7 @@ export default function PredictionGauge({ pct = 64, label = 'prob. UP', directio
     <div className="card">
       <div className="flex items-center justify-between mb-3">
         <h2 className="text-sm font-bold">Next NIFTY move</h2>
-        <span className="badge badge-neutral text-xs font-bold px-2.5 py-1 rounded-full border border-border bg-surface-hover text-text-secondary">{horizon}</span>
+        {horizon ? <span className="badge badge-neutral text-xs font-bold px-2.5 py-1 rounded-full border border-border bg-surface-hover text-text-secondary">{horizon}</span> : null}
       </div>
       <div className="flex items-center gap-5 flex-wrap">
         <div className="relative w-[150px] h-[150px] shrink-0">
@@ -24,10 +36,10 @@ export default function PredictionGauge({ pct = 64, label = 'prob. UP', directio
         </div>
         <div>
           <div className="kv"><span className="text-text-secondary">Direction</span><span className={`font-semibold tabular-nums ${isUp ? 'text-success' : 'text-error'}`}>{direction}</span></div>
-          <div className="kv"><span className="text-text-secondary">Expected move</span><span className="font-semibold tabular-nums">+0.4% · ~28 pts</span></div>
-          <div className="kv"><span className="text-text-secondary">Confidence</span><span className="font-semibold tabular-nums">{confidence.toFixed(2)}</span></div>
+          <div className="kv"><span className="text-text-secondary">Expected move</span><span className="font-semibold tabular-nums">—</span></div>
+          <div className="kv"><span className="text-text-secondary">Confidence</span><span className="font-semibold tabular-nums">{confidence !== null ? confidence.toFixed(2) : '—'}</span></div>
           <div className="kv"><span className="text-text-secondary">Model</span><span className="text-xs text-text-tertiary">{model}</span></div>
-          <div className="kv"><span className="text-text-secondary">Updated</span><span className="text-xs text-text-tertiary">4s ago</span></div>
+          <div className="kv"><span className="text-text-secondary">Updated</span><span className="text-xs text-text-tertiary">—</span></div>
         </div>
       </div>
       <div className="text-xs text-text-tertiary mt-3">A model score never fires a trade alone — it raises or lowers conviction &amp; sizing on top of the breadth-confirmed momentum trigger.</div>

@@ -22,5 +22,6 @@ class HeuristicEngine(BaseEngine):
             prediction=prob,
             confidence=0.85,
             model_version="v1.0.0-heuristic",
+            status="ok",
             reasoning=f"RSI is {last_point.rsi:.2f}. Trend is {'Bullish' if prob > 0.5 else 'Bearish'}."
         )

@@ -30,6 +30,11 @@ const client = require('prom-client');
 const redis = require('redis');
 const symbols = require('../config/symbols.json');
 
+let REDIS_CHANNELS;
+try { REDIS_CHANNELS = require('/app/shared/constants').REDIS_CHANNELS; } catch (_) {
+  try { REDIS_CHANNELS = require('../../shared/constants').REDIS_CHANNELS; } catch (_) {}
+}
+
 // Import shared health-check library
 const { waitForAll, waitForKafka, waitForRedis, initHealthMetrics } = require('/app/shared/health-check');
 
@@ -579,7 +584,7 @@ const runBackfill = async (startParams = {}) => {
     await updateBackfillStatus(1, 10, 'Fetching Data...');
     
     // Scripts path relative to __dirname (which is src/)
-    const batchScript = path.resolve(__dirname, '../scripts/batch_nifty50.js');
+    const batchScript = path.resolve(__dirname, '../scripts/batch_streaming.js');
     const scriptArgs = [];
     if (symbol) scriptArgs.push('--symbol', symbol);
     if (fromDate && toDate) scriptArgs.push('--from', fromDate, '--to', toDate);
@@ -696,6 +701,17 @@ async function handleTick(tick) {
 
     // Publish to Kafka (partitioned by symbol)
     await kafkaProducer.send(normalizedTick);
+
+    // Publish tick to Redis for realtime dashboard
+    if (redisClient && REDIS_CHANNELS?.TICKS) {
+      try {
+        await redisClient.publish(REDIS_CHANNELS.TICKS, JSON.stringify({
+          underlying: normalizedTick.symbol,
+          ltp: normalizedTick.lastPrice || normalizedTick.ltp,
+          time: normalizedTick.timestamp || new Date().toISOString(),
+        }));
+      } catch (_) { /* best effort */ }
+    }
 
     // Update metrics
     metrics.ticksCounter.inc({ symbol: normalizedTick.symbol });

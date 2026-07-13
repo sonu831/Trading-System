@@ -3,10 +3,10 @@ import { useState, useEffect } from 'react';
 import { useSelector } from 'react-redux';
 import { useRouter } from 'next/router';
 import AppShell from '@/components/layout/AppShell/AppShell';
-import PriceChart from '@/components/organisms/PriceChart';
+import TradingViewChart from '@/components/organisms/TradingViewChart';
 import OptionChainGrid from '@/components/organisms/OptionChainGrid';
 import StaleBadge from '@/components/trading/StaleBadge';
-import { useIndexQuote, useCandles } from '@/hooks/useMarket';
+import { useIndexQuote } from '@/hooks/useMarket';
 import { selectBreadth } from '@/store/slices/regimeSlice';
 import { selectCockpitTick } from '@/store/slices/cockpitSlice';
 import { useSocket } from '@/hooks/useSocket';
@@ -28,7 +28,6 @@ export default function ScalpCockpit() {
   const wsSpot = tick[underlying]?.ltp;
 
   const quote = useIndexQuote(underlying);
-  const candles = useCandles(underlying, timeframe);
   const dayPnl: number = execState?.dailyPnl ?? 0;
   const regimeTs = (regime as any)?.timestamp;
 
@@ -63,7 +62,7 @@ export default function ScalpCockpit() {
               </button>
             ))}
           </div>
-          <PriceChart candles={candles} timeframe={timeframe} />
+          <TradingViewChart symbol={underlying} timeframe={timeframe} />
         </div>
 
         {/* Hero + context */}

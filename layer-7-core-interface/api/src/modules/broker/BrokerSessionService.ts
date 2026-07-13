@@ -205,6 +205,149 @@ class BrokerSessionService {
     await this.clearPending(provider);
     return this.brokerService.clearSessionToken(provider);
   }
+
+  /**
+   * Session monitor loop — proactive re-auth before expiry (E1, E2).
+   * Runs every 5 minutes per enabled provider. If a token has <30 min remaining
+   * and unattended auth is possible → re-authenticates silently.
+   * Otherwise → publishes an actionable alert to the notifications channel.
+   */
+  startSessionMonitor() {
+    const providers = this.listStrategies().filter((s: any) => s.id !== 'indianapi');
+    const TTL_WARN_THRESHOLD = 1800; // 30 minutes
+
+    const monitorOne = async (provider: string) => {
+      try {
+        const token = await this.getCachedToken(provider);
+        if (!token) return; // No active session
+
+        const creds = await this.brokerService.getDecryptedCredentials(provider);
+        if (!creds) return;
+
+        const strategy = getStrategy(provider) as any;
+        if (!strategy) return;
+
+        // Check TTL remaining from Redis
+        const raw = await this.brokerService.getJson(`broker:session:${provider}`);
+        const session = raw && typeof raw === 'object' ? raw as any : null;
+        const expiresAt = session?.expiresAt;
+        if (!expiresAt) return;
+
+        const remaining = Math.floor((expiresAt - Date.now()) / 1000);
+        if (remaining > TTL_WARN_THRESHOLD && remaining > 0) return; // Still fresh
+
+        if (strategy.canAuthenticateUnattended(creds)) {
+          // Auto re-auth — unattended possible
+          console.log(`[broker-session] auto re-auth ${provider} (${remaining}s remaining)`);
+          const result = await this.testConnection(provider);
+          if (!result.success) {
+            this.publishAlert(provider, 'error', `Auto re-auth failed: ${result.error}`);
+          }
+        } else {
+          // Interactive needed — publish alert
+          this.publishAlert(provider, 'warn',
+            `${provider} session expires in ${Math.floor(remaining / 60)}min — re-enter TOTP to extend`);
+        }
+      } catch (err: any) {
+        console.error(`[broker-session] monitor error for ${provider}:`, err.message);
+      }
+    };
+
+    // Run immediately, then every 5 minutes
+    console.log('[broker-session] session monitor started (5-min interval)');
+    providers.forEach(p => monitorOne(p.id));
+    setInterval(() => providers.forEach(p => monitorOne(p.id)), 5 * 60 * 1000);
+  }
+
+  /**
+   * Liveness probe — call a cheap authenticated endpoint to verify
+   * the token actually WORKS (resolves GAP-E3: false green).
+   */
+  async probeLiveness(provider: string): Promise<{ ok: boolean; error?: string; lastValidatedAt?: string }> {
+    try {
+      const token = await this.getCachedToken(provider);
+      if (!token) return { ok: false, error: 'no cached token' };
+
+      const creds = await this.brokerService.getDecryptedCredentials(provider);
+      if (!creds) return { ok: false, error: 'no credentials' };
+
+      if (provider === 'mstock') {
+        // Probe using the broker SDK directly with the token — lightweight call to /profile
+        try {
+          const MConnect = require('@mstock-mirae-asset/nodetradingapi-typeb').MConnect;
+          const probeClient = new MConnect('https://api.mstock.trade', creds.api_key);
+          probeClient.setAccessToken(token);
+          const body = await probeClient.profile();
+          const ok = !!(body?.data?.clientcode);
+          if (ok) {
+            return { ok: true, lastValidatedAt: new Date().toISOString() };
+          }
+          return { ok: false, error: 'profile check returned no clientcode' };
+        } catch (err: any) {
+          return { ok: false, error: err.message || 'profile probe failed' };
+        }
+      }
+
+      if (provider === 'flattrade') {
+        // FlatTrade: probe via UserDetails with jKey
+        try {
+          const res = await this.deps.http.post('https://piconnect.flattrade.in/PiConnectAPI/UserDetails', {
+            jKey: token,
+          }, { timeout: 5000 });
+          const ok = res?.data?.stat === 'Ok';
+          return { ok, lastValidatedAt: ok ? new Date().toISOString() : undefined, error: ok ? undefined : res?.data?.emsg };
+        } catch (err: any) {
+          return { ok: false, error: err.message || 'UserDetails probe failed' };
+        }
+      }
+
+      return { ok: false, error: `provider ${provider} has no liveness probe` };
+    } catch (err: any) {
+      return { ok: false, error: err.message };
+    }
+  }
+
+  /** ── In-process single-flight auth lock (E4) ── */
+  private authLocks = new Map<string, Promise<any>>();
+  private LOCK_TTL = 30; // seconds
+
+  async withAuthLock(provider: string, fn: () => Promise<any>): Promise<any> {
+    // In-process lock
+    if (this.authLocks.has(provider)) return this.authLocks.get(provider);
+    // Redis distributed lock for multi-instance
+    const lockKey = `broker:authlock:${provider}`;
+    const lockToken = crypto.randomUUID?.() || crypto.randomBytes(16).toString('hex');
+    try { await this.brokerService.setJson(lockKey, lockToken, this.LOCK_TTL); } catch (_) {}
+    const promise = fn().finally(async () => {
+      this.authLocks.delete(provider);
+      try {
+        const held = await this.brokerService.getJson(lockKey);
+        if (held === lockToken) await this.brokerService.delKey(lockKey);
+      } catch (_) {}
+    });
+    this.authLocks.set(provider, promise);
+    return promise;
+  }
+
+  /** Publish alert to Redis pub/sub channel (canonical ALERTS channel) */
+  private async publishAlert(provider: string, severity: string, message: string) {
+    try {
+      // Get Redis publisher directly from the brokerService's repository, not the DI container.
+      // This avoids the cyclic Awilix resolution: BrokerService ↔ BrokerSessionService.
+      const redisClient = (this.brokerService as any).brokerRepository?.redis;
+      const pub = redisClient?.publisher || redisClient;
+      if (pub?.publish) {
+        const { REDIS_CHANNELS } = require('/app/shared/constants');
+        if (REDIS_CHANNELS?.ALERTS) {
+          await pub.publish(REDIS_CHANNELS.ALERTS, JSON.stringify({
+            severity, message, provider,
+            source: 'broker-session-monitor',
+            timestamp: new Date().toISOString(),
+          }));
+        }
+      }
+    } catch (_) { /* best effort */ }
+  }
 }
 
 module.exports = BrokerSessionService;

@@ -106,6 +106,34 @@ export const MarketViewApi = {
   get: () => get<Record<string, unknown>>('/market-view'),
 };
 
+// ── Predictions ───────────────────────────────
+export const PredictApi = {
+  get: (underlying = 'NIFTY', horizon = 'scalp') =>
+    get<{
+      status: string;
+      direction?: string;
+      probability?: number;
+      confidence?: number;
+      model_version?: string;
+      features?: Array<{ label: string; value: number; tone?: string }>;
+    }>(`/predict?underlying=${underlying}&horizon=${horizon}`),
+};
+
+// ── Signals ──────────────────────────────────
+export const SignalsApi = {
+  list: () =>
+    get<Array<{
+      id: number;
+      action: string;
+      strategy: string;
+      tier: string;
+      price: number;
+      reason: string;
+      confidence: number;
+      timestamp: string;
+    }>>('/signals'),
+};
+
 // ── System Status ────────────────────────────
 export const SystemApi = {
   getStatus: () => get<Record<string, unknown>>('/system-status'),

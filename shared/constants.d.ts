@@ -110,6 +110,30 @@ export declare const REDIS_KEYS: {
   readonly BROKER_SESSION: (provider: string) => string;
   readonly EXECUTION_PREFIX: string;
   readonly OPTION_CHAIN: (underlying: string) => string;
+  readonly ALERTS_FEED: string;
+  readonly STRATEGIES_CONFIG: string;
+  readonly RISK_CONFIG: string;
+  readonly SYSTEM_COMMANDS: string;
+  readonly PROVIDERS_CHANGED: string;
+  readonly LOGS: string;
+  readonly BACKFILL_STATUS: string;
+  readonly SWARM_STATUS: string;
+  readonly HEARTBEAT_PREFIX: string;
+};
+
+export declare const REDIS_CHANNELS: {
+  readonly TICKS: 'market_ticks';
+  readonly SIGNALS: 'signals:trade';
+  readonly REGIME: 'market-regime';
+  readonly BREADTH: 'market_view';
+  readonly OPTION_CHAIN: 'option_chain_updates';
+  readonly EXECUTION_STATE: 'execution:state';
+  readonly EXECUTION_EVENTS: 'execution-events';
+  readonly ALERTS: 'notifications';
+  readonly PROVIDERS_CHANGED: 'providers-changed';
+  readonly STRATEGIES_CHANGED: 'strategies-changed';
+  readonly RISK_CHANGED: 'risk-changed';
+  readonly SYSTEM_COMMANDS: 'system:commands';
 };
 
 export declare const KAFKA_TOPICS: {

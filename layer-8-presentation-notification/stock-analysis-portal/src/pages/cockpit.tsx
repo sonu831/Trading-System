@@ -4,7 +4,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { useRouter } from 'next/router';
 import { Layers, Activity, Ban, Hash, TrendingUp, XOctagon } from 'lucide-react';
 import SafetyBar from '@/components/organisms/SafetyBar';
-import PriceChart from '@/components/organisms/PriceChart';
+import TradingViewChart from '@/components/organisms/TradingViewChart';
 import OptionChainGrid from '@/components/organisms/OptionChainGrid';
 import ConfluenceChecklist from '@/components/organisms/ConfluenceChecklist';
 import StrikePreviewCard from '@/components/organisms/StrikePreviewCard';
@@ -27,7 +27,7 @@ import {
 import { fetchRegime, selectRegime, selectRegimeUpdatedAt, selectRegimeReachable } from '@/store/slices/regimeSlice';
 import { selectCockpitTick } from '@/store/slices/cockpitSlice';
 import { useSocket } from '@/hooks/useSocket';
-import { useCandles } from '@/hooks/useMarket';
+// TradingViewChart uses its own data source — no REST candle fetch needed
 import {
   EMPTY, formatSignedCurrency, formatCurrency, formatNumber, pnlDirection,
 } from '@/utils/format';
@@ -73,9 +73,6 @@ export default function CockpitDashboard() {
   const { subscribe } = useSocket();
   const tick = useSelector(selectCockpitTick);
   const spot = tick[underlying]?.ltp ?? null;
-
-  // REST fallback for candles
-  const candles = useCandles(underlying, timeframe);
 
   useEffect(() => {
     subscribe(`cockpit:${underlying}`);
@@ -145,7 +142,7 @@ export default function CockpitDashboard() {
             ))}
           </div>
           <div className="bg-surface border border-border rounded-xl overflow-hidden min-h-[350px] xl:min-h-[420px]">
-            <PriceChart candles={candles} timeframe={timeframe} />
+            <TradingViewChart symbol={underlying} timeframe={timeframe} />
           </div>
 
           {/* Hero + KPI row under chart */}

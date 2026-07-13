@@ -1,13 +1,16 @@
 // @ts-nocheck
 export default function FeatureContributions({ features = [] }) {
-  const defaults = [
-    { label: 'Breadth (A/D, %VWAP)', value: 0.8, tone: 'pos' },
-    { label: 'Sector momentum', value: 0.6, tone: 'pos' },
-    { label: 'Heavyweight push', value: 0.5, tone: 'pos' },
-    { label: 'PCR / ΔOI', value: -0.2, tone: 'neg' },
-    { label: 'India VIX', value: 0.1, tone: 'pos' },
-  ];
-  const items = features.length ? features : defaults;
+  if (features.length === 0) {
+    return (
+      <div className="card">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-sm font-bold">Why — top feature contributions</h2>
+          <span className="text-[11px] text-text-tertiary">signed push toward the call</span>
+        </div>
+        <div className="flex items-center justify-center py-8 text-xs text-text-tertiary">— Feature data unavailable</div>
+      </div>
+    );
+  }
 
   return (
     <div className="card">
@@ -15,7 +18,7 @@ export default function FeatureContributions({ features = [] }) {
         <h2 className="text-sm font-bold">Why — top feature contributions</h2>
         <span className="text-[11px] text-text-tertiary">signed push toward the call</span>
       </div>
-      {items.map((f, i) => {
+      {features.map((f, i) => {
         const absVal = Math.abs(f.value);
         const width = Math.round(absVal * 40);
         const isPos = (f.tone || (f.value >= 0 ? 'pos' : 'neg')) === 'pos';

@@ -1,86 +1,96 @@
 // @ts-nocheck
-import { useEffect, useRef, useId } from 'react';
+import { useEffect, useRef } from 'react';
+import { createChart, ColorType } from 'lightweight-charts';
 
-const TV_SCRIPT = 'https://s3.tradingview.com/tv.js';
+// lightweight-charts v5 uses addSeries(CandlestickSeries, options) — import the series type
+let CandlestickSeries: any;
+try { CandlestickSeries = require('lightweight-charts').CandlestickSeries; } catch (_) {
+  // Fallback: v4 API uses addCandlestickSeries() directly
+}
 
 export default function TradingViewChart({ symbol = 'NIFTY', timeframe = '1m', height = 420 }) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const widgetRef = useRef<any>(null);
-  const id = useId().replace(/:/g, '');
-
-  const tvSymbol = `NSE:${symbol}`;
-  const tfMap: Record<string, string> = { '1m': '1', '5m': '5', '15m': '15', '1h': '60', '1d': 'D' };
-  const tvInterval = tfMap[timeframe] || '1';
+  const containerRef = useRef(null);
+  const chartRef = useRef(null);
+  const seriesRef = useRef(null);
 
   useEffect(() => {
-    const containerId = `tv-${id}`;
+    if (!containerRef.current) return;
 
-    // Custom UDF datafeed backed by our /api/v1/tv endpoints
-    const datafeed = {
-      onReady: (cb: any) => fetch('/api/v1/tv/config').then(r => r.json()).then(cb),
-      resolveSymbol: (name: string, cb: any) => fetch(`/api/v1/tv/symbols?symbol=${name}`).then(r => r.json()).then(cb),
-      getBars: (symInfo: any, res: string, from: number, to: number, onResult: any) => {
-        fetch(`/api/v1/tv/history?symbol=${symInfo.name}&resolution=${res}&from=${from}&to=${to}`)
-          .then(r => r.json())
-          .then(d => {
-            if (d.s === 'ok' && d.t?.length) {
-              const bars = d.t.map((t: number, i: number) => ({
-                time: t * 1000, open: d.o[i], high: d.h[i], low: d.l[i], close: d.c[i], volume: d.v[i],
-              }));
-              onResult(bars, { noData: false });
-            } else {
-              onResult([], { noData: true });
-            }
-          })
-          .catch(() => onResult([], { noData: true }));
+    const chart = createChart(containerRef.current, {
+      height,
+      layout: {
+        background: { type: ColorType.Solid, color: '#1e1e2e' },
+        textColor: '#a0a0b0',
       },
-      subscribeBars: () => {},
-      unsubscribeBars: () => {},
+      grid: {
+        vertLines: { color: '#2a2a3a' },
+        horzLines: { color: '#2a2a3a' },
+      },
+      crosshair: { mode: 0 },
+      rightPriceScale: { borderColor: '#3a3a4a', autoScale: true },
+      timeScale: { borderColor: '#3a3a4a', timeVisible: true },
+      width: containerRef.current.clientWidth,
+    });
+
+    const opts = { upColor: '#26a69a', downColor: '#ef5350', borderUpColor: '#26a69a', borderDownColor: '#ef5350', wickUpColor: '#26a69a', wickDownColor: '#ef5350' };
+
+    // v5: chart.addSeries(CandlestickSeries, opts). v4: chart.addCandlestickSeries(opts)
+    const s = CandlestickSeries
+      ? chart.addSeries(CandlestickSeries, opts)
+      : chart.addCandlestickSeries(opts);
+
+    chartRef.current = chart;
+    seriesRef.current = series;
+
+    const handleResize = () => { if (containerRef.current) chart.applyOptions({ width: containerRef.current.clientWidth }); };
+    window.addEventListener('resize', handleResize);
+
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      chart.remove();
     };
-
-    const createWidget = () => {
-      if (!containerRef.current || !(window as any).TradingView) return;
-      widgetRef.current = new (window as any).TradingView.widget({
-        container_id: containerId,
-        datafeed,
-        symbol: tvSymbol,
-        interval: tvInterval,
-        theme: 'dark',
-        style: '1',
-        locale: 'in',
-        timezone: 'Asia/Kolkata',
-        toolbar_bg: '#1e1e2e',
-        enable_publishing: false,
-        hide_side_toolbar: true,
-        allow_symbol_change: true,
-        details: false,
-        studies: ['MASimple@tv-basicstudies', 'VWAP@tv-basicstudies'],
-        width: '100%',
-        height,
-        disabled_features: ['header_compare', 'header_saveload'],
-      });
-    };
-
-    if (!document.querySelector(`script[src="${TV_SCRIPT}"]`)) {
-      const script = document.createElement('script');
-      script.src = TV_SCRIPT;
-      script.async = true;
-      script.onload = createWidget;
-      document.head.appendChild(script);
-    } else if ((window as any).TradingView) {
-      createWidget();
-    }
-
-    return () => { try { widgetRef.current?.remove(); } catch (_) {} };
   }, []);
 
   useEffect(() => {
-    if (widgetRef.current) widgetRef.current.setSymbol(tvSymbol, tvInterval, () => {});
+    const tvSymbol = `NSE:${symbol}`;
+    const resMap = { '1m': '1', '5m': '5', '15m': '15', '1h': '60', '1d': 'D' };
+    const resolution = resMap[timeframe] || '1';
+    const series = seriesRef.current;
+    if (!series) return;
+
+    let active = true;
+
+    const fetchData = async () => {
+      try {
+        const from = Math.floor(Date.now() / 1000) - 86400;
+        const to = Math.floor(Date.now() / 1000) + 3600;
+        const res = await fetch(`/api/v1/tv/history?symbol=${tvSymbol}&resolution=${resolution}&from=${from}&to=${to}`);
+        const data = await res.json();
+        if (!active || data.s !== 'ok' || !data.t?.length) return;
+
+        const bars = [];
+        for (let i = 0; i < data.t.length; i++) {
+          bars.push({
+            time: data.t[i],
+            open: data.o[i],
+            high: data.h[i],
+            low: data.l[i],
+            close: data.c[i],
+          });
+        }
+        series.setData(bars);
+      } catch (_) {}
+    };
+
+    fetchData();
+    const timer = setInterval(fetchData, 5000);
+
+    return () => { active = false; clearInterval(timer); };
   }, [symbol, timeframe]);
 
   return (
-    <div className="w-full rounded-xl overflow-hidden border border-border" style={{ height }}>
-      <div id={`tv-${id}`} ref={containerRef} className="w-full h-full" />
+    <div className="w-full rounded-xl overflow-hidden border border-border">
+      <div ref={containerRef} />
     </div>
   );
 }

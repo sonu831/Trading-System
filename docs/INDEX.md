@@ -41,6 +41,7 @@
 | 5 | `docs/design/mockups/cockpit-app.html` | Interactive visual reference (open in browser) | 🟢 |
 | 6 | `docs/PREDICTIVE_MODEL_BUILD_PROMPT.md` | ML build phases 0–6 (P0 edge-study GATE first) | 🟢 |
 | 7 | **`docs/BACKFILL_SYSTEM_PLAN.md`** | Backfill/swarm: root cause (TS-in-`.js` SyntaxError kills every run) + redesign (range fan-out NIFTY+BANKNIFTY+50, coverage map, live progress) | 🟢 |
+| 8 | **`docs/DATA_PLATFORM_PLAN.md`** | **Dual-broker roles (MStock=data / FlatTrade=execution, capability-forced), 3-year 1m backfill (19.5k requests, 14.6M rows), work-unit model, coverage map, realtime/scalping plane. Phase 0 = PROBE the lookback wall** | 🟢 |
 
 ## 3. Domain & architecture (open when the phase touches them)
 

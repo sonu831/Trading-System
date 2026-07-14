@@ -1,6 +1,7 @@
 // @ts-nocheck
 import Link from 'next/link';
 import { useRouter } from 'next/router';
+import IndexTicker from './IndexTicker';
 
 function SidebarLink({ href, icon, label, tag, active }) {
   return (
@@ -24,14 +25,7 @@ export default function AppShell({ children }) {
           Stock Analysis By Gurus
         </Link>
         <div className="flex items-center gap-3 ml-4 text-xs">
-          <div className="flex flex-col leading-tight">
-            <span className="text-[10px] uppercase tracking-wider text-text-tertiary">NIFTY</span>
-            <span className="font-bold text-sm tabular-nums">24,850.30 <span className="text-success">+0.45%</span></span>
-          </div>
-          <div className="flex flex-col leading-tight">
-            <span className="text-[10px] uppercase tracking-wider text-text-tertiary">BANKNIFTY</span>
-            <span className="font-bold text-sm tabular-nums">54,210.80 <span className="text-error">−0.16%</span></span>
-          </div>
+          <IndexTicker />
         </div>
         <div className="flex items-center gap-2 ml-auto">
           <span className="badge badge-paper text-[11px] font-bold px-2.5 py-1 rounded-full border">🧪 PAPER</span>

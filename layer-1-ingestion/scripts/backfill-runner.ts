@@ -38,14 +38,24 @@ const JOB_ID = args.includes('--job-id') ? args[args.indexOf('--job-id') + 1] : 
 const PROVIDER = args.includes('--provider') ? args[args.indexOf('--provider') + 1] : null;
 
 // ═══════════ PROVIDER DISCOVERY + CREDENTIALS ═══════════
-async function loadProvider(providerName?: string) {
+async function loadProvider(providerName?: string, masterMap?: any[]) {
   console.log(`🔍 Discovering enabled data providers...`);
   const { data: providersResp } = await axios.get(`${API}/api/v1/providers`, { timeout: 5000 });
   const providers = (providersResp.data || []).filter((p: any) => p.enabled && (p.role === 'data' || p.role === 'both'));
 
   if (providers.length === 0) throw new Error('No enabled data providers found. Configure via Dashboard → Brokers.');
 
-  const name = providerName || providers[0].provider;
+  // Pick provider with actual instrument tokens, not the first one blindly
+  let name = providerName;
+  if (!name && masterMap) {
+    for (const p of providers) {
+      const tf = { mstock: 'mstock', flattrade: 'flattrade', kite: 'kite', indianapi: 'indianapi' }[p.provider];
+      const hasTokens = masterMap.some((i: any) => i.tokens?.[tf]);
+      if (hasTokens) { name = p.provider; break; }
+    }
+  }
+  if (!name) name = providers[0]?.provider;
+
   const provider = providers.find((p: any) => p.provider === name);
   if (!provider) throw new Error(`Provider "${name}" not found or not enabled`);
 
@@ -79,12 +89,14 @@ function loadTokenMap() {
 async function main() {
   console.log(`🚀 Backfill: ${TARGET || 'ALL'} ${FROM} → ${TO}`);
 
-  const provider = await loadProvider(PROVIDER);
-  const tokenField = { mstock: 'mstock', flattrade: 'flattrade', kite: 'kite', indianapi: 'indianapi' }[provider.name] || 'mstock';
-
-  // 1. Token map
+  // Load token map FIRST so we can pick a provider with actual tokens
   console.log('📋 Loading instrument token map...');
   const masterMap = loadTokenMap();
+
+  const provider = await loadProvider(PROVIDER, masterMap);
+  const tokenField = { mstock: 'mstock', flattrade: 'flattrade', kite: 'kite', indianapi: 'indianapi' }[provider.name] || 'mstock';
+
+  // 1. Token map — already loaded above, now filter
   const items = masterMap
     .filter((i: any) => i.tokens?.[tokenField] || i[`${tokenField}_token`])
     .map((i: any) => ({

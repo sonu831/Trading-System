@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
+import { BROKER_CAPABILITIES } from '@/shared/types';
 
 export const fetchBrokers = createAsyncThunk('brokers/fetchList', async () => {
   const res = await fetch('/api/v1/providers');
@@ -161,4 +162,28 @@ export const selectBrokers = (state) => state.brokers.list;
 export const selectBrokersLoading = (state) => state.brokers.loading;
 export const selectBrokerError = (state) => state.brokers.error;
 export const selectAuthFlow = (state) => state.brokers.authFlow;
+
+/**
+ * Select the valid execution broker — only a broker with restingStop capability
+ * AND the 'execution' or 'both' role qualifies as the OMS executor.
+ * mStock has restingStop:false and must NEVER be the OMS executor.
+ */
+export const selectExecutorBroker = (state) => {
+  const brokers = state.brokers.list || [];
+  return brokers.find(
+    (b) => b.enabled !== false
+      && (b.role === 'execution' || b.role === 'both')
+      && BROKER_CAPABILITIES[b.provider]?.restingStop === true
+  ) || null;
+};
+
+/**
+ * Select the feed broker (highest priority data source).
+ */
+export const selectFeedBroker = (state) => {
+  const brokers = state.brokers.list || [];
+  return brokers
+    .filter((b) => b.enabled !== false && (b.role === 'data' || b.role === 'both'))
+    .sort((a, b) => (a.priority || 0) - (b.priority || 0))[0] || null;
+};
 export default brokerSlice.reducer;

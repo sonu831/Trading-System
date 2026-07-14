@@ -308,17 +308,17 @@ const VERIFY_OK = { status: true, data: { ClientId: 'C123', ClientName: 'TEST', 
   {
     // Stored jKey path: probe UserDetails, no browser step.
     const { svc, store } = makeService({
-      creds: { api_key: 'ftkey', client_code: 'FT01', access_token: 'stored-jkey' },
+      creds: { api_key: 'ftkey', client_code: 'FT01', access_token: 'GHUDWU53H32MTHPA536Q32WR' },
       routes: { '/UserDetails': { stat: 'Ok', uname: 'Trader' } },
     });
     const r = await svc.testConnection('flattrade');
     ok('stored jKey validated -> connected', r.success === true, r.error);
-    ok('jKey cached', store.session.flattrade === 'stored-jkey');
+    ok('jKey cached', store.session.flattrade === 'GHUDWU53H32MTHPA536Q32WR');
     ok('user surfaced', r.user === 'Trader');
   }
   {
     const { svc, store } = makeService({
-      creds: { api_key: 'ftkey', client_code: 'FT01', access_token: 'expired' },
+      creds: { api_key: 'ftkey', client_code: 'FT01', access_token: 'EXPIREDJKEY0000000000000' },
       routes: { '/UserDetails': { stat: 'Not_Ok', emsg: 'Invalid Session Key' } },
     });
     const r = await svc.testConnection('flattrade');
@@ -337,7 +337,7 @@ const VERIFY_OK = { status: true, data: { ClientId: 'C123', ClientName: 'TEST', 
     // K1: the strategy hardcoded the /PiConnectTP base, which shared/constants.js explicitly
     // flags as WRONG (/PiConnectAPI). Every jKey validation silently hit a dead path.
     const { svc, calls } = makeService({
-      creds: { api_key: 'ftkey', client_code: 'FT01', access_token: 'stored-jkey' },
+      creds: { api_key: 'ftkey', client_code: 'FT01', access_token: 'GHUDWU53H32MTHPA536Q32WR' },
       routes: { '/UserDetails': { stat: 'Ok', uname: 'Trader' } },
     });
     await svc.testConnection('flattrade');
@@ -365,24 +365,57 @@ const VERIFY_OK = { status: true, data: { ClientId: 'C123', ClientName: 'TEST', 
     ok('K2: TTL is no longer the next clock hour', at0930 > 3600 && at1400 > 3600);
   }
 
-  console.log('\nF3. Session TTL never outlives the token itself (GAP-M1)');
+  console.log('\nF2b. FlatTrade speaks Noren, not JSON (GAP-K6)');
   {
-    // MStock issues JWTs that live 300s, but the strategy policy cached them until IST midnight
-    // (~12h). For almost their entire cached life we served a token the broker had already
-    // killed — every call came back 401, and MStock "could not fetch data" at all.
+    // Noren requires `jData=<json>&jKey=<token>`. We posted a plain JSON body, and the broker
+    // answered "Invalid Input : jData is Missing." — which reads like a missing field in OUR
+    // payload, not a wholly wrong wire format. L1 already had norenBody(); this layer did not.
+    const { svc, calls, store } = makeService({
+      creds: { api_key: 'ftkey', client_code: 'FT01', access_token: 'jkey-abcdefghijklmnop' },
+      routes: { '/UserDetails': { stat: 'Ok', uname: 'Trader' } },
+    });
+    const r = await svc.testConnection('flattrade');
+    const ud = calls.find((c) => c.url.includes('/UserDetails'));
+
+    ok('K6: stored jKey validated -> connected', r.success === true, r.error);
+    ok('K6: body is the Noren wire format, not JSON',
+      typeof ud?.body === 'string' && ud.body.startsWith('jData='), typeof ud?.body);
+    ok('K6: the jKey is sent as its own param (not nested in jData)',
+      typeof ud?.body === 'string' && /&jKey=jkey-abcdefghijklmnop/.test(ud.body));
+    ok('K6: session token cached', store.session.flattrade === 'jkey-abcdefghijklmnop');
+  }
+  {
+    // A jKey is ~24+ chars. A 6-char value is something else pasted by mistake — say so, rather
+    // than shipping it to the broker and reporting the rejection as "invalid/expired token".
+    const { svc, calls } = makeService({ creds: { api_key: 'ftkey', access_token: '123456' }, routes: {} });
+    const r = await svc.testConnection('flattrade');
+    ok('K6: an implausibly short jKey is rejected locally', r.success === false && r.stage === 'credentials', r.stage);
+    ok('K6: it explains what a jKey is', /jKey/i.test(r.error) && /api_key/i.test(r.error));
+    ok('K6: the junk token is never sent to the broker', !calls.some((c) => c.url.includes('/UserDetails')));
+  }
+
+  console.log('\nF3. Session TTL: trust a JWT exp only when the broker means it (GAP-M1)');
+  {
     const jwt = (expSecondsFromNow) => {
       const claims = Buffer.from(JSON.stringify({ exp: Math.floor(Date.now() / 1000) + expSecondsFromNow })).toString('base64');
       return `eyJhbGciOiJIUzI1NiJ9.${claims}.sig`;
     };
-
-    const short = jwt(300); // what MStock actually issues
     const { svc, store } = makeService({ creds: { api_key: 'k' }, routes: {} });
 
-    await svc.saveToken('mstock', short, 43200); // policy asks for 12h
-    ok('M1: TTL clamped to the JWT exp, not the 12h policy', store.ttl <= 300 && store.ttl > 200, `ttl=${store.ttl}`);
+    // MStock's docs say the JWT is "valid till 12:00 AM of generated day", yet every token it
+    // issues — including the sample in its OWN docs — carries exp-iat = 300s. The claim is fiction.
+    // Honouring it would re-auth every 5 min (~288 logins/day) against a broker that rate-limits
+    // logins ("9 attempts remaining") — a good way to get the account locked. Keep the policy TTL;
+    // real expiry is discovered from a 401, not from a lying claim.
+    await svc.saveToken('mstock', jwt(300), 43200);
+    ok("M1: mstock's untrustworthy 300s exp does NOT shrink the session", store.ttl === 43200, `ttl=${store.ttl}`);
 
-    await svc.saveToken('mstock', jwt(-60), 43200); // already-dead token
-    ok('M1: an already-expired token is not cached as valid', store.ttl <= 1, `ttl=${store.ttl}`);
+    // Any broker whose exp we DO trust must never have its token cached past that instant.
+    await svc.saveToken('kite', jwt(300), 43200);
+    ok('M1: a trustworthy JWT exp DOES clamp the cache TTL', store.ttl <= 300 && store.ttl > 200, `ttl=${store.ttl}`);
+
+    await svc.saveToken('kite', jwt(-60), 43200); // already dead
+    ok('M1: an already-expired (trusted) token is not cached as valid', store.ttl <= 1, `ttl=${store.ttl}`);
 
     await svc.saveToken('flattrade', 'opaque-jkey-not-a-jwt', 3600);
     ok('M1: opaque (non-JWT) tokens keep the policy TTL', store.ttl === 3600, `ttl=${store.ttl}`);

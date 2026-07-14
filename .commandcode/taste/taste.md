@@ -16,6 +16,8 @@
 
 # Docker
 - Always use `--project-name trading-system` on every `docker compose` command to prevent project name splits that cause port/network conflicts. Prefer `make` targets (which already include it) over raw docker commands. Confidence: 0.85
+- Place scripts that need to run inside the ingestion container under `layer-1-ingestion/scripts/`, not repo-root `scripts/`. The ingestion Dockerfile build context is `layer-1-ingestion/`, so repo-root scripts won't be copied into the image. Confidence: 0.70
+- All containers must share a single Docker network (`local-trading-network`). Never create separate networks per compose file — use `external: true` referencing the shared network in every compose file. Confidence: 0.75
 
 # Typescript
 - Write ingestion layer scripts in TypeScript (.ts) not plain JavaScript (.js). Confidence: 0.75

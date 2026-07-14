@@ -1,5 +1,6 @@
 // @ts-nocheck
 import BrokerStatusBadge from '@/components/brokers/BrokerList/BrokerStatusBadge';
+import { BROKER_CAPABILITIES } from '@/shared/types';
 
 const BROKER_CONFIG = {
   mstock:    { color: 'border-l-blue-500', bg: 'bg-info/10', text: 'text-info', icon: '📊' },
@@ -10,6 +11,9 @@ const BROKER_CONFIG = {
 
 const BrokerCard = ({ broker, onToggle, onSelect }) => {
   const config = BROKER_CONFIG[broker.provider] || { color: 'border-l-border', bg: 'bg-surface-hover', text: 'text-text-secondary', icon: '🔌' };
+  const caps = BROKER_CAPABILITIES[broker.provider];
+  const isExecutorRole = broker.role === 'execution' || broker.role === 'both';
+  const unsafeExecutor = isExecutorRole && caps && !caps.restingStop;
 
   return (
     <div
@@ -27,6 +31,13 @@ const BrokerCard = ({ broker, onToggle, onSelect }) => {
         <BrokerStatusBadge status={broker.status} />
       </div>
 
+      {/* Capability warnings */}
+      {unsafeExecutor && (
+        <div className="mb-3 p-2 rounded bg-error/10 border border-error/20 text-error text-[11px] flex items-center gap-1.5">
+          ⚠️ {broker.provider} does not support resting stop-loss — cannot be the OMS executor
+        </div>
+      )}
+
       {broker.credentials?.length > 0 && (
         <div className="flex flex-wrap gap-1.5 mb-3">
           {broker.credentials.map((c) => (
@@ -34,6 +45,14 @@ const BrokerCard = ({ broker, onToggle, onSelect }) => {
               {c.field_name.replace(/_/g, ' ')}
             </span>
           ))}
+        </div>
+      )}
+
+      {caps && (
+        <div className="flex flex-wrap gap-1.5 mb-3">
+          {caps.dataFeed && <span className="text-[10px] px-1.5 py-0.5 rounded bg-surface-hover text-text-secondary">📡 Data Feed</span>}
+          {caps.restingStop ? <span className="text-[10px] px-1.5 py-0.5 rounded bg-success/10 text-success border border-success/20">🛡 Resting SL</span> : <span className="text-[10px] px-1.5 py-0.5 rounded bg-warning/10 text-warning border border-warning/20">⚠ No Resting SL</span>}
+          <span className="text-[10px] px-1.5 py-0.5 rounded bg-surface-hover text-text-tertiary">Max {caps.maxCandlesPerRequest} candles/req</span>
         </div>
       )}
 

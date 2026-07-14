@@ -130,3 +130,49 @@ export type Loaded<T> =
   | { status: 'unreachable'; reason: string }
   | { status: 'stale'; value: T; ageSeconds: number }
   | { status: 'fresh'; value: T };
+
+// ── Broker capabilities ────────────────────────────
+export interface BrokerCapabilities {
+  /** Whether this broker supports placing stop-loss orders on the exchange */
+  restingStop: boolean;
+  /** Whether this broker supports bracket orders */
+  bracketOrders: boolean;
+  /** Whether this broker provides live market data streams */
+  dataFeed: boolean;
+  /** Maximum candles returned per single historical API request */
+  maxCandlesPerRequest: number;
+  /** Maximum lookback in days for historical intraday data */
+  maxHistoricalDays: number;
+}
+
+/** Broker capability matrix — used to enforce role/capability rules */
+export const BROKER_CAPABILITIES: Record<string, BrokerCapabilities> = {
+  mstock: {
+    restingStop: false,
+    bracketOrders: false,
+    dataFeed: true,
+    maxCandlesPerRequest: 500,
+    maxHistoricalDays: 60,
+  },
+  flattrade: {
+    restingStop: true,
+    bracketOrders: true,
+    dataFeed: true,
+    maxCandlesPerRequest: 1000,
+    maxHistoricalDays: 365,
+  },
+  kite: {
+    restingStop: true,
+    bracketOrders: true,
+    dataFeed: true,
+    maxCandlesPerRequest: 1000,
+    maxHistoricalDays: 365,
+  },
+  indianapi: {
+    restingStop: false,
+    bracketOrders: false,
+    dataFeed: true,
+    maxCandlesPerRequest: 500,
+    maxHistoricalDays: 30,
+  },
+};

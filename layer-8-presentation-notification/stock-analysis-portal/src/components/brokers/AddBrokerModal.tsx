@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { createBroker, selectBrokersLoading } from '@/store/slices/brokerSlice';
+import { BROKER_CAPABILITIES } from '@/shared/types';
 
 const PROVIDERS = [
   { value: 'mstock', label: 'mStock (Mirae Asset)' },
@@ -19,6 +20,10 @@ const AddBrokerModal = ({ isOpen, onClose }) => {
   const [error, setError] = useState(null);
 
   if (!isOpen) return null;
+
+  const caps = BROKER_CAPABILITIES[provider];
+  const isExecutorRole = role === 'execution' || role === 'both';
+  const unsafeExecutor = isExecutorRole && caps && !caps.restingStop;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -51,12 +56,24 @@ const AddBrokerModal = ({ isOpen, onClose }) => {
             <select value={role} onChange={(e) => setRole(e.target.value)} className="w-full p-2 rounded-lg bg-surface border border-border text-text-primary text-sm">
               {['data', 'execution', 'both'].map((r) => <option key={r} value={r}>{r.charAt(0).toUpperCase() + r.slice(1)}</option>)}
             </select>
+            {unsafeExecutor && (
+              <p className="text-[10px] text-error mt-1">⚠️ {provider} lacks resting stop-loss — will NOT function as OMS executor. Use FlatTrade for execution.</p>
+            )}
           </div>
 
           <div>
             <label className="text-xs text-text-tertiary block mb-1">Priority</label>
             <input type="number" min={1} max={100} value={priority} onChange={(e) => setPriority(parseInt(e.target.value) || 1)} className="w-full p-2 rounded-lg bg-surface border border-border text-text-primary text-sm" />
           </div>
+
+          {caps && (
+            <div className="p-2 rounded bg-surface-hover border border-border text-[10px] text-text-tertiary grid grid-cols-2 gap-1">
+              <span>📡 Data Feed: {caps.dataFeed ? 'Yes' : 'No'}</span>
+              <span>🛡 Resting SL: {caps.restingStop ? 'Yes' : 'No'}</span>
+              <span>Max candles/req: {caps.maxCandlesPerRequest}</span>
+              <span>Max history: {caps.maxHistoricalDays}d</span>
+            </div>
+          )}
 
           <div className="flex gap-3 pt-1">
             <button type="button" onClick={onClose} className="flex-1 px-4 py-2 rounded-lg border border-border text-text-secondary hover:text-text-primary text-sm transition">Cancel</button>

@@ -622,17 +622,11 @@ const runBackfill = async (startParams = {}) => {
     }
 
     await runScriptWithIPC(batchScript, scriptArgs);
-    await updateBackfillStatus(1, 50, 'Step 1 Complete');
+    await updateBackfillStatus(1, 50, 'Step 1 Complete — candles streamed to Kafka');
 
-    // Step 2: Feed
-    logger.info('⏳ Step 2: Feeding Kafka...');
-    await updateBackfillStatus(1, 55, 'Feeding Kafka...');
-    const feedScript = path.resolve(__dirname, '../scripts/feed_kafka.js');
-    const feedArgs = symbol ? ['--symbol', symbol] : [];
-    await runScriptWithIPC(feedScript, feedArgs);
-
-    // Step 3: Verification & Notification
-    logger.info('⏳ Step 3: Verifying Database Sync...');
+    // Step 2: Verify DB sync (backfill-runner.ts writes candles to Kafka independently;
+    // L2 processes them into TimescaleDB. Poll until rows arrive or timeout.)
+    logger.info('⏳ Step 2: Verifying Database Sync...');
     await updateBackfillStatus(2, 80, 'Verifying Database...');
     
     // Poll Backend until count stabilizes or timeout
@@ -673,11 +667,12 @@ const runBackfill = async (startParams = {}) => {
     await updateBackfillStatus(3, 0, err.message);
     if (jobId) {
       await backendApi
-        .updateBackfillJob(jobId, { status: 'FAILED', details: err.message, error: err.message })
+        .updateBackfillJob(jobId, { status: 'FAILED', errors: [{ message: err.message, timestamp: new Date().toISOString() }] })
         .catch(() => {});
     }
     await logToRedis(`❌ Backfill Failed: ${err.message}`);
     logger.error(`❌ Backfill Failed: ${err.message}`);
+    throw err; // propagate to the HTTP handler so the dashboard gets a real error
   } finally {
     isBackfilling = false;
   }
@@ -704,14 +699,50 @@ app.get('/api/backfill/swarm/status', async (req, res) => {
 app.post('/api/backfill/historical', async (req, res) => {
   try {
     const { symbol, fromDate, toDate } = req.body;
-    // Allow null symbol -> "All Symbols"
-    // if (!symbol) return res.status(400).json({ error: 'Symbol is required' });
 
-    logger.info(`🎯 Received Historical Backfill Request: ${symbol}`);
-    runBackfill({ symbol, fromDate, toDate }).catch(err => logger.error('Backfill Error', err));
+    logger.info(`🎯 Received Historical Backfill Request: ${symbol || 'ALL SYMBOLS'}`);
 
-    res.json({ success: true, message: `Started backfill for ${symbol}` });
-  } catch (err) {
+    // Verify the child process can spawn before responding. The old code returned
+    // {success:true} before the fork, so a SyntaxError crash was invisible to the
+    // dashboard (rule 13: fabricated confidence). The backfill-runner reports progress
+    // independently via PATCH /api/v1/backfill/:jobId, so we only need to confirm
+    // the process STARTED — not wait for it to finish (which can take minutes).
+    //
+    // We verify by awaiting the runBackfill Promise with a short circuit: if the
+    // child exits NON-ZERO within 5 seconds, it's a crash (not a backfill completion).
+    // If it survives 5s, it's running and we respond "started" truthfully.
+
+    let settled = false;
+    let fiveSec = false;
+
+    const timeout = setTimeout(() => {
+      fiveSec = true;
+      if (!settled) {
+        settled = true;
+        res.json({ success: true, message: `Backfill started for ${symbol || 'ALL SYMBOLS'}` });
+      }
+    }, 5000);
+
+    runBackfill({ symbol, fromDate, toDate })
+      .then(() => {
+        if (!settled) {
+          settled = true;
+          clearTimeout(timeout);
+          res.json({ success: true, message: `Backfill completed for ${symbol || 'ALL SYMBOLS'}` });
+        }
+      })
+      .catch((err: any) => {
+        logger.error(`Backfill failed: ${err.message}`);
+        if (!settled) {
+          settled = true;
+          clearTimeout(timeout);
+          if (!fiveSec) {
+            // Crashed immediately — tell the dashboard
+            res.status(500).json({ success: false, error: err.message });
+          }
+        }
+      });
+  } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
 });

@@ -39,11 +39,33 @@ class VendorManager {
     this.initVendors(providerNames);
   }
 
+  /**
+   * Build a vendor from whatever the control plane currently knows about it.
+   *
+   * Credentials live in the database now, so the vendor's api_key must be handed to it here.
+   * It used to fall back to `process.env.MSTOCK_API_KEY` — an env var that was deliberately
+   * removed in the credentials-to-DB migration. The vendor was therefore constructed with an
+   * empty apiKey, built no REST client, and logged "missing apiKey — cannot connect" no matter
+   * how fresh its session token was.
+   */
+  private buildVendor(name: string) {
+    const creds = this.credentialStore?.getCredentials(name) || {};
+    return VendorFactory.createVendor(
+      {
+        ...this.options,
+        onTick: (t: any) => this.handleTick(t),
+        sessionToken: this.credentialStore?.getToken(name),
+        apiKey: creds.api_key,
+        credentials: creds, // each adapter takes the fields its broker actually needs
+      },
+      name,
+    );
+  }
+
   initVendors(providerNames: string[]): void {
     providerNames.forEach(name => {
       try {
-        const token = this.credentialStore?.getToken(name);
-        const vendor = VendorFactory.createVendor({ ...this.options, onTick: (t: any) => this.handleTick(t), sessionToken: token }, name);
+        const vendor = this.buildVendor(name);
         if (vendor) this.vendors.set(name, vendor as any);
       } catch (e: any) { logger.error(`VendorManager: failed '${name}': ${e.message}`); }
     });
@@ -55,19 +77,25 @@ class VendorManager {
     for (const name of providerNames) {
       if (!current.has(name)) {
         try {
-          const token = this.credentialStore?.getToken(name);
-          const vendor = VendorFactory.createVendor({ ...this.options, onTick: (t: any) => this.handleTick(t), sessionToken: token }, name);
+          const vendor = this.buildVendor(name);
           if (vendor) this.vendors.set(name, vendor as any);
         } catch (e: any) { logger.error(`VendorManager: failed '${name}': ${e.message}`); }
       } else {
         // Token may have changed — push it to the running vendor (I1 fix)
         try {
           const token = this.credentialStore?.getToken(name);
-          const vendor = this.vendors.get(name);
-          if (token && vendor && typeof (vendor as any).setAccessToken === 'function') {
-            (vendor as any).setAccessToken(token);
+          const vendor: any = this.vendors.get(name);
+          if (token && vendor && typeof vendor.setAccessToken === 'function') {
+            // Hand the token over and let the adapter decide what to do with it. The vendor owns
+            // its own transport: MStock re-opens its tick socket (the token is baked into the
+            // socket URL, so a rotated token needs a new connection), while a vendor with a
+            // healthy stream can simply keep it. Reconnecting from here as well would open a
+            // second socket, because the adapter's connect() is still in flight.
+            vendor.setAccessToken(token);
           }
-        } catch (_) {}
+        } catch (e: any) {
+          logger.error(`VendorManager: failed to apply new token for '${name}': ${e.message}`);
+        }
       }
     }
   }

@@ -456,7 +456,8 @@
     "isIndex": true,
     "tokens": {
       "kite": "256265",
-      "mstock": "TODO_VERIFY_FROM_MSTOCK_UI"
+      "mstock": "26000",
+      "flattrade": "26000"
     }
   },
   {
@@ -466,7 +467,8 @@
     "isIndex": true,
     "tokens": {
       "kite": "260105",
-      "mstock": "TODO_VERIFY_FROM_MSTOCK_UI"
+      "mstock": "26009",
+      "flattrade": "26009"
     }
   },
   {
@@ -476,7 +478,7 @@
     "isIndex": true,
     "tokens": {
       "kite": "260093",
-      "mstock": "TODO_VERIFY_FROM_MSTOCK_UI"
+      "mstock": "26017"
     }
   }
 ]

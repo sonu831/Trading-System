@@ -1,5 +1,5 @@
 // @ts-nocheck
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Head from 'next/head';
 import { useSelector } from 'react-redux';
 import AppShell from '@/components/layout/AppShell/AppShell';
@@ -8,6 +8,46 @@ import useBackfillManager from '@/hooks/useBackfillManager';
 import { Database, RefreshCw, Zap, AlertTriangle, CheckCircle2, Clock, Download, BarChart3, Play } from 'lucide-react';
 
 const CANDLE_THRESHOLD = { HEALTHY: 50000, WARNING: 20000 };
+
+function ProviderStatusBanner() {
+  const [status, setStatus] = useState(null);
+
+  useEffect(() => {
+    const check = async () => {
+      try {
+        const res = await fetch('/api/v1/providers');
+        const data = await res.json();
+        const providers = data.data || [];
+        const mstock = providers.find((p) => p.provider === 'mstock');
+        setStatus(mstock ? { status: mstock.status, enabled: mstock.enabled } : null);
+      } catch (_) { setStatus(null); }
+    };
+    check();
+    const id = setInterval(check, 10000);
+    return () => clearInterval(id);
+  }, []);
+
+  if (!status) return (
+    <div className="mb-4 p-3 rounded-lg bg-error/10 border border-error/30 text-error text-xs">
+      ⚠️ No mStock provider configured — <a href="/brokers" className="underline">add one in Broker settings</a>
+    </div>
+  );
+
+  if (status.status === 'CONNECTED') return (
+    <div className="mb-4 p-3 rounded-lg bg-success/10 border border-success/30 text-success text-xs flex items-center gap-2">
+      <CheckCircle2 size={14} /> mStock session active — ready for backfill
+    </div>
+  );
+
+  return (
+    <div className="mb-4 p-3 rounded-lg bg-warning/10 border border-warning/30 text-warning text-xs">
+      <div className="flex items-center gap-2 font-semibold mb-1">
+        <AlertTriangle size={14} /> mStock session: {status.status || 'UNKNOWN'}
+      </div>
+      <p>mStock requires TOTP authentication before pulling data. Go to <a href="/brokers" className="underline">Broker settings</a>, select mStock, enter credentials and TOTP to establish a session. Until then, backfill will return 0 candles.</p>
+    </div>
+  );
+}
 
 function StatBadge({ icon: Icon, label, value, tone = '' }) {
   return (
@@ -20,33 +60,37 @@ function StatBadge({ icon: Icon, label, value, tone = '' }) {
 }
 
 function SymbolRow({ item, backfillInProgress, onBackfill }) {
-  const getStatus = (candles) => candles >= CANDLE_THRESHOLD.HEALTHY ? 'healthy' : candles >= CANDLE_THRESHOLD.WARNING ? 'warning' : 'critical';
-  const status = getStatus(item.total_candles || 0);
+  const getStatus = (candles, status) => {
+    if (status === 'unpopulated') return 'unpopulated';
+    return candles >= CANDLE_THRESHOLD.HEALTHY ? 'healthy' : candles >= CANDLE_THRESHOLD.WARNING ? 'warning' : 'critical';
+  };
+  const status = getStatus(item.total_candles || 0, item.status);
   return (
-    <tr className={`border-b border-border/50 hover:bg-surface-hover transition-colors ${status === 'critical' ? 'bg-error/5' : status === 'warning' ? 'bg-warning/5' : ''}`}>
+    <tr className={`border-b border-border/50 hover:bg-surface-hover transition-colors ${status === 'critical' ? 'bg-error/5' : status === 'warning' ? 'bg-warning/5' : status === 'unpopulated' ? 'bg-surface-hover/30' : ''}`}>
       <td className="px-4 py-3">
         <span className="font-bold text-text-primary">{item.symbol}</span>
+        {item.sector && <span className="text-[10px] text-text-tertiary ml-1.5">{item.sector}</span>}
       </td>
       <td className="px-4 py-3 text-xs tabular-nums text-text-secondary">
-        {item.first_date ? new Date(item.first_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
+        {item.first_date ? new Date(item.first_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : <span className="text-text-tertiary">—</span>}
       </td>
       <td className="px-4 py-3 text-xs tabular-nums text-text-secondary">
-        {item.last_date ? new Date(item.last_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
+        {item.last_date ? new Date(item.last_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : <span className="text-text-tertiary">—</span>}
       </td>
       <td className="px-4 py-3 text-right">
-        <span className={`tabular-nums font-bold text-sm ${status === 'healthy' ? 'text-success' : status === 'warning' ? 'text-warning' : 'text-error'}`}>
+        <span className={`tabular-nums font-bold text-sm ${status === 'healthy' ? 'text-success' : status === 'warning' ? 'text-warning' : status === 'unpopulated' ? 'text-text-tertiary' : 'text-error'}`}>
           {(item.total_candles || 0).toLocaleString()}
         </span>
         {item.gaps?.length > 0 && <span className="text-[10px] text-warning ml-1">· {item.gaps.length} gap{item.gaps.length > 1 ? 's' : ''}</span>}
       </td>
       <td className="px-4 py-3">
-        <span className={`badge text-[10px] font-bold px-2 py-1 rounded-full border ${status === 'healthy' ? 'badge-ok' : status === 'warning' ? 'badge-warn' : 'badge-err'}`}>
-          {status === 'healthy' ? '✓ Synced' : status === 'warning' ? '⚠ Partial' : '✗ Lagging'}
+        <span className={`badge text-[10px] font-bold px-2 py-1 rounded-full border ${status === 'healthy' ? 'badge-ok' : status === 'warning' ? 'badge-warn' : status === 'unpopulated' ? 'badge-muted' : 'badge-err'}`}>
+          {status === 'healthy' ? '✓ Synced' : status === 'warning' ? '⚠ Partial' : status === 'unpopulated' ? '○ Unpopulated' : '✗ Lagging'}
         </span>
       </td>
       <td className="px-4 py-3 text-right">
         <button onClick={() => onBackfill(item.symbol)} disabled={backfillInProgress[item.symbol]}
-          className={`text-[11px] font-semibold px-2.5 py-1.5 rounded-lg transition ${backfillInProgress[item.symbol] ? 'bg-surface-hover text-text-tertiary cursor-wait' : status === 'critical' ? 'bg-error/15 text-error hover:bg-error/25' : 'bg-primary/15 text-primary hover:bg-primary/25'}`}>
+          className={`text-[11px] font-semibold px-2.5 py-1.5 rounded-lg transition ${backfillInProgress[item.symbol] ? 'bg-surface-hover text-text-tertiary cursor-wait' : 'bg-primary/15 text-primary hover:bg-primary/25'}`}>
           {backfillInProgress[item.symbol] ? <RefreshCw size={12} className="inline animate-spin mr-1" /> : <Download size={12} className="inline mr-1" />}
           {backfillInProgress[item.symbol] ? 'Running' : 'Backfill'}
         </button>
@@ -59,9 +103,9 @@ export default function BackfillPage() {
   const pipeline = useSelector(selectPipelineStatus);
   const backfillData = pipeline?.layers?.layer1?.backfill;
   const {
-    symbols, loading, error, summary, laggingSymbols, isDialogOpen, backfillInProgress, message,
+    symbols, loading, error, summary, laggingSymbols, isDialogOpen, backfillInProgress,
     activeJobId, jobStatus,
-    handleSort, fetchCoverage, triggerBackfill, triggerBulkBackfill, openBackfillDialog, closeDialog, setMessage,
+    handleSort, fetchCoverage, triggerBackfill, triggerBulkBackfill, openBackfillDialog, closeDialog,
   } = useBackfillManager();
 
   const [fromDate, setFromDate] = useState('');
@@ -104,8 +148,8 @@ export default function BackfillPage() {
           <button onClick={fetchCoverage} className="btn-primary text-xs" disabled={loading}>
             <RefreshCw size={12} className={loading ? 'animate-spin' : ''} /> Refresh
           </button>
-          <button onClick={() => setShowBulkDlg(true)} disabled={laggingSymbols.length === 0}
-            className="text-xs font-semibold px-3 py-2 rounded-lg bg-gradient-to-r from-emerald-600 to-emerald-500 text-white hover:shadow-emerald-500/25 transition disabled:opacity-40">
+          <button onClick={() => setShowBulkDlg(true)}
+            className="text-xs font-semibold px-3 py-2 rounded-lg bg-gradient-to-r from-emerald-600 to-emerald-500 text-white hover:shadow-emerald-500/25 transition">
             🚀 Bulk ({laggingSymbols.length})
           </button>
         </div>
@@ -150,12 +194,7 @@ export default function BackfillPage() {
       </div>
 
       {/* MESSAGE */}
-      {message && (
-        <div className={`p-3 rounded-lg mb-4 flex justify-between items-center text-xs ${message.type === 'success' ? 'bg-success/10 border border-success/30 text-success' : message.type === 'error' ? 'bg-error/10 border border-error/30 text-error' : 'bg-info/10 border border-info/30 text-info'}`}>
-          <span>{message.text}</span>
-          <button onClick={() => setMessage(null)} className="opacity-70 hover:opacity-100">✕</button>
-        </div>
-      )}
+      <ProviderStatusBanner />
 
       {/* ERROR */}
       {error && (

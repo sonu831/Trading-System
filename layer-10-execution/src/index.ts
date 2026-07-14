@@ -220,6 +220,20 @@ async function reconcile() {
         }));
       }
 
+      // Execution events push (fills, exits, state changes — the execution room)
+      if (REDIS_CHANNELS?.EXECUTION_EVENTS) {
+        const latestTrade = journal;
+        await redisClient.publish(REDIS_CHANNELS.EXECUTION_EVENTS, JSON.stringify({
+          type: 'STATE_SNAPSHOT',
+          timestamp: new Date().toISOString(),
+          mode: config.tradeMode,
+          killSwitch: riskManager.killSwitch,
+          positions: positionManager.getOpenPositions().length,
+          dailyPnl: riskManager.getState().dailyState?.totalPnl ?? 0,
+          source: 'execution-engine',
+        }));
+      }
+
       // Publish alerts/notifications
       const openCount = positionManager.getOpenPositions().length;
       if (openCount > 0) {
@@ -299,11 +313,26 @@ function startExpress() {
         error: 'Kill switch set, but square-off failed — check positions at the broker',
       });
     }
+    // Push execution event so dashboard updates instantly
+    if (redisClient && REDIS_CHANNELS?.EXECUTION_EVENTS) {
+      redisClient.publish(REDIS_CHANNELS.EXECUTION_EVENTS, JSON.stringify({
+        type: 'KILL_ACTIVATED',
+        timestamp: new Date().toISOString(),
+        source: 'execution-engine',
+      })).catch(() => {});
+    }
     res.json({ killSwitch: true, positions: positionManager.getAllPositions() });
   });
 
   app.post('/resume', (req, res) => {
     riskManager.setKillSwitch(false, 'api');
+    if (redisClient && REDIS_CHANNELS?.EXECUTION_EVENTS) {
+      redisClient.publish(REDIS_CHANNELS.EXECUTION_EVENTS, JSON.stringify({
+        type: 'KILL_DEACTIVATED',
+        timestamp: new Date().toISOString(),
+        source: 'execution-engine',
+      })).catch(() => {});
+    }
     res.json({ killSwitch: false });
   });
 

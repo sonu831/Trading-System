@@ -7,17 +7,50 @@ import HistoricalView from '@/components/features/Historical';
 import AdvanceDeclineBar from '@/components/organisms/AdvanceDeclineBar';
 import PredictionGauge from '@/components/organisms/PredictionGauge';
 import { useDashboard } from '@/hooks';
+import { useIndexQuote } from '@/hooks/useMarket';
 import { selectPipelineStatus } from '@/store/slices/systemSlice';
 import { selectBreadth } from '@/store/slices/regimeSlice';
+import { selectExecution } from '@/store/slices/executionSlice';
 import { BackfillProgress } from '@/components/features/Backfill';
 import SwarmNotification from '@/components/features/Backfill/SwarmNotification';
+
+function IndexTile({ label, value, changeLabel, changeTone, footer }: { label: string; value: string; changeLabel?: string; changeTone?: string; footer?: string }) {
+  return (
+    <div className="card stat">
+      <div className="text-[11px] uppercase tracking-wider text-text-tertiary">{label}</div>
+      <div className="text-2xl font-extrabold tabular-nums mt-0.5">{value}</div>
+      {changeLabel && (
+        <div className={`text-xs font-semibold mt-1 flex items-center gap-1 ${changeTone === 'pos' ? 'text-success' : changeTone === 'neg' ? 'text-error' : 'text-text-tertiary'}`}>
+          {changeTone === 'pos' ? '▲' : changeTone === 'neg' ? '▼' : ''} {changeLabel}
+        </div>
+      )}
+      {footer && <div className="text-xs text-text-tertiary mt-1">{footer}</div>}
+    </div>
+  );
+}
 
 export default function Home() {
   const { marketView, signals, systemStatus, loading, viewMode, setViewMode } = useDashboard();
   const pipelineStatus = useSelector(selectPipelineStatus);
   const breadth = useSelector(selectBreadth);
+  const exec = useSelector(selectExecution);
   const backfillData = pipelineStatus?.layers?.layer1?.backfill;
   const [isDismissed, setIsDismissed] = useState(false);
+
+  const niftyQuote = useIndexQuote('NIFTY');
+  const bankQuote = useIndexQuote('BANKNIFTY');
+
+  const niftyLtp = niftyQuote?.ltp;
+  const niftyChg = niftyQuote?.changePct;
+  const bankLtp = bankQuote?.ltp;
+  const bankChg = bankQuote?.changePct;
+  const dayPnl = exec?.risk?.dailyState?.totalPnl ?? exec?.dailyPnl ?? null;
+  const tradesToday = exec?.risk?.dailyState?.tradesToday ?? null;
+  const maxDailyLoss = exec?.risk?.maxDailyLoss ?? null;
+
+  const fmtPrice = (v: number | undefined | null) => v != null ? v.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—';
+  const fmtChange = (v: number | undefined | null) => v != null ? `${v >= 0 ? '+' : ''}${v.toFixed(2)}%` : '—';
+  const fmtPnl = (v: number | undefined | null) => v != null ? `${v >= 0 ? '+' : '−'}₹${Math.abs(v).toLocaleString()}` : '—';
 
   useEffect(() => {
     if (backfillData?.status === 'running') setIsDismissed(false);
@@ -41,38 +74,23 @@ export default function Home() {
         )}
       </div>
 
-      {/* Stat row */}
+      {/* Stat row — all values now derived from real API calls, never hardcoded */}
       <div className="grid gap-3.5 mb-4" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
-        <div className="card stat">
-          <div className="text-[11px] uppercase tracking-wider text-text-tertiary">NIFTY spot</div>
-          <div className="text-2xl font-extrabold tabular-nums mt-0.5">{marketView?.indices?.NIFTY?.ltp?.toLocaleString() || '24,850.30'}</div>
-          <div className={`text-xs font-semibold mt-1 flex items-center gap-1 ${marketView?.indices?.NIFTY?.change >= 0 ? 'text-success' : 'text-error'}`}>
-            {marketView?.indices?.NIFTY?.change >= 0 ? '▲' : '▼'} {marketView?.indices?.NIFTY?.changePct?.toFixed(2)}%
-          </div>
-        </div>
-        <div className="card stat">
-          <div className="text-[11px] uppercase tracking-wider text-text-tertiary">BANKNIFTY spot</div>
-          <div className="text-2xl font-extrabold tabular-nums mt-0.5">54,210.80</div>
-          <div className="text-xs font-semibold mt-1 flex items-center gap-1 text-error">▼ −0.16%</div>
-        </div>
-        <div className="card stat">
-          <div className="text-[11px] uppercase tracking-wider text-text-tertiary">India VIX</div>
-          <div className="text-2xl font-extrabold tabular-nums mt-0.5">13.24</div>
-          <div className="text-xs text-text-tertiary mt-1">Normal band · scalp-friendly</div>
-        </div>
-        <div className="card stat">
-          <div className="text-[11px] uppercase tracking-wider text-text-tertiary">Day P&amp;L</div>
-          <div className="text-2xl font-extrabold tabular-nums mt-0.5 text-success">+₹8,450</div>
-          <div className="text-xs text-text-tertiary mt-1">of −₹2,500 loss limit · 3 trades</div>
-        </div>
+        <IndexTile label="NIFTY spot" value={fmtPrice(niftyLtp)}
+          changeLabel={fmtChange(niftyChg)} changeTone={niftyChg != null ? (niftyChg >= 0 ? 'pos' : 'neg') : undefined} />
+        <IndexTile label="BANKNIFTY spot" value={fmtPrice(bankLtp)}
+          changeLabel={fmtChange(bankChg)} changeTone={bankChg != null ? (bankChg >= 0 ? 'pos' : 'neg') : undefined} />
+        <IndexTile label="India VIX" value="—" footer="Unavailable — VIX index token not configured" />
+        <IndexTile label="Day P&amp;L" value={fmtPnl(dayPnl)} changeTone={dayPnl != null ? (dayPnl >= 0 ? 'pos' : 'neg') : undefined}
+          footer={maxDailyLoss != null ? `of ₹${maxDailyLoss.toLocaleString()} limit · ${tradesToday ?? '—'} trades` : undefined} />
       </div>
 
       {/* Breadth + Pred row */}
       <div className="grid gap-3.5 mb-4" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))' }}>
-        <AdvanceDeclineBar advancing={breadth?.advancing || 38} declining={breadth?.declining || 12}
-          aboveVwap={breadth?.aboveVwapPct || 74} aboveEma20={breadth?.aboveEma20Pct || 68}
-          adRatio={breadth?.adRatio || 3.17} />
-        <PredictionGauge pct={64} />
+        <AdvanceDeclineBar advancing={breadth?.advancing ?? null} declining={breadth?.declining ?? null}
+          aboveVwap={breadth?.aboveVwapPct ?? null} aboveEma20={breadth?.aboveEma20Pct ?? null}
+          adRatio={breadth?.adRatio ?? null} breadth={breadth?.breadth ?? null} />
+        <PredictionGauge pct={null} />
       </div>
 
       {/* LIVE/HISTORICAL toggle + main content */}

@@ -2,6 +2,8 @@
 import { useState, useEffect } from 'react';
 import { useDispatch } from 'react-redux';
 import { updateBroker, saveCredentialsBulk } from '@/store/slices/brokerSlice';
+import { addToast } from '@/store/slices/systemSlice';
+import { BROKER_CAPABILITIES } from '@/shared/types';
 
 const BROKER_FORM_FIELDS = {
   mstock:    ['api_key', 'client_code', 'password', 'totp_secret'],
@@ -22,8 +24,9 @@ const BrokerForm = ({ broker }) => {
   const [role, setRole] = useState(broker?.role || 'data');
   const [priority, setPriority] = useState(broker?.priority || 1);
   const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState(null);
   const [loading, setLoading] = useState(true);
+
+  const toast = (type, text, title) => dispatch(addToast({ type, text, title }));
 
   useEffect(() => {
     if (!broker) return;
@@ -50,24 +53,27 @@ const BrokerForm = ({ broker }) => {
 
   const handleSaveAll = async () => {
     setSaving(true);
-    setMessage(null);
     try {
       await dispatch(updateBroker({ id: broker.id, role, priority }));
       const credentials = fields.map((f) => ({ field_name: f, field_value: formValues[f] || '' }));
       const res = await dispatch(saveCredentialsBulk({ providerId: broker.id, credentials }));
       if (res.meta.requestStatus === 'fulfilled') {
-        setMessage({ type: 'success', text: 'All settings saved' });
+        toast('success', 'All settings saved', 'Broker config');
       } else {
-        setMessage({ type: 'error', text: res.error?.message || 'Failed to save' });
+        toast('error', res.error?.message || 'Failed to save', 'Broker config');
       }
     } catch (err) {
-      setMessage({ type: 'error', text: err.message });
+      toast('error', err.message, 'Broker config');
     }
     setSaving(false);
   };
 
   if (!broker) return null;
   if (loading) return <div className="card text-text-tertiary text-sm text-center py-6">Loading credentials...</div>;
+
+  const capCaps = BROKER_CAPABILITIES[broker.provider];
+  const isExecRole = role === 'execution' || role === 'both';
+  const unsafeExecutor = isExecRole && capCaps && !capCaps.restingStop;
 
   return (
     <div className="card">
@@ -79,6 +85,9 @@ const BrokerForm = ({ broker }) => {
           <select value={role} onChange={(e) => setRole(e.target.value)} className="w-full p-2 rounded-lg bg-surface border border-border text-text-primary text-sm">
             {['data', 'execution', 'both'].map((r) => <option key={r} value={r}>{r.charAt(0).toUpperCase() + r.slice(1)}</option>)}
           </select>
+          {unsafeExecutor && (
+            <p className="text-[10px] text-error mt-1">⚠️ {broker.provider} lacks resting stop-loss — will NOT function as OMS executor. Use FlatTrade for execution.</p>
+          )}
         </div>
         <div>
           <label className="text-xs text-text-tertiary block mb-1">Priority</label>
@@ -105,11 +114,6 @@ const BrokerForm = ({ broker }) => {
         ))}
       </div>
 
-      {message && (
-        <div className={`mb-3 p-2.5 rounded-lg text-xs ${message.type === 'success' ? 'bg-success/10 border border-success/30 text-success' : 'bg-error/10 border border-error/30 text-error'}`}>
-          {message.text}
-        </div>
-      )}
       <button onClick={handleSaveAll} disabled={saving} className="btn-primary w-full justify-center text-sm">
         {saving ? 'Saving...' : 'Save All Settings'}
       </button>

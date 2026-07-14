@@ -136,6 +136,30 @@ const BROKER_BASE_URLS = {
   KITE: 'https://api.kite.trade',
 };
 
+// ── Market Hours (single source of truth — rule 3/14) ──
+//
+// Every layer that checks "is the market open?" uses these values.
+// Previously defined in 6+ independent locations with conflicting close times
+// (15:00 vs 15:30) and one broken method call (getMarketStatus did not exist).
+// Declare ONCE, here. All layers import from shared/.
+
+const MARKET_HOURS = {
+  OPEN_HOUR: 9,
+  OPEN_MINUTE: 15,
+  CLOSE_HOUR: 15,
+  CLOSE_MINUTE: 30,
+  TIMEZONE: 'Asia/Kolkata',
+  IST_OFFSET_MS: 5.5 * 3600000, // 330 minutes
+  WEEKEND_DAYS: [0, 6],          // Sunday, Saturday
+
+  // Execution risk gates (deliberately different from market close)
+  ENTRY_CUTOFF: '15:00',         // no new trades after
+  SQUARE_OFF_TIME: '15:15',      // force-exit all positions
+
+  // API fetch windows
+  MIN_API_FETCH_HOURS: [9, 16],  // 9 AM to 4 PM (covers market + pre/post)
+};
+
 // ── Weekly expiry weekday (ISO: 1=Mon .. 7=Sun) ─────
 //
 // ⚠️ OWNER MUST VERIFY against the current NSE circular before live trading.
@@ -267,6 +291,6 @@ module.exports = {
   SIGNAL_DIRECTION, SIGNAL_ACTION, SIGNAL_TIER, OPTION_TYPE,
   SECTOR_MOMENTUM, TRADE_MODE, PROVIDER_ROLE,
   BROKER_CREDENTIAL_FIELDS, BROKER_REQUIRED_FIELDS, BROKER_FORM_FIELDS, BROKER_PROVIDERS,
-  BROKER_BASE_URLS, EXPIRY_WEEKDAY_ISO, REDIS_KEYS, REDIS_CHANNELS, PORTS, KAFKA_TOPICS, KAFKA_GROUPS,
-  API_KEY_HEADER, PUBLIC_API_ROUTES,
+  BROKER_BASE_URLS, EXPIRY_WEEKDAY_ISO, REDIS_KEYS, REDIS_CHANNELS, MARKET_HOURS, PORTS,
+  KAFKA_TOPICS, KAFKA_GROUPS, API_KEY_HEADER, PUBLIC_API_ROUTES,
 };

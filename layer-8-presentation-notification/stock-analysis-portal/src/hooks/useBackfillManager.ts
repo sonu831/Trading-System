@@ -1,4 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useDispatch } from 'react-redux';
+import { addToast } from '@/store/slices/systemSlice';
 
 const API_URL = ''; // Uses proxy
 
@@ -8,73 +10,110 @@ const CANDLE_THRESHOLD = {
   // < 20k = critical
 };
 
-/**
- * Custom hook for Backfill Manager page
- * Handles data fetching, state management, and backfill actions
- */
+async function checkProviderReady() {
+  try {
+    const res = await fetch(`${API_URL}/api/v1/providers`);
+    const data = await res.json();
+    if (!data.success || !data.data) return 'unreachable';
+    const providers = data.data || [];
+    const mstock = providers.find((p) => p.provider === 'mstock');
+    if (!mstock) return 'no-provider';
+    if (mstock.status === 'CONNECTED') return 'ready';
+    if (mstock.status === 'ERROR' || mstock.status === 'DISABLED') return `error:${mstock.status}`;
+    return 'not-ready';
+  } catch (e) {
+    return 'unreachable';
+  }
+}
+
 export default function useBackfillManager() {
+  const dispatch = useDispatch();
   const [symbols, setSymbols] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedSymbol, setSelectedSymbol] = useState(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [backfillInProgress, setBackfillInProgress] = useState({});
-  const [message, setMessage] = useState(null);
   const [sortConfig, setSortConfig] = useState({ key: 'total_candles', direction: 'asc' });
   const [activeJobId, setActiveJobId] = useState(null);
   const [jobStatus, setJobStatus] = useState(null);
 
-  // Fetch data availability
+  const toast = (type, text, title) => dispatch(addToast({ type, text, title }));
+
   const fetchCoverage = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await fetch(`${API_URL}/api/v1/data/availability`);
-      const data = await res.json();
-      
-      if (!res.ok) {
-        throw new Error(data.error || 'Failed to fetch data availability');
+      const [availRes, symRes] = await Promise.all([
+        fetch(`${API_URL}/api/v1/data/availability`).then(r => r.json()).catch(() => ({ data: null })),
+        fetch(`${API_URL}/api/v1/data/symbols`).then(r => r.json()).catch(() => ({ data: { symbols: [] } })),
+      ]);
+
+      const configuredSymbols = symRes.data?.symbols || [];
+      const configuredSet = new Set(configuredSymbols.map((s) => s.symbol));
+      const coverageMap = {};
+      if (availRes.data?.symbols) {
+        for (const row of availRes.data.symbols) {
+          coverageMap[row.symbol] = row;
+        }
       }
 
-      const symbolsData = (data.data?.symbols || []).map((item) => ({
-        ...item,
-        total_candles: item.total_candles || 0,
-        status: getSymbolStatus(item.total_candles || 0),
-      }));
+      const symbolsData = configuredSymbols.map((cfg) => {
+        const covered = coverageMap[cfg.symbol];
+        return {
+          symbol: cfg.symbol,
+          exchange: cfg.exchange || 'NSE',
+          sector: cfg.sector || null,
+          total_candles: covered?.total_candles || covered?.total_records || 0,
+          first_date: covered?.first_date || covered?.earliest || null,
+          last_date: covered?.last_date || covered?.latest || null,
+          status: covered ? getSymbolStatus(covered.total_candles || covered.total_records || 0) : 'unpopulated',
+        };
+      });
+
+      if (availRes.data?.symbols) {
+        for (const row of availRes.data.symbols) {
+          if (!configuredSet.has(row.symbol)) {
+            symbolsData.push({
+              symbol: row.symbol,
+              exchange: 'NSE',
+              sector: null,
+              total_candles: row.total_candles || row.total_records || 0,
+              first_date: row.first_date || row.earliest || null,
+              last_date: row.last_date || row.latest || null,
+              status: getSymbolStatus(row.total_candles || row.total_records || 0),
+            });
+          }
+        }
+      }
 
       setSymbols(symbolsData);
       setError(null);
     } catch (e) {
       console.error('Failed to fetch coverage:', e);
       setError(e.message);
+      toast('error', e.message, 'Coverage fetch failed');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [dispatch]);
 
-  // Initial fetch
   useEffect(() => {
     fetchCoverage();
   }, [fetchCoverage]);
 
-  // Determine status based on candle count
   const getSymbolStatus = (candleCount) => {
     if (candleCount >= CANDLE_THRESHOLD.HEALTHY) return 'healthy';
     if (candleCount >= CANDLE_THRESHOLD.WARNING) return 'warning';
     return 'critical';
   };
 
-  // Sort symbols
   const sortedSymbols = [...symbols].sort((a, b) => {
     const aValue = a[sortConfig.key];
     const bValue = b[sortConfig.key];
-    
-    if (sortConfig.direction === 'asc') {
-      return aValue > bValue ? 1 : -1;
-    }
+    if (sortConfig.direction === 'asc') return aValue > bValue ? 1 : -1;
     return aValue < bValue ? 1 : -1;
   });
 
-  // Handle sort
   const handleSort = (key) => {
     setSortConfig((prev) => ({
       key,
@@ -82,10 +121,8 @@ export default function useBackfillManager() {
     }));
   };
 
-  // Get lagging symbols (< HEALTHY threshold)
   const laggingSymbols = symbols.filter((s) => s.status !== 'healthy');
 
-  // Poll active job status every 2s
   useEffect(() => {
     if (!activeJobId) return;
     const poll = async () => {
@@ -96,7 +133,20 @@ export default function useBackfillManager() {
           setJobStatus(data.data || data);
           if (data.data?.status === 'COMPLETED' || data.data?.status === 'FAILED') {
             setActiveJobId(null);
-            setMessage({ type: data.data.status === 'COMPLETED' ? 'success' : 'error', text: data.data.status === 'COMPLETED' ? `✅ Backfill done · ${(data.data.processed || 0).toLocaleString()} records` : `❌ Failed · ${data.data.errors?.[0] || 'unknown error'}` });
+            const processed = data.data?.processed || 0;
+            const wasFailed = data.data?.status === 'FAILED';
+            const zeroResult = processed === 0 && data.data?.status === 'COMPLETED';
+            const authError = (data.data?.errors || []).some(
+              (e) => typeof e === 'string' && (e.includes('401') || e.includes('auth') || e.includes('token') || e.includes('session'))
+            );
+
+            if (wasFailed || (zeroResult && authError)) {
+              toast('error', authError ? 'mStock session not ready — authenticate via Broker Detail page first. Go to /brokers to check provider status.' : (data.data?.errors?.[0] || '0 records processed'), 'Backfill failed');
+            } else if (zeroResult) {
+              toast('warning', '0 candles returned — provider may need re-authentication. Check provider status in /brokers.', 'Backfill warning');
+            } else {
+              toast('success', `${processed.toLocaleString()} records`, 'Backfill complete');
+            }
             setBackfillInProgress({});
             fetchCoverage();
           }
@@ -108,110 +158,94 @@ export default function useBackfillManager() {
     return () => clearInterval(id);
   }, [activeJobId]);
 
-  // Trigger backfill for a single symbol
   const triggerBackfill = async (symbol, fromDate, toDate) => {
     setBackfillInProgress((prev) => ({ ...prev, [symbol]: true }));
-    setMessage(null);
+
+    const providerStatus = await checkProviderReady();
+    if (providerStatus !== 'ready') {
+      const msgs = {
+        'no-provider': 'No mStock provider found — add one via /brokers',
+        'not-ready': 'mStock session not ready — enter TOTP via Broker Detail page first',
+        'unreachable': 'Cannot reach provider API — check broker service status',
+      };
+      toast('error', msgs[providerStatus] || providerStatus, 'Cannot start backfill');
+      setBackfillInProgress((prev) => ({ ...prev, [symbol]: false }));
+      return;
+    }
 
     try {
       const res = await fetch(`${API_URL}/api/v1/system/backfill/trigger`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          symbol,
-          fromDate,
-          toDate,
-        }),
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ symbol, fromDate, toDate }),
       });
-
       const data = await res.json();
-
       if (res.ok) {
         const jobId = data.data?.jobId;
         if (jobId) setActiveJobId(jobId);
-        setMessage({
-          type: 'success',
-          text: `✅ Backfill started for ${symbol}! Monitoring progress...`,
-        });
+        toast('success', `Backfill started for ${symbol} — monitoring progress`, 'Backfill triggered');
       } else {
-        throw new Error(data.error || 'Failed to trigger backfill');
+        toast('error', data.error || 'Failed to trigger backfill', 'Backfill error');
       }
     } catch (e) {
-      setMessage({
-        type: 'error',
-        text: `❌ Failed to start backfill for ${symbol}: ${e.message}`,
-      });
+      toast('error', `${symbol}: ${e.message}`, 'Backfill failed');
     } finally {
       setBackfillInProgress((prev) => ({ ...prev, [symbol]: false }));
       setIsDialogOpen(false);
     }
   };
 
-  // Trigger bulk backfill for all lagging symbols
   const triggerBulkBackfill = async (fromDate, toDate) => {
-    setMessage(null);
-    const lagging = laggingSymbols.map((s) => s.symbol);
-    
-    if (lagging.length === 0) {
-      setMessage({ type: 'info', text: 'No lagging symbols to backfill.' });
+    const providerStatus = await checkProviderReady();
+    if (providerStatus !== 'ready') {
+      const msgs = {
+        'no-provider': 'No mStock provider found — add one via /brokers',
+        'not-ready': 'mStock session not ready — enter TOTP via Broker Detail page first',
+        'unreachable': 'Cannot reach provider API — check broker service status',
+      };
+      toast('error', msgs[providerStatus] || providerStatus, 'Cannot start bulk backfill');
       return;
     }
 
-    // Mark all as in progress
+    const lagging = laggingSymbols.map((s) => s.symbol);
+    if (lagging.length === 0) {
+      toast('info', 'All symbols are healthy — nothing to backfill.', 'Backfill');
+      return;
+    }
+
     const inProgressMap = {};
-    lagging.forEach((s) => {
-      inProgressMap[s] = true;
-    });
+    lagging.forEach((s) => { inProgressMap[s] = true; });
     setBackfillInProgress((prev) => ({ ...prev, ...inProgressMap }));
 
     try {
-      // Trigger backfill for ALL symbols (null means all)
       const res = await fetch(`${API_URL}/api/v1/system/backfill/trigger`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          symbol: null, // All symbols
-          fromDate,
-          toDate,
-        }),
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ symbol: null, fromDate, toDate }),
       });
-
       const data = await res.json();
-
       if (res.ok) {
         const jobId = data.data?.jobId;
         if (jobId) setActiveJobId(jobId);
-        setMessage({
-          type: 'success',
-          text: `✅ Bulk backfill started for ${lagging.length} lagging symbols! Monitoring...`,
-        });
+        toast('success', `Bulk backfill started for ${lagging.length} symbols — monitoring`, 'Backfill triggered');
       } else {
-        throw new Error(data.error || 'Failed to trigger bulk backfill');
+        toast('error', data.error || 'Failed to trigger bulk backfill', 'Bulk backfill error');
       }
     } catch (e) {
-      setMessage({
-        type: 'error',
-        text: `❌ Bulk backfill failed: ${e.message}`,
-      });
+      toast('error', e.message, 'Bulk backfill failed');
     } finally {
-      // Clear all in progress
       setBackfillInProgress({});
     }
   };
 
-  // Open dialog for a specific symbol
   const openBackfillDialog = (symbol) => {
     setSelectedSymbol(symbol);
     setIsDialogOpen(true);
   };
 
-  // Close dialog
   const closeDialog = () => {
     setSelectedSymbol(null);
     setIsDialogOpen(false);
   };
 
-  // Compute summary stats
   const summary = {
     totalSymbols: symbols.length,
     healthyCount: symbols.filter((s) => s.status === 'healthy').length,
@@ -229,7 +263,6 @@ export default function useBackfillManager() {
     selectedSymbol,
     isDialogOpen,
     backfillInProgress,
-    message,
     sortConfig,
     activeJobId,
     jobStatus,
@@ -239,6 +272,5 @@ export default function useBackfillManager() {
     triggerBulkBackfill,
     openBackfillDialog,
     closeDialog,
-    setMessage,
   };
 }

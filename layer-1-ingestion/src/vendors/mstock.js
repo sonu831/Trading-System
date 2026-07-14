@@ -73,8 +73,12 @@ class MStockVendor extends BaseVendor {
     this.token = token;
     if (this.client) this.client.setAccessToken(token);
     logger.info(`[${this.instanceId}] MStockVendor: token updated`);
-    if (!this.connected) {
-      logger.info(`[${this.instanceId}] MStockVendor: token received after deferred connect — reconnecting`);
+    // Only auto-reconnect if we were already connected (live stream context).
+    // For backfill/one-shot REST usage, don't start WebSocket — marketHours
+    // may not be set and the caller only needs fetchHistoricalCandles.
+    if (this.connected && this.ticker) {
+      logger.info(`[${this.instanceId}] MStockVendor: token refreshed — reconnecting WebSocket`);
+      this.disconnect();
       this.connect();
     }
   }

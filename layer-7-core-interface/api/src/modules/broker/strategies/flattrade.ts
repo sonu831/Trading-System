@@ -22,6 +22,17 @@ const API_BASE = BROKER_BASE_URLS.FLATTRADE;        // https://piconnect.flattra
 const AUTH_API = BROKER_BASE_URLS.FLATTRADE_AUTH;   // https://authapi.flattrade.in/trade/apitoken
 const PORTAL = BROKER_BASE_URLS.FLATTRADE_PORTAL;   // https://auth.flattrade.in
 
+// Noren wire format (`jData=…&jKey=…`). Shared, because L1 already had it and this layer did not —
+// so FlatTrade auth posted raw JSON and the broker answered "Invalid Input : jData is Missing."
+let NOREN: any = null;
+try { NOREN = require('/app/shared/noren'); } catch (_) {
+  try { NOREN = require('../../../../../../shared/noren'); } catch (_e) { NOREN = null; }
+}
+if (!NOREN?.norenBody) {
+  throw new Error('shared/noren.js not resolvable — FlatTrade strategy cannot start');
+}
+const { norenBody, isNorenOk, norenError } = NOREN;
+
 // FlatTrade tokens live ~24h and the broker clears them between 05:00-06:00 IST.
 // Cache until the next 06:00 IST — NOT the next clock hour. FlatTrade cannot re-authenticate
 // unattended (canAuthenticateUnattended === false), so an hourly TTL silently forced the
@@ -44,15 +55,32 @@ const strategy: BrokerAuthStrategy = {
 
     // Pre-generated jKey — validate it, no browser step needed
     if (access_token) {
+      // A jKey is ~24+ chars. A short value here is almost always something else pasted by
+      // mistake (a PIN, an OTP, a placeholder) — reject it rather than sending it to the broker
+      // and reporting the resulting "invalid jKey" as if the token were merely stale.
+      if (access_token.trim().length < 12) {
+        return {
+          success: false,
+          stage: 'credentials',
+          error: `access_token looks too short to be a FlatTrade jKey (${access_token.trim().length} chars). The jKey comes from the login flow — it is NOT the api_key, a PIN, or an OTP. Leave it blank to use the browser login instead.`,
+        };
+      }
+
       try {
-        const resp = await http.post(`${API_BASE}/UserDetails`, {
-          uid: client_code || '', actid: client_code || '', susertoken: access_token, source: 'API',
-        }, { timeout: 10000 });
-        if (resp.data?.stat === 'Ok') {
+        // Noren speaks `jData=<json>&jKey=<token>` — NOT a JSON body. Posting JSON gets you
+        // `Invalid Input : jData is Missing.`, which reads like our payload is wrong when in fact
+        // the whole wire format is. (L1 already knew this; this layer did not — hence shared/noren.js.)
+        const resp = await http.post(
+          `${API_BASE}/UserDetails`,
+          norenBody({ uid: client_code || '', actid: client_code || '' }, access_token),
+          { timeout: 10000, headers: { 'Content-Type': 'application/json' } },
+        );
+
+        if (isNorenOk(resp.data)) {
           return { success: true, status: 'connected', token: access_token,
             ttlSeconds: strategy.ttlSeconds(deps.now || new Date()), provider: 'flattrade', auth_type: 'access_token', user: resp.data?.uname };
         }
-        return { success: false, error: resp.data?.emsg || 'invalid jKey', stage: 'validate' };
+        return { success: false, error: norenError(resp.data), stage: 'validate' };
       } catch (err: any) {
         return { success: false, error: err.response?.data?.emsg || err.message, stage: 'validate' };
       }

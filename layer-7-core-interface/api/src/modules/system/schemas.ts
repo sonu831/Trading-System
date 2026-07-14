@@ -50,14 +50,16 @@ const systemStatusSchema = {
 };
 
 const backfillTriggerSchema = {
-  description: 'Trigger a backfill job',
+  description: 'Trigger a backfill job — set symbol=null for bulk (all symbols)',
   tags: ['System'],
   summary: 'Start Backfill',
   body: {
     type: 'object',
-    required: ['symbol'],
+    required: ['fromDate', 'toDate'],
     properties: {
-      symbol: { type: 'string', example: 'RELIANCE' },
+      symbol: { type: ['string', 'null'], example: 'RELIANCE', description: 'Symbol or null for bulk backfill' },
+      fromDate: { type: 'string', example: '2026-01-01' },
+      toDate: { type: 'string', example: '2026-01-07' },
       days: { type: 'number', default: 30 },
     },
   },

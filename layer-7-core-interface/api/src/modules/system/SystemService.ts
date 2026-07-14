@@ -105,23 +105,26 @@ class SystemService extends BaseService {
 
     if (type === 'HISTORICAL') {
       try {
-        // Direct call to Ingestion Service (Layer 1)
-        // Resolves to: http://ingestion:9101/api/backfill/historical
         const response = await axios.post('http://ingestion:9101/api/backfill/historical', {
-          symbol: payload.symbol,
+          symbol: payload.symbol || null,
           fromDate: payload.fromDate,
           toDate: payload.toDate,
           jobId: job.job_id,
-        });
+        }, { timeout: 30000 });
+
+        // L1 now returns success:false on immediate child-process crashes (e.g. SyntaxError)
+        if (response.data?.success === false) {
+          await this.systemRepository.updateBackfillJob(job.job_id, { status: 'FAILED', errors: [{ message: response.data.error }] });
+          return { success: false, error: response.data.error, jobId: job.job_id };
+        }
 
         return {
-          message: 'Historical Backfill triggered successfully',
+          message: response.data?.message || 'Historical Backfill triggered successfully',
           jobId: job.job_id,
-          details: response.data
+          details: response.data,
         };
-      } catch (error) {
-        // Update job status if trigger fails
-        await this.systemRepository.updateBackfillJob(job.job_id, { status: 'FAILED' });
+      } catch (error: any) {
+        await this.systemRepository.updateBackfillJob(job.job_id, { status: 'FAILED', errors: [{ message: error.message }] });
         throw new Error(`Failed to trigger ingestion service: ${error.message}`);
       }
     }
@@ -224,6 +227,44 @@ class SystemService extends BaseService {
   async getSymbolsWithGaps(tradingDays = 5) {
     const records = await this.systemRepository.getSymbolsWithGaps(tradingDays);
     return records.map(r => r.symbol);
+  }
+
+  /**
+   * Returns configured Nifty 50 symbol list (from token map).
+   * Always available — no dependency on data_availability table.
+   */
+  async getSymbolList() {
+    try {
+      // Read the token map from vendor/ — same file backfill-runner.ts uses
+      const path = require('path');
+      let map = [];
+      try { map = require(path.resolve('/app/vendor/nifty50_shared.json')); } catch (_) {}
+      if (!map.length) {
+        try { map = require(path.resolve(__dirname, '..', '..', '..', 'vendor', 'nifty50_shared.json')); } catch (_) {}
+      }
+      // Also include indices if not already present
+      const indices = [
+        { symbol: 'NIFTY', exchange: 'NSE', sector: 'Index' },
+        { symbol: 'BANKNIFTY', exchange: 'NSE', sector: 'Index' },
+      ];
+      const existing = new Set(map.map((s: any) => s.symbol));
+      for (const idx of indices) {
+        if (!existing.has(idx.symbol)) map.push(idx);
+      }
+      return map.map((s: any) => ({
+        symbol: s.symbol,
+        exchange: s.exchange || 'NSE',
+        sector: s.sector || null,
+        token: s.tokens?.mstock ? String(s.tokens.mstock) : null,
+      }));
+    } catch (_) {
+      // Ultimate fallback — if even the file path is wrong, return a minimal hardcoded list
+      return [
+        { symbol: 'NIFTY', exchange: 'NSE', sector: 'Index', token: null },
+        { symbol: 'BANKNIFTY', exchange: 'NSE', sector: 'Index', token: null },
+        { symbol: 'RELIANCE', exchange: 'NSE', sector: 'Energy', token: '2885' },
+      ];
+    }
   }
 }
 

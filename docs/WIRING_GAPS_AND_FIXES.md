@@ -79,6 +79,15 @@
 | L6 | No range fan-out: cannot backfill **NIFTY + BANKNIFTY + 50 constituents** for a date range (owner's core requirement); `isBackfilling` boolean = no queue/resume | plan §5 step 7 | 🔴 |
 | L7 | `data_availability` (the coverage map table) is **never populated** — because no backfill has ever succeeded | plan §5 step 9 | 🔴 |
 | L8 | Candle inserts lack an asserted `ON CONFLICT DO NOTHING` (rule 5) → re-running a range may duplicate bars | plan §5 step 8 | 🟠 |
+| **D0** | **🔥 UNVERIFIED: how far back MStock/FlatTrade actually serve 1-MINUTE candles.** Brokers commonly cap intraday history (~60d). A "3-year 1m backfill" may be impossible from the source — 19,500 requests returning nothing, reported as COMPLETE. **PROBE before building** | `DATA_PLATFORM_PLAN.md` §1 | 🔥 |
+| D1 | No work-unit model — a 19,500-request job that dies at 18,000 restarts from zero; no resume/queue/per-symbol progress | plan §5.2 | 🔴 |
+| D2 | `data_availability` never populated → cannot answer "from which timestamp do we have data" (the owner's core purpose) | plan §5.3 | 🔴 |
+| D3 | Progress is one global % — Swarm page cannot show per-symbol chunks/rows | plan §5.2 | 🔴 |
+| D4 | No rate limiter — 19,500 requests will trip broker throttles | plan §5.4 | 🔴 |
+| D5 | Candle insert lacks an asserted `ON CONFLICT DO NOTHING` (rule 5) | plan §6 | 🟠 |
+| D6 | Executor role not capability-asserted: **mstock has `restingStop:false`** so it must NEVER be the OMS (rule 11); FlatTrade is the only valid executor | plan §2 | 🔴 |
+| D7 | No after-hours window — a 20-min swarm would contend with the live tick feed | plan §5.5 | 🟠 |
+| D8 | `BROKER_BASE_URLS.FLATTRADE_WS` unverified — cannot be relied on as the failover tick feed | plan §5.6 | 🟠 |
 | R1–R14 | Robustness/troubleshooting enhancements (correlation IDs … chaos drill) | §8 | 🔵 recommended |
 
 ## 0.2 GAP-G6 detail — frontend pages show dummy data (🟣 SAFETY) + fix prompt

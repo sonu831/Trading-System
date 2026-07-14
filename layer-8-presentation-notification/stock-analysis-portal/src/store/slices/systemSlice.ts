@@ -14,6 +14,12 @@ const initialState = {
   uptimeSec: null,
   ticksPerSec: null,
   swarmStatus: null,
+  // Data availability — owner can query "from which timestamp do we have data"
+  dataAvailability: {
+    symbols: [],
+    summary: null,
+    fetchedAt: null,
+  },
 };
 
 const systemSlice = createSlice({
@@ -44,12 +50,30 @@ const systemSlice = createSlice({
       if (uptimeSec != null) state.uptimeSec = uptimeSec;
       if (ticksPerSec != null) state.ticksPerSec = ticksPerSec;
     },
+    setDataAvailability: (state, action) => {
+      state.dataAvailability = {
+        ...action.payload,
+        fetchedAt: Date.now(),
+      };
+    },
+    addToast: (state, action) => {
+      const toast = {
+        id: Date.now() + Math.random(),
+        ...action.payload,
+        timestamp: Date.now(),
+      };
+      state.notifications.push(toast);
+    },
+    dismissToast: (state, action) => {
+      state.notifications = state.notifications.filter((n) => n.id !== action.payload);
+    },
   },
 });
 
 export const {
   setSystemStatus, setViewMode, setBackfillModalOpen,
-  addNotification, setSwarmStatus, updateSystemStats,
+  addNotification, setSwarmStatus, updateSystemStats, setDataAvailability,
+  addToast, dismissToast,
 } = systemSlice.actions;
 
 export const selectSystemStatus = (state) => state.system.status;
@@ -59,5 +83,7 @@ export const selectBackfillModalOpen = (state) => state.system.isBackfillModalOp
 export const selectSwarmStatus = (state) => state.system.swarmStatus;
 export const selectSystemDbRows = (state) => state.system.dbRows;
 export const selectSystemUptime = (state) => state.system.uptimeSec;
+export const selectDataAvailability = (state) => state.system.dataAvailability;
+export const selectToasts = (state) => state.system.notifications;
 
 export default systemSlice.reducer;

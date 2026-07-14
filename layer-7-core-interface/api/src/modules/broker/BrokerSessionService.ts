@@ -18,10 +18,26 @@ const PENDING_KEY = (p: string) => `broker:pending:${p}`;
 const TOKEN_EXPIRY_MARGIN_S = 30;
 
 /**
- * If the token is a JWT carrying `exp`, never cache it beyond that instant.
- * Returns the policy TTL unchanged for opaque tokens (e.g. FlatTrade's jKey).
+ * Brokers whose JWT `exp` claim must NOT be believed.
+ *
+ * MStock is the cautionary tale. Its official docs state "Generated JWT token will be valid till
+ * 12:00 AM of generated day", yet every JWT it issues — including the sample in its own docs —
+ * carries `exp - iat = 300` (five minutes). The claim is simply wrong.
+ *
+ * Believing it is not a harmless over-caution: MStock rate-limits LOGINS ("9 attempts remaining"),
+ * and re-authenticating every 5 minutes is ~288 logins/day, which risks locking the account. So a
+ * bogus `exp` must never drive the refresh cadence. Expiry for these brokers is discovered the only
+ * honest way — the broker rejects a call with 401, we invalidate and re-auth once, on demand.
  */
-function clampTtlToTokenExpiry(token: string, policyTtlSeconds: number): number {
+const UNTRUSTWORTHY_TOKEN_EXPIRY = new Set(['mstock']);
+
+/**
+ * If the token is a JWT carrying a *trustworthy* `exp`, never cache it beyond that instant.
+ * Returns the policy TTL unchanged for opaque tokens (FlatTrade's jKey) and for brokers whose
+ * `exp` is known to be fiction.
+ */
+function clampTtlToTokenExpiry(provider: string, token: string, policyTtlSeconds: number): number {
+  if (UNTRUSTWORTHY_TOKEN_EXPIRY.has(provider)) return policyTtlSeconds;
   try {
     const [, payloadB64] = String(token).split('.');
     if (!payloadB64) return policyTtlSeconds; // not a JWT — nothing to learn from it
@@ -128,7 +144,7 @@ class BrokerSessionService {
    * came back 401. Trust the token, not the policy (rule 13: never claim a validity we don't have).
    */
   async saveToken(provider: string, token: string, ttlSeconds: number): Promise<void> {
-    const effective = clampTtlToTokenExpiry(token, ttlSeconds);
+    const effective = clampTtlToTokenExpiry(provider, token, ttlSeconds);
     if (effective < ttlSeconds) {
       // Surface it: a token far shorter-lived than the policy means the policy is wrong, and
       // anything relying on that session must re-authenticate far more often than we assumed.

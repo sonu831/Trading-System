@@ -12,9 +12,26 @@ class BrokerService extends BaseService {
     return p.map((r: any) => ({ id: r.id, provider: r.provider, enabled: r.enabled, role: r.role, priority: r.priority, status: r.status, credentials: (r.credentials || []).map((c: any) => ({ field_name: c.field_name, is_active: c.is_active })), created_at: r.created_at, updated_at: r.updated_at }));
   }
 
-  async getProvider(id: number): Promise<any> {
-    const p = await this.brokerRepository.findProviderById(id);
-    if (!p) { const e: any = new Error('Provider not found'); e.statusCode = 404; throw e; }
+  /**
+   * Look a provider up by numeric id OR by name ("mstock").
+   *
+   * The routes are split: some key on `:id`, some on `:provider`, and the dashboard sends
+   * whichever it happens to hold. Sending a name to the `:id` route used to run
+   * `parseInt("mstock")` → NaN → straight into Prisma, which threw — surfacing as a **500**,
+   * i.e. "the server is broken", when the truth was "that isn't an id". `provider` is UNIQUE in
+   * the schema, so resolving either form is exact, not a guess.
+   */
+  async resolveProvider(idOrName: string | number): Promise<any> {
+    const raw = String(idOrName);
+    const p = /^\d+$/.test(raw)
+      ? await this.brokerRepository.findProviderById(Number(raw))
+      : await this.brokerRepository.findProviderByName(raw);
+    if (!p) { const e: any = new Error(`Provider not found: ${raw}`); e.statusCode = 404; throw e; }
+    return p;
+  }
+
+  async getProvider(idOrName: string | number): Promise<any> {
+    const p = await this.resolveProvider(idOrName);
     return { ...p, credentials: p.credentials.map((c: any) => ({ field_name: c.field_name, value: maskValue(decrypt(c.ciphertext, c.iv, c.tag)) })) };
   }
 

@@ -121,11 +121,9 @@ async function systemRoutes(fastify, options) {
         const { underlying } = req.params;
         const sym = underlying.toUpperCase();
 
-        // Latest candle from Redis
+        // Latest candle from Redis (WebSocket feed, fastest path)
         const raw = await redis.get(`candle:${sym}:1m`);
         const candle = raw ? (typeof raw === 'string' ? JSON.parse(raw) : raw) : null;
-
-        // Spot price from Redis
         const spotRaw = await redis.get(`ltp:${sym}`);
         const spot = spotRaw ? (typeof spotRaw === 'string' ? JSON.parse(spotRaw) : spotRaw) : null;
 
@@ -133,8 +131,59 @@ async function systemRoutes(fastify, options) {
         const prevRaw = await redis.get(`candle:${sym}:1d`);
         const prevDay = prevRaw ? (typeof prevRaw === 'string' ? JSON.parse(prevRaw) : prevRaw) : null;
 
-        const ltp = candle?.close || spot?.price || null;
+        let ltp = candle?.close || spot?.price || null;
         const prevClose = prevDay?.close || null;
+
+        // ── REST fallback: fetch from MStock historical API when no WebSocket data ──
+        if (!ltp) {
+          try {
+            const brokerService = container.resolve('brokerService');
+            const token = await brokerService.getSessionToken('mstock');
+            const creds = await brokerService.getDecryptedCredentials('mstock');
+            if (token && creds?.api_key) {
+              // Get the MStock instrument token for this index from the vendor map
+              const path = require('path');
+              let tokenMap: any[] = [];
+              try { tokenMap = require('/app/vendor/nifty50_shared.json'); } catch (_) {}
+              if (!tokenMap.length) {
+                try { tokenMap = require(path.resolve(__dirname, '..', '..', '..', 'vendor', 'nifty50_shared.json')); } catch (_) {}
+              }
+              const entry = tokenMap.find((s: any) => s.symbol === sym);
+              const symboltoken = entry?.tokens?.mstock;
+              if (symboltoken && symboltoken !== 'TODO_VERIFY_FROM_MSTOCK_UI') {
+                const axios = require('axios');
+                const today = new Date();
+                const todate = today.toISOString().split('T')[0] + ' 15:30';
+                const fromdate = today.toISOString().split('T')[0] + ' 09:15';
+                const resp = await axios.post(
+                  'https://api.mstock.trade/openapi/typeb/instruments/historical',
+                  { exchange: 'NSE', symboltoken: String(symboltoken), interval: 'ONE_MINUTE', fromdate, todate },
+                  {
+                    headers: {
+                      'X-PrivateKey': creds.api_key,
+                      Authorization: `Bearer ${token}`,
+                      'X-Mirae-Version': '1',
+                      'Content-Type': 'application/json',
+                    },
+                    timeout: 5000,
+                  },
+                );
+                const candles: any[] = resp.data?.data?.candles || [];
+                if (candles.length > 0) {
+                  const latest = candles[candles.length - 1];
+                  if (Array.isArray(latest)) {
+                    ltp = latest[4]; // OHLCV array: [time, open, high, low, close, volume]
+                  } else {
+                    ltp = latest.close || latest.ltp;
+                  }
+                  // Cache in Redis so next poll hits the fast path
+                  redis.set(`ltp:${sym}`, JSON.stringify({ price: ltp, timestamp: new Date().toISOString() }), { EX: 60 }).catch(() => {});
+                }
+              }
+            }
+          } catch (_) { /* REST fallback best-effort — return null if fails */ }
+        }
+
         const change = ltp && prevClose ? ltp - prevClose : null;
         const changePct = change && prevClose ? (change / prevClose) * 100 : null;
 
@@ -149,7 +198,7 @@ async function systemRoutes(fastify, options) {
             low: candle?.low || ltp,
             open: candle?.open || ltp,
             vwap: candle?.vwap || null,
-            atr: null, // computed in L4
+            atr: null,
             volume: candle?.volume || 0,
             timestamp: candle?.timestamp || Date.now(),
           },
@@ -235,6 +284,11 @@ async function systemRoutes(fastify, options) {
 
   fastify.put('/api/v1/data/availability', {
     handler: systemController.updateDataAvailability,
+  });
+
+  // Return configured Nifty 50 symbols (token map) — available before any backfill
+  fastify.get('/api/v1/data/symbols', {
+    handler: systemController.getSymbolList,
   });
 
   fastify.get('/api/v1/data/stats', {

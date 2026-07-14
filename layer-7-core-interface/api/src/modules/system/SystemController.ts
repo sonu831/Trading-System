@@ -174,6 +174,21 @@ class SystemController extends BaseController {
       return this.sendError(reply, err);
     }
   };
+
+  /**
+   * @method getSymbolList
+   * @description Returns the full configured Nifty 50 symbol list (token map).
+   * Always available — no dependency on data_availability table.
+   * @route GET /api/v1/data/symbols
+   */
+  getSymbolList = async (req, reply) => {
+    try {
+      const symbols = await this.systemService.getSymbolList();
+      return this.sendSuccess(reply, { symbols });
+    } catch (err) {
+      return this.sendError(reply, err);
+    }
+  };
 }
 
 module.exports = SystemController;

@@ -63,8 +63,8 @@ class CredentialStore {
         this.fallbackToEnv();
       }
     } catch (err: any) {
-      logger.warn(`CredentialStore: API unavailable (${err.message}), fallback to env`);
-      this.fallbackToEnv();
+      logger.warn(`CredentialStore: L7 unavailable (${err.message}), retrying in 5s...`);
+      setTimeout(() => this.refreshProviders(), 5000);
     }
   }
 

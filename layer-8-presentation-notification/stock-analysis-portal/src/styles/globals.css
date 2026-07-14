@@ -132,3 +132,12 @@
 ::-webkit-scrollbar-thumb {
   @apply bg-border rounded-full hover:bg-text-tertiary;
 }
+
+/* Toast slide-in animation */
+@keyframes slide-in-right {
+  from { transform: translateX(120%); opacity: 0; }
+  to   { transform: translateX(0); opacity: 1; }
+}
+.animate-slide-in-right {
+  animation: slide-in-right 0.3s ease-out;
+}

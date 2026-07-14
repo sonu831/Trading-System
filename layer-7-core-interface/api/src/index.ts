@@ -142,7 +142,7 @@ fastify.register(require('./plugins/logging'));
 // Now: everything outside PUBLIC_API_ROUTES requires a valid key. IP allow-listing is NOT
 // used on purpose — Docker SNATs published-port traffic to the bridge gateway, so an
 // internet client and the dashboard both arrive as 172.x and are indistinguishable.
-const { PUBLIC_API_ROUTES } = require('/app/shared/constants');
+const { PUBLIC_API_ROUTES, REDIS_CHANNELS } = require('/app/shared/constants');
 
 const isPublicRoute = (url) => {
   const path = url.split('?')[0];
@@ -222,8 +222,12 @@ fastify.post('/api/v1/suggestions', async (req, reply) => {
       user: user || 'Anonymous',
       text,
       source: source || 'telegram',
+      type: 'suggestion',
+      severity: 'info',
+      timestamp: new Date().toISOString(),
     });
-    await redis.publisher.publish('notifications:suggestions', payload);
+    const alertChannel = REDIS_CHANNELS?.ALERTS || 'notifications';
+    await redis.publisher.publish(alertChannel, payload);
 
     return { success: true, message: 'Suggestion saved' };
   } catch (err) {

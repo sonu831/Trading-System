@@ -4,6 +4,7 @@ import '@/styles/globals.css';
 import { ThemeProvider } from '@/utils/theme-provider';
 import { Provider } from 'react-redux';
 import { store } from '@/store';
+import { ToastContainer } from '@/components/ui/Toast';
 
 /**
  * Per-page layout pattern:
@@ -18,6 +19,7 @@ export default function App({ Component, pageProps }: { Component: any; pageProp
     <Provider store={store}>
       <ThemeProvider>
         {getLayout(<Component {...pageProps} />)}
+        <ToastContainer />
       </ThemeProvider>
     </Provider>
   );

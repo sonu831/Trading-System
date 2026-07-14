@@ -14,9 +14,11 @@ import { selectExecution } from '@/store/slices/executionSlice';
 import { BackfillProgress } from '@/components/features/Backfill';
 import SwarmNotification from '@/components/features/Backfill/SwarmNotification';
 
-function IndexTile({ label, value, changeLabel, changeTone, footer }: { label: string; value: string; changeLabel?: string; changeTone?: string; footer?: string }) {
-  return (
-    <div className="card stat">
+import Link from 'next/link';
+
+function IndexTile({ label, value, changeLabel, changeTone, footer, href }: { label: string; value: string; changeLabel?: string; changeTone?: string; footer?: string; href?: string }) {
+  const content = (
+    <div className="card stat cursor-pointer hover:border-accent/50 transition-colors">
       <div className="text-[11px] uppercase tracking-wider text-text-tertiary">{label}</div>
       <div className="text-2xl font-extrabold tabular-nums mt-0.5">{value}</div>
       {changeLabel && (
@@ -27,6 +29,7 @@ function IndexTile({ label, value, changeLabel, changeTone, footer }: { label: s
       {footer && <div className="text-xs text-text-tertiary mt-1">{footer}</div>}
     </div>
   );
+  return href ? <Link href={href}>{content}</Link> : content;
 }
 
 export default function Home() {
@@ -76,9 +79,9 @@ export default function Home() {
 
       {/* Stat row — all values now derived from real API calls, never hardcoded */}
       <div className="grid gap-3.5 mb-4" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
-        <IndexTile label="NIFTY spot" value={fmtPrice(niftyLtp)}
+        <IndexTile label="NIFTY spot" value={fmtPrice(niftyLtp)} href="/cockpit?u=NIFTY"
           changeLabel={fmtChange(niftyChg)} changeTone={niftyChg != null ? (niftyChg >= 0 ? 'pos' : 'neg') : undefined} />
-        <IndexTile label="BANKNIFTY spot" value={fmtPrice(bankLtp)}
+        <IndexTile label="BANKNIFTY spot" value={fmtPrice(bankLtp)} href="/cockpit?u=BANKNIFTY"
           changeLabel={fmtChange(bankChg)} changeTone={bankChg != null ? (bankChg >= 0 ? 'pos' : 'neg') : undefined} />
         <IndexTile label="India VIX" value="—" footer="Unavailable — VIX index token not configured" />
         <IndexTile label="Day P&amp;L" value={fmtPnl(dayPnl)} changeTone={dayPnl != null ? (dayPnl >= 0 ? 'pos' : 'neg') : undefined}

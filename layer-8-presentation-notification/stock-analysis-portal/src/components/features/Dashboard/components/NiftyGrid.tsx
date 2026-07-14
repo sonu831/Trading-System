@@ -58,7 +58,7 @@ const NiftyGrid = React.memo(({ marketView }) => {
                   : 'bg-surface text-text-tertiary'
             }`}
           >
-            {val.toFixed(1)}
+            {val != null ? val.toFixed(1) : '—'}
           </span>
         ),
       },

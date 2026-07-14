@@ -211,6 +211,7 @@ services:
     volumes:
       - ../../layer-7-core-interface/api/src:/app/src
       - ../../shared:/app/shared:ro
+      - ../../vendor:/app/vendor:ro
     networks:
       - trading-network
     restart: unless-stopped

@@ -154,11 +154,9 @@ async function systemRoutes(fastify, options) {
                 if (token) {
                   adapter.setAccessToken(jwt);
                   const result = await adapter.getQuote({ mode: 'LTP', exchangeTokens: { NSE: [token] } });
-                  const fetched = result?.fetched?.[0] || {};
+                  const fetched = result?.data?.fetched?.[0] || result?.fetched?.[0] || {};
                   if (fetched.ltp) {
                     ltp = Number(fetched.ltp);
-                    // Also capture high/low for the response
-                    if (fetched.high) candle = candle || {}; 
                     redis.set(`ltp:${sym}`, JSON.stringify({ price: ltp, timestamp: new Date().toISOString() }), { EX: 60 }).catch(() => {});
                   }
                 }
@@ -240,6 +238,10 @@ async function systemRoutes(fastify, options) {
       }
     },
   });
+
+  // ─────────────────────────────────────────────────────────────
+  // MARKET VIEW — handled in modules/market/routes.ts
+  // ─────────────────────────────────────────────────────────────
 
   // ─────────────────────────────────────────────────────────────
   // EXECUTION STATE
@@ -325,6 +327,34 @@ async function systemRoutes(fastify, options) {
         const sr = await redis.get(`ltp:${u}`);
         const s = sr ? (typeof sr === 'string' ? JSON.parse(sr) : sr) : null;
         const spot = s?.price || s?.close || 0;
+        if (!spot) {
+          // Fallback: fetch live spot from MStock 
+          try {
+            const { getAdapter } = require('../broker/adapters');
+            const brokerService = require('../../container').resolve('brokerService');
+            const creds = await brokerService.getDecryptedCredentials('mstock');
+            const { createClient } = require('redis');
+            const r2 = createClient({ url: process.env.REDIS_URL || 'redis://redis:6379' });
+            await r2.connect();
+            const raw = await r2.get('broker:session:mstock');
+            await r2.disconnect();
+            const jwt = raw ? JSON.parse(raw)?.token : null;
+            if (creds?.api_key && jwt) {
+              const TOKENS: Record<string, string> = { NIFTY: '26000', BANKNIFTY: '26009', FINNIFTY: '26037' };
+              const token = TOKENS[u];
+              if (token) {
+                const adapter = getAdapter('mstock', creds.api_key);
+                adapter.setAccessToken(jwt);
+                const result = await adapter.getQuote({ mode: 'LTP', exchangeTokens: { NSE: [token] } });
+                const fetched = result?.data?.fetched?.[0] || result?.fetched?.[0] || {};
+                if (fetched.ltp) {
+                  spot = Number(fetched.ltp);
+                  redis.set(`ltp:${u}`, JSON.stringify({ price: spot, timestamp: new Date().toISOString() }), { EX: 60 }).catch(() => {});
+                }
+              }
+            }
+          } catch (_) {}
+        }
         if (!spot) return { success: true, data: { underlying: u, spot: null, atm: 0, rows: [] } };
         const atm = Math.round(spot / step) * step;
         const strikes = [];

@@ -1,7 +1,7 @@
 // @ts-nocheck
 import React from 'react';
 import { Card } from '@/components/ui';
-import MarketTrendChart from './components/MarketTrendChart';
+import MarketTrendChart from '@/components/features/Historical/components/MarketTrendChart';
 
 const HistoricalView = () => {
   return (

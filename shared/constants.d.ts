@@ -110,6 +110,31 @@ export declare const REDIS_KEYS: {
   readonly BROKER_SESSION: (provider: string) => string;
   readonly EXECUTION_PREFIX: string;
   readonly OPTION_CHAIN: (underlying: string) => string;
+  readonly ALERTS_FEED: string;
+  readonly STRATEGIES_CONFIG: string;
+  readonly RISK_CONFIG: string;
+  readonly SYSTEM_COMMANDS: string;
+  readonly PROVIDERS_CHANGED: string;
+  readonly LOGS: string;
+  readonly BACKFILL_STATUS: string;
+  readonly SWARM_STATUS: string;
+  readonly HEARTBEAT_PREFIX: string;
+};
+
+export declare const REDIS_CHANNELS: {
+  readonly TICKS: 'market_ticks';
+  readonly SIGNALS: 'signals:trade';
+  readonly REGIME: 'market-regime';
+  readonly BREADTH: 'market_view';
+  readonly OPTION_CHAIN: 'option_chain_updates';
+  readonly EXECUTION_STATE: 'execution:state';
+  readonly EXECUTION_EVENTS: 'execution-events';
+  readonly ALERTS: 'notifications';
+  readonly PROVIDERS_CHANGED: 'providers-changed';
+  readonly STRATEGIES_CHANGED: 'strategies-changed';
+  readonly RISK_CHANGED: 'risk-changed';
+  readonly SYSTEM_COMMANDS: 'system:commands';
+  readonly BROKER_SESSION_CHANGED: 'broker-session-changed';
 };
 
 export declare const KAFKA_TOPICS: {
@@ -164,3 +189,8 @@ export declare const BROKER_CREDENTIAL_FIELDS: readonly string[];
 export declare const BROKER_REQUIRED_FIELDS: Readonly<Record<string, readonly string[]>>;
 export declare const BROKER_FORM_FIELDS: Readonly<Record<string, readonly string[]>>;
 export declare const BROKER_PROVIDERS: ReadonlyArray<{ value: string; label: string }>;
+
+// L7 API auth. Every internal caller (dashboard proxy, L1, L10) sends API_KEY_HEADER;
+// L7 is default-deny for everything outside PUBLIC_API_ROUTES.
+export declare const API_KEY_HEADER: string;
+export declare const PUBLIC_API_ROUTES: readonly string[];

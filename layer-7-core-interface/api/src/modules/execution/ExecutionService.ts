@@ -75,6 +75,10 @@ class ExecutionService {
   async squareOff() {
     return this.request('post', '/square-off', this.writeTimeoutMs);
   }
+
+  async getOrders() {
+    return this.request('get', '/orders', this.readTimeoutMs);
+  }
 }
 
 module.exports = ExecutionService;

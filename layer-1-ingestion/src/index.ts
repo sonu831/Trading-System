@@ -30,6 +30,11 @@ const client = require('prom-client');
 const redis = require('redis');
 const symbols = require('../config/symbols.json');
 
+let REDIS_CHANNELS;
+try { REDIS_CHANNELS = require('/app/shared/constants').REDIS_CHANNELS; } catch (_) {
+  try { REDIS_CHANNELS = require('../../shared/constants').REDIS_CHANNELS; } catch (_) {}
+}
+
 // Import shared health-check library
 const { waitForAll, waitForKafka, waitForRedis, initHealthMetrics } = require('/app/shared/health-check');
 
@@ -236,26 +241,45 @@ async function initialize() {
     await logToRedis('✅ Normalizer initialized');
 
     // Load Subscription List from Global Shared Map
+    // Repository-root vendor/nifty50_shared.json is the DEFINITIVE MStock token source.
+    // Must resolve from repo root (workspace), not the L1 subdirectory.
     let subscriptionList = [];
-    try {
-      // In Docker: /app/src/index.js -> ../vendor = /app/vendor (mounted)
-      // Locally: layer-1-ingestion/src/index.js -> ../vendor = layer-1-ingestion/vendor (symlink)
-      const mapPath = path.resolve(__dirname, '../vendor/nifty50_shared.json');
-      const masterMap = require(mapPath);
-
-      // Map to MStock Format: "NSE:Token"
-      // Filter out items without mstock token
-      subscriptionList = masterMap
-        .filter((item) => item.tokens && item.tokens.mstock)
-        .map((item) => `NSE:${item.tokens.mstock}`);
-
-      logger.info(`📋 Loaded ${subscriptionList.length} Symbols from Global Map for Subscription.`);
-    } catch (e) {
-      logger.warn(
-        `⚠️ Failed to load Global Map: ${e.message}. Falling back to config/symbols.json (Legacy)`
-      );
-      // Fallback or Empty
-      subscriptionList = symbols.nifty50.map((s) => `NSE:${s.token}`); // Legacy fallback (might be Kite tokens!)
+    let vendorTokenMaps: Record<string, string[]> = {}; // provider → tokens[NSE:TOKEN]
+    const vendorMapPaths = [
+      path.resolve(__dirname, '../../vendor/nifty50_shared.json'), // local workspace root
+      '/app/vendor/nifty50_shared.json',                          // Docker mount
+    ];
+    let masterMap = null;
+    for (const p of vendorMapPaths) {
+      try { masterMap = require(p); console.log(`✅ Loaded Global Map: ${p}`); break; } catch (_) {}
+    }
+    if (masterMap) {
+      // Build per-vendor token lists from the unified map
+      for (const item of masterMap) {
+        if (item.tokens?.mstock) {
+          vendorTokenMaps.mstock = vendorTokenMaps.mstock || [];
+          vendorTokenMaps.mstock.push(`NSE:${item.tokens.mstock}`);
+        }
+        if (item.tokens?.kite) {
+          vendorTokenMaps.kite = vendorTokenMaps.kite || [];
+          vendorTokenMaps.kite.push(`NSE:${item.tokens.kite}`);
+        }
+        if (item.tokens?.flattrade) {
+          vendorTokenMaps.flattrade = vendorTokenMaps.flattrade || [];
+          vendorTokenMaps.flattrade.push(`NSE:${item.tokens.flattrade}`);
+        }
+      }
+      subscriptionList = vendorTokenMaps.mstock || [];
+      console.log(`📋 Loaded ${subscriptionList.length} MStock tokens.`);
+      for (const [v, tokens] of Object.entries(vendorTokenMaps)) {
+        console.log(`   ${v}: ${tokens.length} instruments`);
+      }
+    }
+    if (!masterMap || subscriptionList.length === 0) {
+      // Fail closed — never substitute another broker's tokens silently
+      console.error(`❌ FATAL: Could not load ${vendorMapPaths.join(' or ')}, and 0 MStock tokens found.`);
+      console.error(`   A wrong token set produces zero ticks with no error (silent failure). Exiting.`);
+      process.exit(1);
     }
 
     // Initialize Market Hours (MUST be before VendorManager for status checks)
@@ -480,7 +504,13 @@ let isBackfilling = false;
  */
 const runScriptWithIPC = (scriptPath, args = []) => {
   return new Promise((resolve, reject) => {
-    const child = fork(scriptPath, args, { stdio: 'inherit' });
+    // The batch scripts are TypeScript. A bare fork() runs them under plain Node, which cannot
+    // parse TS — that is how every backfill used to die on `SyntaxError: Unexpected token '?'`.
+    // tsx is the project's TS loader (rule 15: tsx, never ts-node).
+    const child = fork(scriptPath, args, {
+      stdio: 'inherit',
+      execArgv: ['--import', 'tsx'],
+    });
 
     child.on('message', (msg) => {
       if (msg.type === 'metric') {
@@ -579,7 +609,7 @@ const runBackfill = async (startParams = {}) => {
     await updateBackfillStatus(1, 10, 'Fetching Data...');
     
     // Scripts path relative to __dirname (which is src/)
-    const batchScript = path.resolve(__dirname, '../scripts/batch_nifty50.js');
+    const batchScript = path.resolve(__dirname, '../scripts/backfill-runner.ts');
     const scriptArgs = [];
     if (symbol) scriptArgs.push('--symbol', symbol);
     if (fromDate && toDate) scriptArgs.push('--from', fromDate, '--to', toDate);
@@ -592,17 +622,11 @@ const runBackfill = async (startParams = {}) => {
     }
 
     await runScriptWithIPC(batchScript, scriptArgs);
-    await updateBackfillStatus(1, 50, 'Step 1 Complete');
+    await updateBackfillStatus(1, 50, 'Step 1 Complete — candles streamed to Kafka');
 
-    // Step 2: Feed
-    logger.info('⏳ Step 2: Feeding Kafka...');
-    await updateBackfillStatus(1, 55, 'Feeding Kafka...');
-    const feedScript = path.resolve(__dirname, '../scripts/feed_kafka.js');
-    const feedArgs = symbol ? ['--symbol', symbol] : [];
-    await runScriptWithIPC(feedScript, feedArgs);
-
-    // Step 3: Verification & Notification
-    logger.info('⏳ Step 3: Verifying Database Sync...');
+    // Step 2: Verify DB sync (backfill-runner.ts writes candles to Kafka independently;
+    // L2 processes them into TimescaleDB. Poll until rows arrive or timeout.)
+    logger.info('⏳ Step 2: Verifying Database Sync...');
     await updateBackfillStatus(2, 80, 'Verifying Database...');
     
     // Poll Backend until count stabilizes or timeout
@@ -637,10 +661,18 @@ const runBackfill = async (startParams = {}) => {
     const countMsg = `🕯️ DB Total: ${finalCount.toLocaleString()} candles`;
     await logToRedis(`✅ Backfill Complete: ${symbolMsg}. ${countMsg}`);
     
-  } catch (err) {
+  } catch (err: any) {
+    // Record WHY. The job used to be marked FAILED with no reason, so the dashboard showed a
+    // dead job and the operator had to go read container logs to learn the script had crashed.
     await updateBackfillStatus(3, 0, err.message);
-    if (jobId) await backendApi.updateBackfillJob(jobId, { status: 'FAILED' }).catch(() => {});
+    if (jobId) {
+      await backendApi
+        .updateBackfillJob(jobId, { status: 'FAILED', errors: [{ message: err.message, timestamp: new Date().toISOString() }] })
+        .catch(() => {});
+    }
+    await logToRedis(`❌ Backfill Failed: ${err.message}`);
     logger.error(`❌ Backfill Failed: ${err.message}`);
+    throw err; // propagate to the HTTP handler so the dashboard gets a real error
   } finally {
     isBackfilling = false;
   }
@@ -667,14 +699,50 @@ app.get('/api/backfill/swarm/status', async (req, res) => {
 app.post('/api/backfill/historical', async (req, res) => {
   try {
     const { symbol, fromDate, toDate } = req.body;
-    // Allow null symbol -> "All Symbols"
-    // if (!symbol) return res.status(400).json({ error: 'Symbol is required' });
 
-    logger.info(`🎯 Received Historical Backfill Request: ${symbol}`);
-    runBackfill({ symbol, fromDate, toDate }).catch(err => logger.error('Backfill Error', err));
+    logger.info(`🎯 Received Historical Backfill Request: ${symbol || 'ALL SYMBOLS'}`);
 
-    res.json({ success: true, message: `Started backfill for ${symbol}` });
-  } catch (err) {
+    // Verify the child process can spawn before responding. The old code returned
+    // {success:true} before the fork, so a SyntaxError crash was invisible to the
+    // dashboard (rule 13: fabricated confidence). The backfill-runner reports progress
+    // independently via PATCH /api/v1/backfill/:jobId, so we only need to confirm
+    // the process STARTED — not wait for it to finish (which can take minutes).
+    //
+    // We verify by awaiting the runBackfill Promise with a short circuit: if the
+    // child exits NON-ZERO within 5 seconds, it's a crash (not a backfill completion).
+    // If it survives 5s, it's running and we respond "started" truthfully.
+
+    let settled = false;
+    let fiveSec = false;
+
+    const timeout = setTimeout(() => {
+      fiveSec = true;
+      if (!settled) {
+        settled = true;
+        res.json({ success: true, message: `Backfill started for ${symbol || 'ALL SYMBOLS'}` });
+      }
+    }, 5000);
+
+    runBackfill({ symbol, fromDate, toDate })
+      .then(() => {
+        if (!settled) {
+          settled = true;
+          clearTimeout(timeout);
+          res.json({ success: true, message: `Backfill completed for ${symbol || 'ALL SYMBOLS'}` });
+        }
+      })
+      .catch((err: any) => {
+        logger.error(`Backfill failed: ${err.message}`);
+        if (!settled) {
+          settled = true;
+          clearTimeout(timeout);
+          if (!fiveSec) {
+            // Crashed immediately — tell the dashboard
+            res.status(500).json({ success: false, error: err.message });
+          }
+        }
+      });
+  } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
 });
@@ -696,6 +764,17 @@ async function handleTick(tick) {
 
     // Publish to Kafka (partitioned by symbol)
     await kafkaProducer.send(normalizedTick);
+
+    // Publish tick to Redis for realtime dashboard
+    if (redisClient && REDIS_CHANNELS?.TICKS) {
+      try {
+        await redisClient.publish(REDIS_CHANNELS.TICKS, JSON.stringify({
+          underlying: normalizedTick.symbol,
+          ltp: normalizedTick.lastPrice || normalizedTick.ltp,
+          time: normalizedTick.timestamp || new Date().toISOString(),
+        }));
+      } catch (_) { /* best effort */ }
+    }
 
     // Update metrics
     metrics.ticksCounter.inc({ symbol: normalizedTick.symbol });

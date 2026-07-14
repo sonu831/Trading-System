@@ -1,7 +1,7 @@
 // @ts-nocheck
 import React from 'react';
 import PropTypes from 'prop-types';
-import { Carousel } from '@/components/ui';
+import { Carousel } from '@/components/molecules';
 
 const StockCard = ({ title, symbol, value, subValue, type }) => {
   const getValueColor = () => {

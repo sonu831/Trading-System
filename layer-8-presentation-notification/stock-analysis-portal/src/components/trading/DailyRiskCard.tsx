@@ -2,7 +2,7 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 import { ShieldAlert } from 'lucide-react';
-import RiskMeter from './RiskMeter';
+import RiskMeter from '@/components/trading/RiskMeter';
 import { formatCurrency, formatNumber, EMPTY } from '@/utils/format';
 
 /**

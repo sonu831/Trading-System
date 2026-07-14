@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import List
+from typing import List, Optional
 from pydantic import BaseModel
 
 class FeatureVector(BaseModel):
@@ -11,9 +11,10 @@ class FeatureVector(BaseModel):
     volume: float
 
 class PredictionResult(BaseModel):
-    prediction: float
-    confidence: float
-    model_version: str
+    prediction: Optional[float] = None       # null = abstain / no prediction
+    confidence: Optional[float] = None
+    model_version: str = "unknown"
+    status: str = "ok"                       # "ok" | "abstain" | "not_trained" | "error"
     reasoning: str = "Analysis based on technical indicators."
     prompt_tokens: int = 0
     completion_tokens: int = 0

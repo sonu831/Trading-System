@@ -27,6 +27,43 @@
 9. **No git writes** -- don't commit/push without explicit owner instruction
 10. **Hand-off on exit** -- every report ends with `## Hand-off` section
 
+## ⚡ ACTIVE WORK ORDER (2026-07-11) — Wiring Gaps
+
+**`docs/WIRING_GAPS_AND_FIXES.md` is the active, code-verified work order** for the realtime plane, command
+fan-out, broker sessions, and DB schema. Every tool touching those areas MUST read it first and follow
+`.ai/skills/wiring-gaps.md` **strictly**: graphify for every codebase query; channel/room/topic names only from
+`shared/constants.js` (add `REDIS_CHANNELS` first); ONE WebSocket relay only; every fixed gap becomes a named
+assertion in `scripts/verify-wiring.js`. Key verified facts: REST plane complete (~20 endpoints live); realtime
+push mostly dead (2 competing relays; `market_ticks`/`option_chain_updates`/`execution:state`/`execution-events`
+have no Redis publishers; `signals`≠`signals:trade`, `notifications`≠`notifications:execution`; only
+`market-regime` live); `strategies-changed`/`risk-changed` have no consumers; broker sessions have no refresh
+loop and expire silently at IST midnight; DB has dual schema authority (SQL = DDL owner, Prisma = introspect-only).
+Trust map: old PROJECT_STATE.md retired; CHANGELOG.md = project state; `COCKPIT_BACKEND_PLAN.md` §4–§5 superseded.
+**Document map: `docs/INDEX.md`** (every doc + trust level). **Session baton: `.ai/handoffs/` (newest file)** —
+write one at every session end. **Execution entry point: `docs/MASTER_EXECUTION_PROMPT.md` → PHASE 0.**
+
+## 🔐 Auth & Secrets Architecture (DECIDED 2026-07-13 — do not re-litigate)
+
+**Credentials live in the DB, not `.env`.** Broker secrets are AES-256-GCM encrypted in `broker_credentials`,
+managed from the dashboard. L1/L10 fetch them from L7 (`CredentialStore` / `CredentialProvider`) and hot-reload
+on `providers-changed`. **L7 is the single gateway between every layer and the database.**
+
+**Exactly THREE bootstrap secrets stay in `.env`** — they are the root of trust and *cannot* come from the DB,
+because each is required to reach or decrypt it (this is a circular dependency, not a missing feature):
+`DATABASE_URL`/`POSTGRES_PASSWORD` (opens the DB) · `CREDENTIAL_MASTER_KEY` (decrypts `broker_credentials`) ·
+`INTERNAL_API_KEY` (authenticates callers to L7, which fronts the DB). Everything else belongs in the DB.
+
+**L7 is DEFAULT-DENY** (GAP-J1, fixed 2026-07-13). Only `PUBLIC_API_ROUTES` (`/health`, `/metrics`,
+`/documentation`, `/swagger`, `/`) are open; every other route requires `x-api-key`. A missing header is a 401 —
+never "unauthenticated but allowed". The old hook authenticated *only if the header was present*, leaving
+`GET /providers/:provider/credentials/decrypted` (plaintext broker secrets) and the kill switch wide open.
+`INTERNAL_API_KEY` is presented by: the dashboard (server-side `src/middleware.ts`, never `NEXT_PUBLIC_*`),
+L1 (**scoped** axios interceptor — a blanket header would leak the key to MStock/FlatTrade), L10 (explicit headers).
+CORS is allow-listed via `DASHBOARD_ORIGINS` (was `*`). `backend-api` is bound to `127.0.0.1:4000` (was `0.0.0.0`).
+**Do NOT use IP allow-listing:** Docker SNATs published-port traffic to the bridge gateway, so external clients and
+the dashboard both appear as `172.x`. Next.js reads env from its OWN dir — local dev needs
+`stock-analysis-portal/.env.local`; changing the middleware requires an image rebuild.
+
 ## Kafka Topics
 
 | Topic | Producer | Consumer | Schema |

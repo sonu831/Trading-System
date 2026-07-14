@@ -1,8 +1,9 @@
 // @ts-nocheck
 import React, { useState } from 'react';
 import PropTypes from 'prop-types';
-import { Card, Button, Badge, Table, Modal, Input } from '@/components/ui';
-import SwarmMonitor from './SwarmMonitor';
+import { Card, Button, Badge, Input } from '@/components/ui';
+import { Table, Modal } from '@/components/molecules';
+import SwarmMonitor from '@/components/features/BackfillManager/SwarmMonitor';
 
 /**
  * BackfillManager Component

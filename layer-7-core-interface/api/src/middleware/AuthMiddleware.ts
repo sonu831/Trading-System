@@ -1,16 +1,56 @@
 const fp = require('fastify-plugin');
+const crypto = require('crypto');
+
+/* eslint-disable @typescript-eslint/no-var-requires */
+let SHARED: any = null;
+try { SHARED = require('/app/shared/constants'); } catch (_) {
+  try { SHARED = require('../../../../shared/constants'); } catch (_e) { SHARED = null; }
+}
+if (!SHARED?.API_KEY_HEADER) {
+  throw new Error('shared/constants.js API_KEY_HEADER not resolvable — auth cannot start');
+}
+const API_KEY_HEADER: string = SHARED.API_KEY_HEADER;
+
+/**
+ * INTERNAL_API_KEY — the shared secret the trusted callers present:
+ *   dashboard (Next.js proxy, server-side) · L1 ingestion · L10 execution
+ *
+ * It is NOT stored in the api_keys table: those rows are per-vendor keys for external
+ * consumers. A service key that lived in the DB would need seeding before the stack could
+ * boot, and a bootstrap chicken-and-egg is how "temporarily allow everything" gets shipped.
+ *
+ * Absent => the process refuses to start (see index.ts). We never fall back to open access:
+ * this API can return DECRYPTED broker credentials and can halt live trading.
+ */
+const INTERNAL_API_KEY: string = process.env.INTERNAL_API_KEY || '';
+
+/** Constant-time compare that does not leak length (hash both sides first). */
+function safeEqual(a: string, b: string): boolean {
+  if (!a || !b) return false;
+  const ha = crypto.createHash('sha256').update(String(a)).digest();
+  const hb = crypto.createHash('sha256').update(String(b)).digest();
+  return crypto.timingSafeEqual(ha, hb);
+}
 
 async function authMiddleware(fastify, options) {
   fastify.decorate('authenticate', async (req, reply) => {
     const { prisma, redis } = fastify.container.cradle;
     try {
-      const apiKey = req.headers['x-api-key'];
+      const apiKey = req.headers[API_KEY_HEADER];
 
+      // Default-deny. A missing header is a rejection, not a reason to skip the check.
       if (!apiKey) {
-        return reply.code(401).send({ error: 'Missing X-API-KEY header' });
+        return reply.code(401).send({ error: `Missing ${API_KEY_HEADER} header` });
       }
 
-      const cacheKey = `auth:key:${apiKey}`;
+      // Internal service key — checked before the DB so L1/L10/dashboard never depend on
+      // a seeded row, and so a DB outage cannot silently open or close the control plane.
+      if (INTERNAL_API_KEY && safeEqual(apiKey, INTERNAL_API_KEY)) {
+        req.vendor = { id: 0, vendor_name: 'internal-service', user_id: null, role: 'internal' };
+        return;
+      }
+
+      const cacheKey = `auth:key:${crypto.createHash('sha256').update(String(apiKey)).digest('hex')}`;
 
       // 1. Try Cache
       let vendor = null;
@@ -48,10 +88,6 @@ async function authMiddleware(fastify, options) {
 
       // Attach to request
       req.vendor = vendor;
-
-      // Update Rate Limit Context (if we want dynamic limits per vendor)
-      // Fastify Rate Limit plugin usually runs BEFORE this,
-      // but we can use this for business logic validation.
     } catch (err) {
       req.log.error(err);
       return reply.code(500).send({ error: 'Authentication Failed' });

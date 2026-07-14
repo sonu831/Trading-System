@@ -4,6 +4,15 @@ const logger = require('../utils/logger');
 const { metrics } = require('../utils/metrics');
 const { MConnect, MTicker } = require('@mstock-mirae-asset/nodetradingapi-typeb');
 
+// Broker URLs live in shared/constants.js (rule 3/14) — never hardcoded per-layer.
+let BROKER_BASE_URLS = null;
+try { BROKER_BASE_URLS = require('/app/shared/constants').BROKER_BASE_URLS; } catch (_) {
+  try { BROKER_BASE_URLS = require('../../../shared/constants').BROKER_BASE_URLS; } catch (_e) { BROKER_BASE_URLS = null; }
+}
+if (!BROKER_BASE_URLS?.MSTOCK) {
+  throw new Error('shared/constants.js BROKER_BASE_URLS.MSTOCK not resolvable — MStock vendor cannot start');
+}
+
 const util = require('util');
 
 const noopLog = new Set([
@@ -57,12 +66,21 @@ class MStockVendor extends BaseVendor {
   /**
    * Consume a token produced by the centralized BrokerSessionService (L7).
    * Called by VendorManager after CredentialStore loads / refreshes tokens.
+   * RE-CONNECTS the vendor if it was waiting for a token.
    */
   setAccessToken(token) {
     if (!token) return;
     this.token = token;
-    this.client.setAccessToken(token);
+    if (this.client) this.client.setAccessToken(token);
     logger.info(`[${this.instanceId}] MStockVendor: token updated`);
+    // Only auto-reconnect if we were already connected (live stream context).
+    // For backfill/one-shot REST usage, don't start WebSocket — marketHours
+    // may not be set and the caller only needs fetchHistoricalCandles.
+    if (this.connected && this.ticker) {
+      logger.info(`[${this.instanceId}] MStockVendor: token refreshed — reconnecting WebSocket`);
+      this.disconnect();
+      this.connect();
+    }
   }
 
   /**
@@ -246,6 +264,46 @@ class MStockVendor extends BaseVendor {
     if (this.connected && this.ticker) {
       this.subscribeToTicker(symbols);
     }
+  }
+
+  /**
+   * Historical candles.
+   *
+   * We do NOT use the SDK's client.getHistoricalData() here: that call omits the mandatory
+   * `X-Mirae-Version: 1` header and MStock answers every request with
+   * `401 Invalid request. Please try again.` — which reads like an auth failure and sent us
+   * hunting a perfectly valid session token. Issue the request ourselves with the full header
+   * set. (The workaround previously existed only in an orphaned batch script.)
+   */
+  async fetchHistoricalCandles({ symboltoken, interval, fromdate, todate, exchange = 'NSE' }) {
+    if (!this.apiKey) return { status: false, message: 'Client not initialized' };
+    if (!this.token) return { status: false, message: 'No session token — authenticate via dashboard first' };
+
+    const axios = require('axios');
+    const base = BROKER_BASE_URLS.MSTOCK;
+
+    const resp = await axios.post(
+      `${base}/openapi/typeb/instruments/historical`,
+      { exchange, symboltoken: String(symboltoken), interval, fromdate, todate },
+      {
+        headers: {
+          'X-PrivateKey': this.apiKey,
+          Authorization: `Bearer ${this.token}`,
+          'X-Mirae-Version': '1', // ← the header the SDK forgets; without it every call is 401
+          'Content-Type': 'application/json',
+        },
+        timeout: 30000,
+      },
+    );
+
+    const candles = resp.data?.data?.candles;
+    if (candles) return { status: true, data: { candles } };
+    return { status: false, data: { candles: [] }, message: resp.data?.message || 'no candles' };
+  }
+
+  /** Vendor-agnostic entry point used by the batch runner. */
+  async fetchData(params) {
+    return this.fetchHistoricalCandles(params);
   }
 
   async getHistoricalData(params, retryCount = 0) {

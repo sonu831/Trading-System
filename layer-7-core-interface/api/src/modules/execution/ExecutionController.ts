@@ -57,6 +57,16 @@ class ExecutionController extends BaseController {
       return this.sendError(reply, err, err.statusCode || 503);
     }
   };
+
+  /** GET /api/v1/execution/orders — order book from L10 journal */
+  getOrders = async (req, reply) => {
+    try {
+      const orders = await this.executionService.getOrders();
+      return this.sendSuccess(reply, orders);
+    } catch (err) {
+      return this.sendError(reply, err, err.statusCode || 503);
+    }
+  };
 }
 
 module.exports = ExecutionController;

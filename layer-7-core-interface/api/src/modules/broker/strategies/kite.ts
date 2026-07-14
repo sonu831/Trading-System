@@ -37,6 +37,11 @@ const strategy: BrokerAuthStrategy = {
       }
     }
 
+    // Must have either an access_token or the api_secret to complete auth
+    if (!api_secret) {
+      return { success: false, stage: 'credentials', error: 'Kite requires an api_secret or a pre-generated access_token' };
+    }
+
     // Interactive: user must get request_token from browser redirect
     const requestToken = ctx.input?.request_token as string;
     if (!requestToken) {

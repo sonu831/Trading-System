@@ -1,5 +1,10 @@
 const { systemStatusSchema, backfillTriggerSchema } = require('./schemas');
 
+let REDIS_CHANNELS: any;
+try { REDIS_CHANNELS = require('/app/shared/constants').REDIS_CHANNELS; } catch (_) {
+  try { REDIS_CHANNELS = require('../../../../shared/constants').REDIS_CHANNELS; } catch (_) {}
+}
+
 /**
  * System Routes
  * @param {FastifyInstance} fastify
@@ -18,6 +23,10 @@ async function systemRoutes(fastify, options) {
   });
 
   // ─────────────────────────────────────────────────────────────
+  // ALERTS — notification feed from Kafka/Redis
+  // ─────────────────────────────────────────────────────────────
+
+  // ─────────────────────────────────────────────────────────────
   // BACKFILL MANAGEMENT
   // ─────────────────────────────────────────────────────────────
   fastify.post('/api/v1/system/backfill/trigger', {
@@ -27,6 +36,50 @@ async function systemRoutes(fastify, options) {
 
   fastify.get('/api/v1/system/backfill/swarm/status', {
     handler: systemController.getSwarmStatus,
+  });
+
+  // Push backfill status log (ingestion calls this instead of writing Redis directly)
+  fastify.post('/api/v1/system/log', {
+    schema: {
+      description: 'Push a system log entry (ingestion backfill progress, errors, etc.)',
+      tags: ['System'],
+      body: {
+        type: 'object',
+        properties: {
+          level: { type: 'string', enum: ['info', 'warn', 'error'] },
+          message: { type: 'string' },
+          data: { type: 'object' },
+        },
+        required: ['message'],
+      },
+    },
+    handler: async (req, reply) => {
+      try {
+        const { redis } = require('../../container').cradle;
+        const entry = JSON.stringify({
+          timestamp: new Date().toISOString(),
+          level: req.body.level || 'info',
+          message: req.body.message,
+          data: req.body.data || {},
+        });
+        await redis.lPush('system:layer1:logs', entry);
+        await redis.lTrim('system:layer1:logs', 0, 99);
+
+        // Also set backfill status if data contains progress info
+        if (req.body.data?.progress != null) {
+          await redis.set('system:layer1:backfill', JSON.stringify({
+            status: 1,
+            progress: req.body.data.progress,
+            details: req.body.message,
+            job_type: 'historical_backfill',
+            timestamp: Date.now(),
+          }));
+        }
+        return { success: true };
+      } catch (err: any) {
+        return reply.code(500).send({ success: false, error: err.message });
+      }
+    },
   });
 
   // ─────────────────────────────────────────────────────────────
@@ -68,11 +121,9 @@ async function systemRoutes(fastify, options) {
         const { underlying } = req.params;
         const sym = underlying.toUpperCase();
 
-        // Latest candle from Redis
+        // Latest candle from Redis (WebSocket feed, fastest path)
         const raw = await redis.get(`candle:${sym}:1m`);
         const candle = raw ? (typeof raw === 'string' ? JSON.parse(raw) : raw) : null;
-
-        // Spot price from Redis
         const spotRaw = await redis.get(`ltp:${sym}`);
         const spot = spotRaw ? (typeof spotRaw === 'string' ? JSON.parse(spotRaw) : spotRaw) : null;
 
@@ -80,8 +131,59 @@ async function systemRoutes(fastify, options) {
         const prevRaw = await redis.get(`candle:${sym}:1d`);
         const prevDay = prevRaw ? (typeof prevRaw === 'string' ? JSON.parse(prevRaw) : prevRaw) : null;
 
-        const ltp = candle?.close || spot?.price || null;
+        let ltp = candle?.close || spot?.price || null;
         const prevClose = prevDay?.close || null;
+
+        // ── REST fallback: fetch from MStock historical API when no WebSocket data ──
+        if (!ltp) {
+          try {
+            const brokerService = container.resolve('brokerService');
+            const token = await brokerService.getSessionToken('mstock');
+            const creds = await brokerService.getDecryptedCredentials('mstock');
+            if (token && creds?.api_key) {
+              // Get the MStock instrument token for this index from the vendor map
+              const path = require('path');
+              let tokenMap: any[] = [];
+              try { tokenMap = require('/app/vendor/nifty50_shared.json'); } catch (_) {}
+              if (!tokenMap.length) {
+                try { tokenMap = require(path.resolve(__dirname, '..', '..', '..', 'vendor', 'nifty50_shared.json')); } catch (_) {}
+              }
+              const entry = tokenMap.find((s: any) => s.symbol === sym);
+              const symboltoken = entry?.tokens?.mstock;
+              if (symboltoken && symboltoken !== 'TODO_VERIFY_FROM_MSTOCK_UI') {
+                const axios = require('axios');
+                const today = new Date();
+                const todate = today.toISOString().split('T')[0] + ' 15:30';
+                const fromdate = today.toISOString().split('T')[0] + ' 09:15';
+                const resp = await axios.post(
+                  'https://api.mstock.trade/openapi/typeb/instruments/historical',
+                  { exchange: 'NSE', symboltoken: String(symboltoken), interval: 'ONE_MINUTE', fromdate, todate },
+                  {
+                    headers: {
+                      'X-PrivateKey': creds.api_key,
+                      Authorization: `Bearer ${token}`,
+                      'X-Mirae-Version': '1',
+                      'Content-Type': 'application/json',
+                    },
+                    timeout: 5000,
+                  },
+                );
+                const candles: any[] = resp.data?.data?.candles || [];
+                if (candles.length > 0) {
+                  const latest = candles[candles.length - 1];
+                  if (Array.isArray(latest)) {
+                    ltp = latest[4]; // OHLCV array: [time, open, high, low, close, volume]
+                  } else {
+                    ltp = latest.close || latest.ltp;
+                  }
+                  // Cache in Redis so next poll hits the fast path
+                  redis.set(`ltp:${sym}`, JSON.stringify({ price: ltp, timestamp: new Date().toISOString() }), { EX: 60 }).catch(() => {});
+                }
+              }
+            }
+          } catch (_) { /* REST fallback best-effort — return null if fails */ }
+        }
+
         const change = ltp && prevClose ? ltp - prevClose : null;
         const changePct = change && prevClose ? (change / prevClose) * 100 : null;
 
@@ -96,7 +198,7 @@ async function systemRoutes(fastify, options) {
             low: candle?.low || ltp,
             open: candle?.open || ltp,
             vwap: candle?.vwap || null,
-            atr: null, // computed in L4
+            atr: null,
             volume: candle?.volume || 0,
             timestamp: candle?.timestamp || Date.now(),
           },
@@ -182,6 +284,11 @@ async function systemRoutes(fastify, options) {
 
   fastify.put('/api/v1/data/availability', {
     handler: systemController.updateDataAvailability,
+  });
+
+  // Return configured Nifty 50 symbols (token map) — available before any backfill
+  fastify.get('/api/v1/data/symbols', {
+    handler: systemController.getSymbolList,
   });
 
   fastify.get('/api/v1/data/stats', {
@@ -297,7 +404,7 @@ async function systemRoutes(fastify, options) {
         if (idx < 0) return { success: false, error: 'Strategy not found' };
         config[idx] = { ...config[idx], ...req.body };
         await redis.set('strategies:config', JSON.stringify(config));
-        await redis.publish('strategies-changed', JSON.stringify({ id, action: 'updated' }));
+        await redis.publish(REDIS_CHANNELS?.STRATEGIES_CHANGED || 'strategies-changed', JSON.stringify({ id, action: 'updated' }));
         return { success: true, data: config[idx] };
       } catch (err) { return { success: false, error: err.message }; }
     },
@@ -329,7 +436,7 @@ async function systemRoutes(fastify, options) {
         const current = raw ? (typeof raw === 'string' ? JSON.parse(raw) : raw) : {};
         const updated = { ...current, ...req.body };
         await redis.set('risk:config', JSON.stringify(updated));
-        await redis.publish('risk-changed', JSON.stringify(updated));
+        await redis.publish(REDIS_CHANNELS?.RISK_CHANGED || 'risk-changed', JSON.stringify(updated));
         return { success: true, data: updated };
       } catch (err) { return { success: false, error: err.message }; }
     },
@@ -360,6 +467,123 @@ async function systemRoutes(fastify, options) {
         }
         return { success: true, data: feeds };
       } catch (err) { return { success: false, error: err.message }; }
+    },
+  });
+
+  // ─────────────────────────────────────────────────────────────
+  // BACKTEST PROXY — proxy to L9 AI service
+  // ─────────────────────────────────────────────────────────────
+  fastify.post('/api/v1/backtest', {
+    schema: {
+      description: 'Run a backtest via L9 AI service',
+      tags: ['Backtest'],
+      body: {
+        type: 'object',
+        properties: {
+          strategy: { type: 'string' },
+          fromDate: { type: 'string' },
+          toDate: { type: 'string' },
+          capital: { type: 'number' },
+          regimeBucket: { type: 'string' },
+        },
+      },
+    },
+    handler: async (req, reply) => {
+      try {
+        const axios = require('axios');
+        const aiUrl = process.env.AI_URL || 'http://ai-inference:8000';
+        const resp = await axios.post(`${aiUrl}/backtest`, req.body, { timeout: 30000 });
+        return { success: true, data: resp.data };
+      } catch (err) {
+        return { success: false, error: err.response?.data?.detail || err.message };
+      }
+    },
+  });
+
+  // ─────────────────────────────────────────────────────────────
+  // PREDICT PROXY — proxy to L9 AI service (returns abstain if unavailable)
+  // ─────────────────────────────────────────────────────────────
+  fastify.get('/api/v1/predict', {
+    schema: {
+      description: 'Get AI prediction — returns abstain state when model is not ready',
+      tags: ['AI'],
+      querystring: {
+        type: 'object',
+        properties: {
+          underlying: { type: 'string', default: 'NIFTY' },
+          horizon: { type: 'string', default: 'scalp' },
+        },
+      },
+    },
+    handler: async (req, reply) => {
+      try {
+        const axios = require('axios');
+        const aiUrl = process.env.AI_URL || 'http://ai-inference:8000';
+        const resp = await axios.get(`${aiUrl}/predict`, {
+          params: { underlying: req.query.underlying, horizon: req.query.horizon },
+          timeout: 10000,
+        });
+        return { success: true, data: resp.data };
+      } catch (err) {
+        // Return abstain — never fabricate a prediction
+        return {
+          success: true,
+          data: {
+            status: 'abstain',
+            direction: null,
+            probability: null,
+            confidence: null,
+            model_version: null,
+            reason: err.response?.data?.detail || err.message || 'AI service unavailable',
+          },
+        };
+      }
+    },
+  });
+  fastify.get('/api/v1/alerts', {
+    schema: {
+      description: 'Notification feed — kill-switch trips, NO-STOP warnings, fills, rejects',
+      tags: ['Alerts'],
+      querystring: {
+        type: 'object',
+        properties: {
+          severity: { type: 'string', enum: ['info', 'warn', 'error', 'critical'] },
+          limit: { type: 'integer', default: 50 },
+        },
+      },
+    },
+    handler: async (req, reply) => {
+      try {
+        const { redis } = require('../../container').cradle;
+        const limit = Math.min(req.query.limit || 50, 200);
+        const severity = req.query.severity;
+        // Alerts pushed to Redis list `alerts:feed` by L8 notification service
+        const raw = await redis.lRange('alerts:feed', 0, limit - 1);
+        let alerts = raw.map(r => typeof r === 'string' ? JSON.parse(r) : r);
+        if (severity) alerts = alerts.filter(a => a.severity === severity);
+        return { success: true, data: { alerts, count: alerts.length } };
+      } catch (err) {
+        return { success: true, data: { alerts: [], count: 0 } };
+      }
+    },
+  });
+
+  // ─────────────────────────────────────────────────────────────
+  // OPTIONS EXPIRIES — (moved up, duplicate guard)
+  // ─────────────────────────────────────────────────────────────
+  fastify.get('/api/v1/options/expiries-v2', {
+    handler: async (req, reply) => {
+      const u = (req.query.underlying || 'NIFTY').toUpperCase();
+      const IST = 5.5 * 3600000;
+      const n = new Date(Date.now() + IST);
+      const today = new Date(n.getUTCFullYear(), n.getUTCMonth(), n.getUTCDate());
+      const out = [];
+      for (let i = 0; i < 8; i++) {
+        const d = new Date(today);
+        d.setDate(d.getDate() + (4 - d.getDay() + 7) % 7 + i * 7);
+        if (d > today) { out.push({ date: d.toISOString().split('T')[0], dte: Math.ceil((d - today) / 86400000), type: d.getDate() > 22 ? 'monthly' : 'weekly' }); if (out.length >= 4) break; }
+      }
+      return { success: true, data: { underlying: u, expiries: out } };
     },
   });
 }

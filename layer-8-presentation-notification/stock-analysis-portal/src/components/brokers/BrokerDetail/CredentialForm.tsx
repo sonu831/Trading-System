@@ -1,7 +1,7 @@
 // @ts-nocheck
 import { useState } from 'react';
 import { useDispatch } from 'react-redux';
-import CredentialField from './CredentialField';
+import CredentialField from '@/components/brokers/BrokerDetail/CredentialField';
 import { saveCredential, deleteCredential } from '@/store/slices/brokerSlice';
 
 const CREDENTIAL_FIELDS = ['api_key', 'api_secret', 'client_code', 'password', 'totp_secret', 'access_token'];

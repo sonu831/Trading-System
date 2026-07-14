@@ -85,51 +85,67 @@ async function loginAndVerify(
   TTL: number,
   deps: StrategyDeps,
 ): Promise<AuthResult> {
-  log('start', 'loginAndVerify', { clientcode: creds.clientcode, has_totp_secret: !!totp_secret, totp_secret_len: totp_secret?.length || 0 });
+  log('start', 'loginAndVerify', { clientcode: creds.clientcode, has_totp_secret: !!totp_secret });
 
-  // Step 1 — login
-  let requestToken: string;
-  try {
-    log('step', 'Step 1: calling adapter.login()');
-    const loginResult = await adapter.login({ clientcode: creds.clientcode, password: creds.password, totp: '', state: '' });
-    requestToken = loginResult.jwtToken;
-    log('ok', 'Step 1: login OK — got request token', { token_len: requestToken.length, is_uuid: requestToken.includes('-') });
-  } catch (err: any) {
-    log('fail', 'Step 1: login FAILED', { error: err.message });
-    return { success: false, error: err.message, stage: 'login' };
-  }
-
-  // Step 2a — TOTP (unattended)
+  // Path A — TOTP unattended: two-step flow.
+  //   1. login({ totp: '' })        → request token  (no OTP sent if TOTP is enabled)
+  //   2. verifyTOTP(requestToken)   → trading JWT     (valid for REST + WebSocket)
+  // One-step login gives a session-only token that MStock rejects for REST calls.
   if (totp_secret) {
-    log('step', 'Step 2a: TOTP path — generating code');
     let totp: string;
     try {
       totp = deps.generateTOTP(totp_secret);
-      log('ok', 'TOTP code generated', { code_len: totp.length, code_preview: totp.slice(0, 1) + '*****' });
     } catch (genErr: any) {
-      log('fail', 'TOTP generation FAILED', { error: genErr.message, secret_len: totp_secret.length, first_char: totp_secret[0] });
+      log('fail', 'TOTP generation FAILED', { error: genErr.message });
       return { success: false, error: genErr.message, stage: 'totp_secret' };
     }
 
+    // Step 1 — login without TOTP (returns request token, no OTP when TOTP is enabled)
+    let requestToken: string;
     try {
-      log('step', 'Step 2b: calling adapter.verifyTOTP()');
-      const verifyResult = await adapter.verifyTOTP(requestToken, totp);
-      log('ok', 'verifyTOTP response', { has_jwt: !!verifyResult?.jwtToken, jwt_len: verifyResult?.jwtToken?.length || 0, is_same_as_request: verifyResult?.jwtToken === requestToken });
-      if (!verifyResult?.jwtToken) {
+      log('step', 'Step 1: adapter.login({ totp: "" })');
+      const loginResult = await adapter.login({ clientcode: creds.clientcode, password: creds.password, totp: '', state: '' });
+      requestToken = loginResult.jwtToken;
+      log('ok', 'Got request token', { token_len: requestToken.length });
+    } catch (err: any) {
+      log('fail', 'Step 1 login FAILED', { error: err.message });
+      return { success: false, error: err.message, stage: 'login' };
+    }
+
+    // Step 2 — verify TOTP to get the TRADING token
+    try {
+      log('step', 'Step 2: adapter.verifyTOTP(requestToken, totp)');
+      const tradingResult = await adapter.verifyTOTP(requestToken, totp);
+      if (!tradingResult?.jwtToken) {
         return { success: false, error: 'TOTP verification returned no trading token', stage: 'totp_verify' };
       }
-      if (verifyResult.jwtToken === requestToken) {
-        return { success: false, error: 'broker echoed the request token instead of a trading token', stage: 'totp_verify' };
+      if (tradingResult.jwtToken === requestToken) {
+        return { success: false, error: 'broker echoed request token instead of trading token', stage: 'totp_verify' };
       }
-      log('ok', 'TOTP auth SUCCESS — got JWT', { jwt_len: verifyResult.jwtToken.length });
-      return { success: true, status: 'connected', token: verifyResult.jwtToken, ttlSeconds: TTL, provider: 'mstock', auth_type: 'totp', stage: 'connected' };
+      log('ok', 'TOTP auth SUCCESS — trading JWT', { jwt_len: tradingResult.jwtToken.length });
+      return { success: true, status: 'connected', token: tradingResult.jwtToken, ttlSeconds: TTL, provider: 'mstock', auth_type: 'totp', stage: 'connected' };
     } catch (err: any) {
-      log('fail', 'verifyTOTP FAILED', { error: err.message });
-      return { success: false, error: err.message, stage: 'totp_verify' };
+      log('fail', 'Step 2 verifyTOTP FAILED', { error: err.message });
+      return { success: false, error: err.message, stage: 'totp_verify', likelyCauses: [
+        'TOTP may not be enabled — Enable TOTP at trade.mstock.com → Trading APIs',
+        'The Base32 secret may not match — regenerate and re-enter',
+        'Clock skew >30s produces wrong codes — sync time',
+      ]};
     }
   }
 
-  // Step 2b — needs OTP (interactive)
+  // Path B — no TOTP: login with empty TOTP → request token → prompt for OTP.
+  let requestToken: string;
+  try {
+    log('step', 'adapter.login({ totp: "" }) — interactive path');
+    const loginResult = await adapter.login({ clientcode: creds.clientcode, password: creds.password, totp: '', state: '' });
+    requestToken = loginResult.jwtToken;
+    log('ok', 'Got request token for OTP', { token_len: requestToken.length });
+  } catch (err: any) {
+    log('fail', 'Login FAILED', { error: err.message });
+    return { success: false, error: err.message, stage: 'login' };
+  }
+
   return {
     success: false,
     status: 'needs_input',

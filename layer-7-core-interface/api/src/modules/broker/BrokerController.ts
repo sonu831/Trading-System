@@ -5,7 +5,8 @@ class BrokerController extends BaseController {
   constructor({ brokerService }: { brokerService: any }) { super(); this.brokerService = brokerService; }
 
   listProviders = async (req: any, reply: any) => { try { return this.sendSuccess(reply, await this.brokerService.listProviders()); } catch (e) { return this.sendError(reply, e); } };
-  getProvider = async (req: any, reply: any) => { try { return this.sendSuccess(reply, await this.brokerService.getProvider(parseInt(req.params.id))); } catch (e: any) { return this.sendError(reply, e, e.statusCode || 500); } };
+  // Accepts an id ("1") or a provider name ("mstock") — the dashboard sends both.
+  getProvider = async (req: any, reply: any) => { try { return this.sendSuccess(reply, await this.brokerService.getProvider(req.params.id)); } catch (e: any) { return this.sendError(reply, e, e.statusCode || 500); } };
   createProvider = async (req: any, reply: any) => { try { if (!req.body.provider) return this.sendError(reply, new Error('provider is required'), 400); return this.sendSuccess(reply, await this.brokerService.createProvider(req.body), 'Provider created', 201); } catch (e: any) { return this.sendError(reply, e, e.statusCode || 500); } };
   updateProvider = async (req: any, reply: any) => { try { return this.sendSuccess(reply, await this.brokerService.updateProvider(parseInt(req.params.id), req.body), 'Provider updated'); } catch (e: any) { return this.sendError(reply, e, e.statusCode || 500); } };
   saveCredential = async (req: any, reply: any) => { try { if (!req.body.field_name || !req.body.field_value) return this.sendError(reply, new Error('field_name and field_value required'), 400); await this.brokerService.saveCredential(parseInt(req.params.id), req.body.field_name, req.body.field_value); return this.sendSuccess(reply, null, 'Credential saved', 201); } catch (e: any) { return this.sendError(reply, e, e.statusCode || 500); } };

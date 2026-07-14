@@ -8,6 +8,24 @@
 const axios = require('axios');
 const logger = require('./utils/logger');
 
+/* eslint-disable @typescript-eslint/no-var-requires */
+let SHARED: any = null;
+try { SHARED = require('/app/shared/constants'); } catch (_) {
+  try { SHARED = require('../../shared/constants'); } catch (_e) { SHARED = null; }
+}
+if (!SHARED?.API_KEY_HEADER) {
+  throw new Error('shared/constants.js API_KEY_HEADER not resolvable — L10 cannot authenticate to L7');
+}
+
+/**
+ * L7 is default-deny. These headers go ONLY to our own gateway — never to a broker API,
+ * which is why this is a helper rather than an axios default.
+ */
+function internalAuthHeaders(): Record<string, string> {
+  const key = process.env.INTERNAL_API_KEY || '';
+  return key ? { [SHARED.API_KEY_HEADER]: key } : {};
+}
+
 interface Provider {
   provider: string;
   enabled: boolean;
@@ -84,7 +102,7 @@ class CredentialProvider {
 
   async refresh(): Promise<void> {
     try {
-      const resp = await axios.get(`${this.backendApiUrl}/api/v1/providers`, { timeout: 5000 });
+      const resp = await axios.get(`${this.backendApiUrl}/api/v1/providers`, { timeout: 5000, headers: internalAuthHeaders() });
       if (resp.data?.success && Array.isArray(resp.data.data)) {
         const enabled = (resp.data.data as Provider[]).filter(
           (p) => p.enabled && (p.role === 'execution' || p.role === 'both'),
@@ -137,7 +155,7 @@ class CredentialProvider {
       try {
         const resp = await axios.get(
           `${this.backendApiUrl}/api/v1/providers/${p.provider}/credentials/decrypted`,
-          { timeout: 5000 },
+          { timeout: 5000, headers: internalAuthHeaders() },
         );
         if (resp.data?.success && resp.data.data?.credentials) {
           this.credentialCache.set(p.provider, resp.data.data.credentials);

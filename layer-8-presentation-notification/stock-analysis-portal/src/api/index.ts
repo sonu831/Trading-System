@@ -77,3 +77,65 @@ export const RiskApi = {
   update: (data: Record<string, unknown>) =>
     fetch(`${API}/risk/config`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }),
 };
+
+// ── Orders ──────────────────────────────────
+export const OrdersApi = {
+  list: () => get<Array<Record<string, unknown>>>('/execution/orders'),
+};
+
+// ── Alerts ──────────────────────────────────
+export const AlertsApi = {
+  list: (severity?: string, limit = 50) =>
+    get<{ alerts: Array<{ severity: string; message: string; timestamp: string }>; count: number }>(
+      `/alerts${severity ? `?severity=${severity}&` : '?'}limit=${limit}`,
+    ),
+};
+
+// ── Backtest ────────────────────────────────
+export const BacktestApi = {
+  run: (params: Record<string, unknown>) =>
+    fetch(`${API}/backtest`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(params),
+    }).then((r) => r.json()),
+};
+
+// ── Market View ──────────────────────────────
+export const MarketViewApi = {
+  get: () => get<Record<string, unknown>>('/market-view'),
+};
+
+// ── Predictions ───────────────────────────────
+export const PredictApi = {
+  get: (underlying = 'NIFTY', horizon = 'scalp') =>
+    get<{
+      status: string;
+      direction?: string;
+      probability?: number;
+      confidence?: number;
+      model_version?: string;
+      features?: Array<{ label: string; value: number; tone?: string }>;
+    }>(`/predict?underlying=${underlying}&horizon=${horizon}`),
+};
+
+// ── Signals ──────────────────────────────────
+export const SignalsApi = {
+  list: () =>
+    get<Array<{
+      id: number;
+      action: string;
+      strategy: string;
+      tier: string;
+      price: number;
+      reason: string;
+      confidence: number;
+      timestamp: string;
+    }>>('/signals'),
+};
+
+// ── System Status ────────────────────────────
+export const SystemApi = {
+  getStatus: () => get<Record<string, unknown>>('/system-status'),
+  getFeeds: () => get<Record<string, unknown>>('/health/feeds'),
+};

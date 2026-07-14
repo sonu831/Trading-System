@@ -91,6 +91,15 @@ const Navbar = ({ viewMode, setViewMode, systemStatus = 'ONLINE' }) => {
           </Link>
 
           <Link
+            href="/cockpit"
+            className="relative group overflow-hidden px-5 py-2 rounded-lg font-bold text-sm transition-all duration-300 shadow-md transform hover:-translate-y-0.5 bg-gradient-to-r from-pink-600 to-rose-500 text-white hover:shadow-rose-500/25 border border-rose-400/20"
+            title="Unified Cockpit — chart, chain, risk, regime, positions"
+          >
+            <div className="relative z-10 flex items-center gap-2"><span className="text-lg">🎯</span><span>Cockpit</span></div>
+            <div className="absolute inset-0 bg-gradient-to-r from-rose-400/0 via-white/20 to-rose-400/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700 ease-in-out"></div>
+          </Link>
+
+          <Link
             href="/brokers"
             className={`
               relative group overflow-hidden px-5 py-2 rounded-lg font-bold text-sm transition-all duration-300 shadow-md transform hover:-translate-y-0.5
@@ -138,6 +147,15 @@ const Navbar = ({ viewMode, setViewMode, systemStatus = 'ONLINE' }) => {
             >
               HISTORICAL
             </button>
+          </div>
+
+          {/* Secondary nav — utility pages */}
+          <div className="flex items-center gap-2 ml-2 pl-2 border-l border-border">
+            <Link href="/options" className="text-xs text-text-tertiary hover:text-text-primary transition" title="Option chain">📊 Options</Link>
+            <Link href="/positions" className="text-xs text-text-tertiary hover:text-text-primary transition" title="Positions">📋 Positions</Link>
+            <Link href="/risk" className="text-xs text-text-tertiary hover:text-text-primary transition" title="Risk config">⚠️ Risk</Link>
+            <Link href="/strategies" className="text-xs text-text-tertiary hover:text-text-primary transition" title="Strategies">🧩 Strategies</Link>
+            <Link href="/system" className="text-xs text-text-tertiary hover:text-text-primary transition" title="System health">🖥 System</Link>
           </div>
         </div>
         <div className="text-right hidden md:block">

@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { Layers, Activity, Ban, Hash } from 'lucide-react';
-import { AppLayout } from '@/components/layout';
+import AppShell from '@/components/layout/AppShell/AppShell';
 import {
   StatTile,
   DailyRiskCard,
@@ -12,6 +12,8 @@ import {
   ConfirmDialog,
 } from '@/components/trading';
 import { RegimeCard } from '@/components/regime';
+import ConfluenceChecklist from '@/components/organisms/ConfluenceChecklist';
+import StrikePreviewCard from '@/components/organisms/StrikePreviewCard';
 import {
   fetchExecutionState,
   squareOffAll,
@@ -19,7 +21,7 @@ import {
   selectOpenPositions,
   selectUnrealisedPnl,
 } from '@/store/slices/executionSlice';
-import { fetchRegime, selectRegime, selectRegimeUpdatedAt, selectRegimeReachable } from '@/store/slices/regimeSlice';
+import { fetchRegime, selectRegime, selectRegimeUpdatedAt, selectRegimeReachable, fetchBreadth, selectBreadth } from '@/store/slices/regimeSlice';
 import {
   EMPTY,
   formatSignedCurrency,
@@ -75,6 +77,7 @@ export default function TradingPage() {
   const regime = useSelector(selectRegime);
   const regimeUpdatedAt = useSelector(selectRegimeUpdatedAt);
   const regimeReachable = useSelector(selectRegimeReachable);
+  const breadth = useSelector(selectBreadth);
 
   const [confirmSquareOff, setConfirmSquareOff] = useState(false);
 
@@ -82,6 +85,7 @@ export default function TradingPage() {
     const load = () => {
       dispatch(fetchExecutionState());
       dispatch(fetchRegime());
+      dispatch(fetchBreadth());
     };
     load();
     const id = setInterval(load, POLL_MS);
@@ -99,7 +103,7 @@ export default function TradingPage() {
   };
 
   return (
-    <AppLayout>
+    <AppShell>
       {/* ---- Header: mode, freshness, destructive action ---- */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
         <div>
@@ -177,6 +181,8 @@ export default function TradingPage() {
             lastUpdatedAt={regimeUpdatedAt}
             reachable={regimeReachable === false ? false : undefined}
           />
+          <ConfluenceChecklist regime={regime} breadth={breadth} />
+          <StrikePreviewCard underlying="NIFTY" />
         </div>
       </div>
 
@@ -194,6 +200,6 @@ export default function TradingPage() {
         onConfirm={handleSquareOff}
         onCancel={() => setConfirmSquareOff(false)}
       />
-    </AppLayout>
+    </AppShell>
   );
 }

@@ -1,7 +1,8 @@
 // @ts-nocheck
 import React, { useMemo } from 'react';
 import PropTypes from 'prop-types';
-import { DataTable, Card } from '@/components/ui';
+import { Card } from '@/components/ui';
+import { DataTable } from '@/components/molecules';
 
 const NiftyGrid = React.memo(({ marketView }) => {
   const stocks = useMemo(() => marketView?.all_stocks || [], [marketView]);

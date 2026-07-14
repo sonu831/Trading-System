@@ -1,0 +1,33 @@
+/* Typography tokens.
+   The product ships NO custom webfont — tailwind.config.js declares no fontFamily
+   override, so Next.js/Tailwind falls back to the default system-UI stack. This is
+   intentional for a trading terminal: fastest paint, native OS number rendering. */
+
+:root {
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+
+  /* Type scale (Tailwind defaults used verbatim in source) */
+  --text-xs: 12px;
+  --text-sm: 14px;
+  --text-base: 16px;
+  --text-lg: 18px;
+  --text-xl: 20px;
+  --text-2xl: 24px;
+  --text-3xl: 30px;
+  --text-4xl: 36px;
+
+  --leading-tight: 1.25;
+  --leading-normal: 1.5;
+  --leading-relaxed: 1.625;
+
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+  --font-weight-extrabold: 800;
+
+  --tracking-wide: 0.025em;
+  --tracking-wider: 0.05em;
+  --tracking-tight: -0.025em;
+}

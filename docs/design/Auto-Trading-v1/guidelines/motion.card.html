@@ -1,0 +1,15 @@
+<!-- @dsCard group="Brand" viewport="700x140" name="Motion" subtitle="150/200/300ms, standard ease — no bounce" -->
+<!DOCTYPE html>
+<html><head><link rel="stylesheet" href="../styles.css">
+<style>
+  body{margin:0;padding:16px;background:var(--color-background);font-family:var(--font-sans);font-size:12px;color:var(--color-text-tertiary);}
+  .row{display:flex;align-items:center;gap:12px;margin-bottom:10px;}
+  .dot{width:16px;height:16px;border-radius:50%;background:var(--color-primary);}
+  .track{flex:1;height:1px;background:var(--color-border);position:relative;}
+</style></head>
+<body>
+  <div class="row"><div class="dot"></div><span>duration-fast — 150ms — hover states, toggles</span></div>
+  <div class="row"><div class="dot"></div><span>duration-base — 200ms — theme switch, badge fades</span></div>
+  <div class="row"><div class="dot"></div><span>duration-slow — 300ms — modal open/close, card hover lift</span></div>
+  <div style="margin-top:8px">Easing: <code>cubic-bezier(0.4,0,0.2,1)</code> throughout. No spring/bounce easing anywhere in source.</div>
+</body></html>

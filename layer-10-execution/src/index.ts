@@ -13,6 +13,11 @@ const { StrikeSelector } = require('./strike-selector');
 const { TradeJournal } = require('./trade-journal');
 const { SyntheticQuoteFeed, BrokerQuoteFeed } = require('./quote-feed');
 const { PaperExecutor } = require('./paper-executor');
+
+let REDIS_CHANNELS;
+try { REDIS_CHANNELS = require('/app/shared/constants').REDIS_CHANNELS; } catch (_) {
+  try { REDIS_CHANNELS = require('../../../shared/constants').REDIS_CHANNELS; } catch (_) {}
+}
 const { LiveExecutor } = require('./live-executor');
 
 const app = express();
@@ -193,9 +198,9 @@ async function reconcile() {
     const state = riskManager.getState();
     pnlGauge.set({ type: 'daily' }, state.dailyState.totalPnl ?? 0);
 
-    // Publish state to Redis
+    // Publish state to Redis for realtime dashboard
     if (redisClient) {
-      await redisClient.set(config.redis.keys.state, JSON.stringify({
+      const statePayload = {
         timestamp: new Date().toISOString(),
         mode: config.tradeMode,
         positions: positionManager.getAllPositions().map(p => ({
@@ -203,17 +208,45 @@ async function reconcile() {
           pnl: p.pnl, status: p.status,
         })),
         risk: riskManager.getState(),
-      }));
+      };
+      await redisClient.set(config.redis.keys.state, JSON.stringify(statePayload));
 
-      // Publish notifications to Redis for Layer 8
+      // Execution state push (positions room)
+      if (REDIS_CHANNELS?.EXECUTION_STATE) {
+        await redisClient.publish(REDIS_CHANNELS.EXECUTION_STATE, JSON.stringify({
+          ...statePayload,
+          killSwitch: riskManager.killSwitch,
+          dailyPnl: riskManager.getState().dailyState?.totalPnl ?? 0,
+        }));
+      }
+
+      // Execution events push (fills, exits, state changes — the execution room)
+      if (REDIS_CHANNELS?.EXECUTION_EVENTS) {
+        const latestTrade = journal;
+        await redisClient.publish(REDIS_CHANNELS.EXECUTION_EVENTS, JSON.stringify({
+          type: 'STATE_SNAPSHOT',
+          timestamp: new Date().toISOString(),
+          mode: config.tradeMode,
+          killSwitch: riskManager.killSwitch,
+          positions: positionManager.getOpenPositions().length,
+          dailyPnl: riskManager.getState().dailyState?.totalPnl ?? 0,
+          source: 'execution-engine',
+        }));
+      }
+
+      // Publish alerts/notifications
       const openCount = positionManager.getOpenPositions().length;
       if (openCount > 0) {
-        await redisClient.publish(config.redis.channels.notifications || 'notifications:execution', JSON.stringify({
+        const alertChannel = REDIS_CHANNELS?.ALERTS || config.redis.channels.notifications || 'notifications:execution';
+        await redisClient.publish(alertChannel, JSON.stringify({
+          severity: 'info',
+          message: `${openCount} open position${openCount === 1 ? '' : 's'}`,
           type: 'execution_update',
           mode: config.tradeMode,
           positions: openCount,
           dailyPnl: riskManager.getState().dailyState?.totalPnl ?? 0,
           killSwitch: riskManager.killSwitch,
+          source: 'execution-engine',
           timestamp: new Date().toISOString(),
         }));
       }
@@ -257,6 +290,16 @@ function startExpress() {
     });
   });
 
+  // Order book from the journal
+  app.get('/orders', async (req, res) => {
+    try {
+      const orders = journal ? await journal.getAll() : [];
+      res.json(orders);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // Halting must also flatten the book — same semantics as the Redis KILL command,
   // otherwise "kill" would silently leave live positions running.
   app.post('/kill', async (req, res) => {
@@ -270,11 +313,26 @@ function startExpress() {
         error: 'Kill switch set, but square-off failed — check positions at the broker',
       });
     }
+    // Push execution event so dashboard updates instantly
+    if (redisClient && REDIS_CHANNELS?.EXECUTION_EVENTS) {
+      redisClient.publish(REDIS_CHANNELS.EXECUTION_EVENTS, JSON.stringify({
+        type: 'KILL_ACTIVATED',
+        timestamp: new Date().toISOString(),
+        source: 'execution-engine',
+      })).catch(() => {});
+    }
     res.json({ killSwitch: true, positions: positionManager.getAllPositions() });
   });
 
   app.post('/resume', (req, res) => {
     riskManager.setKillSwitch(false, 'api');
+    if (redisClient && REDIS_CHANNELS?.EXECUTION_EVENTS) {
+      redisClient.publish(REDIS_CHANNELS.EXECUTION_EVENTS, JSON.stringify({
+        type: 'KILL_DEACTIVATED',
+        timestamp: new Date().toISOString(),
+        source: 'execution-engine',
+      })).catch(() => {});
+    }
     res.json({ killSwitch: false });
   });
 

@@ -14,6 +14,7 @@ services:
     environment:
       - NEXT_PUBLIC_API_URL=/api/v1
       - NEXT_PUBLIC_WS_URL=/
+      - INTERNAL_API_KEY=bef711c880b1a5826880c8dc7ab074fe490c35fe34d92e314d794230f3a8ac62
     networks:
       - trading-network
     restart: unless-stopped

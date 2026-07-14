@@ -21,9 +21,33 @@ export interface VerifyResult {
   jwtToken: string;
 }
 
+export interface QuoteParams {
+  mode: 'FULL' | 'LTP' | 'OHLC';
+  exchangeTokens: Record<string, string[]>;
+}
+
+export interface HistoricalParams {
+  exchange: string;
+  symboltoken: string;
+  interval: string;
+  fromdate: string;
+  todate: string;
+}
+
+export interface OptionChainParams {
+  underlying: string;
+  expiry: string;
+  strike?: number;
+}
+
 export interface BrokerAdapter {
   /** Stable identifier matching the provider registry key. */
   readonly id: string;
+
+  /** The underlying SDK client (MConnect, etc.) for direct access. */
+  readonly client: any;
+
+  // ── Auth ──
 
   /** Step 1: authenticate with broker credentials. Returns a request/refresh token. */
   login(params: LoginParams): Promise<LoginResult>;
@@ -36,4 +60,29 @@ export interface BrokerAdapter {
 
   /** End an active session. */
   logout(token: string): Promise<void>;
+
+  /** Apply a JWT access token for subsequent API calls. */
+  setAccessToken(token: string): void;
+
+  // ── Market Data ──
+
+  /** Get real-time quotes. */
+  getQuote(params: QuoteParams): Promise<any>;
+
+  /** Get historical candle data. */
+  getHistoricalData(params: HistoricalParams): Promise<any>;
+
+  /** Get option chain for an underlying. */
+  getOptionChain(params: OptionChainParams): Promise<any>;
+
+  // ── Portfolio ──
+
+  /** Get open positions. */
+  getPositions(): Promise<any>;
+
+  /** Get holdings. */
+  getHoldings(): Promise<any>;
+
+  /** Place an order. */
+  placeOrder(params: Record<string, unknown>): Promise<any>;
 }

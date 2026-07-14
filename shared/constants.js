@@ -136,6 +136,30 @@ const BROKER_BASE_URLS = {
   KITE: 'https://api.kite.trade',
 };
 
+// ── Market Hours (single source of truth — rule 3/14) ──
+//
+// Every layer that checks "is the market open?" uses these values.
+// Previously defined in 6+ independent locations with conflicting close times
+// (15:00 vs 15:30) and one broken method call (getMarketStatus did not exist).
+// Declare ONCE, here. All layers import from shared/.
+
+const MARKET_HOURS = {
+  OPEN_HOUR: 9,
+  OPEN_MINUTE: 15,
+  CLOSE_HOUR: 15,
+  CLOSE_MINUTE: 30,
+  TIMEZONE: 'Asia/Kolkata',
+  IST_OFFSET_MS: 5.5 * 3600000, // 330 minutes
+  WEEKEND_DAYS: [0, 6],          // Sunday, Saturday
+
+  // Execution risk gates (deliberately different from market close)
+  ENTRY_CUTOFF: '15:00',         // no new trades after
+  SQUARE_OFF_TIME: '15:15',      // force-exit all positions
+
+  // API fetch windows
+  MIN_API_FETCH_HOURS: [9, 16],  // 9 AM to 4 PM (covers market + pre/post)
+};
+
 // ── Weekly expiry weekday (ISO: 1=Mon .. 7=Sun) ─────
 //
 // ⚠️ OWNER MUST VERIFY against the current NSE circular before live trading.
@@ -166,6 +190,33 @@ const REDIS_KEYS = {
   BROKER_SESSION: (provider) => `broker:session:${provider}`,
   EXECUTION_PREFIX: 'execution:',
   OPTION_CHAIN: (underlying) => `option-chain:${underlying}`,
+  ALERTS_FEED: 'alerts:feed',
+  STRATEGIES_CONFIG: 'strategies:config',
+  RISK_CONFIG: 'risk:config',
+  SYSTEM_COMMANDS: 'system:commands',
+  PROVIDERS_CHANGED: 'providers-changed',
+  LOGS: 'system:layer1:logs',
+  BACKFILL_STATUS: 'system:layer1:backfill',
+  SWARM_STATUS: 'system:layer1:swarm_status',
+  HEARTBEAT_PREFIX: 'heartbeat:',
+};
+
+// ── Redis pub/sub channels (single source of truth — rule 3/14) ──
+
+const REDIS_CHANNELS = {
+  TICKS: 'market_ticks',
+  SIGNALS: 'signals:trade',              // matches L6 existing publisher
+  REGIME: 'market-regime',
+  BREADTH: 'market_view',               // matches L5 existing publisher
+  OPTION_CHAIN: 'option_chain_updates',
+  EXECUTION_STATE: 'execution:state',
+  EXECUTION_EVENTS: 'execution-events',
+  ALERTS: 'notifications',              // payload carries `source` field
+  PROVIDERS_CHANGED: 'providers-changed',
+  STRATEGIES_CHANGED: 'strategies-changed',
+  RISK_CHANGED: 'risk-changed',
+  SYSTEM_COMMANDS: 'system:commands',
+  BROKER_SESSION_CHANGED: 'broker-session-changed', // L7 → L1: new session token available
 };
 
 // ── Kafka Topic Names (single source of truth — §4) ──
@@ -219,10 +270,27 @@ const PORTS = {
   EMAIL_SERVICE: 7001,
 };
 
+// ── API auth (L7 gateway) ───────────────────────────
+//
+// The header every internal caller (dashboard proxy, L1, L10) must present to L7.
+// Declared once here because it crosses four layers — a mismatch between the sender and
+// the verifier is a silent 401 storm, not a compile error.
+//
+// L7 previously authenticated ONLY when this header happened to be present, so a request
+// that simply omitted it was served unauthenticated — including the endpoint that returns
+// DECRYPTED broker credentials. Auth is now default-deny; these are the only open routes.
+
+const API_KEY_HEADER = 'x-api-key';
+
+// Unauthenticated by design: liveness/metrics/docs. Everything else requires a key.
+// Matched as exact path or path prefix (`/documentation/...`).
+const PUBLIC_API_ROUTES = ['/', '/health', '/metrics', '/documentation', '/swagger'];
+
 module.exports = {
   REGIME_TREND, REGIME_SENTIMENT, REGIME_VOLATILITY, REGIME_PHASE,
   SIGNAL_DIRECTION, SIGNAL_ACTION, SIGNAL_TIER, OPTION_TYPE,
   SECTOR_MOMENTUM, TRADE_MODE, PROVIDER_ROLE,
   BROKER_CREDENTIAL_FIELDS, BROKER_REQUIRED_FIELDS, BROKER_FORM_FIELDS, BROKER_PROVIDERS,
-  BROKER_BASE_URLS, EXPIRY_WEEKDAY_ISO, REDIS_KEYS, PORTS, KAFKA_TOPICS, KAFKA_GROUPS,
+  BROKER_BASE_URLS, EXPIRY_WEEKDAY_ISO, REDIS_KEYS, REDIS_CHANNELS, MARKET_HOURS, PORTS,
+  KAFKA_TOPICS, KAFKA_GROUPS, API_KEY_HEADER, PUBLIC_API_ROUTES,
 };

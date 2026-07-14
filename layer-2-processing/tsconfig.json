@@ -1,5 +1,5 @@
 {
-  "extends": "../../shared/tsconfig.base.json",
+  "extends": "../shared/tsconfig.base.json",
   "compilerOptions": {
     "target": "ES2020",
     "module": "commonjs",
@@ -8,11 +8,8 @@
     "allowJs": true,
     "skipLibCheck": true,
     "noEmit": true,
-    "esModuleInterop": true,
-    "types": ["node"],
-    "baseUrl": "."
+    "esModuleInterop": true
   },
   "include": ["src/**/*.ts"],
-  "exclude": ["node_modules", "dist"],
-  "ts-node": { "transpileOnly": true }
+  "exclude": ["node_modules", "dist"]
 }

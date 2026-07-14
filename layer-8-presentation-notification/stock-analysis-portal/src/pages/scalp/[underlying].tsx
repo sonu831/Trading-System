@@ -1,5 +1,5 @@
 // @ts-nocheck
-import ScalpCockpit from './index';
+import ScalpCockpit from '@/pages/scalp';
 
 export default function ScalpByUnderlying({ underlying }) {
   return <ScalpCockpit underlying={underlying} />;

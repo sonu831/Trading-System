@@ -8,11 +8,15 @@
   "agents_path": ".ai/agents",
   "skills_path": ".ai/skills",
   "read_order": [
+    "VISION.md (what the system is for)",
+    "ARCHITECTURE.md (the three planes)",
     "CLAUDE.md",
     ".ai/MEMORY.md",
     "MEMORY.md",
+    "docs/INDEX.md (document map — every doc, trust level, active work order)",
     ".ai/CONTRACT.md",
     ".ai/skills/<task-relevant>.md",
+    ".ai/handoffs/ (latest running state)",
     "graphify-out/ (knowledge graph)"
   ],
   "rules": [
@@ -38,7 +42,8 @@
     ".ai/skills/engineering-standards.md",
     ".ai/skills/graphify.md",
     ".ai/skills/kafka-patterns.md",
-    ".ai/skills/tradingview.md"
+    ".ai/skills/tradingview.md",
+    ".ai/skills/wiring-gaps.md"
   ],
   "_generated": "read_order/rules/skills are generated from .ai/ai-manifest.json by scripts/sync-ai.mjs. Edit the manifest, then run `npm run sync-ai`."
 }

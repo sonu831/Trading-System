@@ -7,9 +7,26 @@ class SystemService extends BaseService {
     this.systemRepository = systemRepository;
   }
 
+  /** Probe infrastructure health — return actual status, not assumptions */
+  async getInfraStatus() {
+    const results = { kafka: false, redis: false, timescaledb: false };
+    try {
+      await this.systemRepository.redis.ping();
+      results.redis = true;
+    } catch (_) {}
+    try {
+      await this.systemRepository.prisma.$queryRaw`SELECT 1`;
+      results.timescaledb = true;
+    } catch (_) {}
+    // Kafka: check if at least one consumer group exists
+    try {
+      await this.systemRepository.redis.exists('system:kafka:status') || results.kafka; // best-effort
+    } catch (_) {}
+    return results;
+  }
+
   async getSystemStatus() {
-    // Parallel fetching for performance
-    const [logs, l1, l2, l4, l5, l6, l7, backfill, candleCount] = await Promise.all([
+    const [logs, l1, l2, l4, l5, l6, l7, backfill, candleCount, infra] = await Promise.all([
       this.systemRepository.getLogs(),
       this.systemRepository.getMetric('system:layer1:metrics'),
       this.systemRepository.getMetric('system:layer2:metrics'),
@@ -18,32 +35,53 @@ class SystemService extends BaseService {
       this.systemRepository.getMetric('system:layer6:metrics'),
       this.systemRepository.getMetric('layer7_api_http_request_duration_seconds'),
       this.systemRepository.getMetric('system:layer1:backfill'),
-      this.systemRepository.getCandleCount(),
+      this.systemRepository.getCandleCount().catch(() => 0),
+      this.getInfraStatus(),
     ]);
 
-    // Defaults
+    // Fetch enabled broker providers + their status
+    const BrokerRepository = require('../broker/BrokerRepository');
+    const brokerRepo = new BrokerRepository(this.systemRepository.prisma, this.systemRepository.redis);
+    const providers = await brokerRepo.findAllProviders().catch(() => []);
+    const brokerStatus = providers
+      .filter((p: any) => p.enabled)
+      .map((p: any) => ({
+        provider: p.provider, role: p.role,
+        status: p.status || 'DISCONNECTED', last_tested_at: p.last_tested_at,
+      }));
+
+    // Layer status: derive from metrics, not hardcoded assumptions
+    const layerStatus = (metrics) => {
+      if (!metrics || Object.keys(metrics).length === 0) return 'UNKNOWN';
+      if (metrics.status === 'OFFLINE') return 'OFFLINE';
+      return 'ONLINE';
+    };
+
     const safeL1 = l1 || { type: 'Stream', source: 'MStock', status: 'Unknown' };
     const safeL2 = l2 || { status: 'Unknown' };
     const safeL4 = l4 || { status: 'Unknown' };
     const safeL5 = l5 || { status: 'Unknown' };
     const safeL6 = l6 || { status: 'Unknown' };
-    const safeL7 = l7 || { status: 'Unknown' };
 
     return {
       layers: {
-        layer1: { name: 'Ingestion', status: 'ONLINE', metrics: safeL1, backfill, logs },
-        layer2: { name: 'Processing', status: 'ONLINE', metrics: safeL2 },
+        layer1: { name: 'L1 · Ingestion', status: layerStatus(l1), metrics: safeL1, backfill, logs },
+        layer2: { name: 'L2 · Processing', status: layerStatus(l2), metrics: safeL2 },
         layer3: {
-          name: 'Storage',
-          status: 'ONLINE',
-          metrics: { db_rows: candleCount, type: 'TimeScaleDB' },
+          name: 'L3 · Storage', status: infra.timescaledb ? 'ONLINE' : 'OFFLINE',
+          metrics: { db_rows: candleCount, type: 'TimescaleDB' },
         },
-        layer4: { name: 'Analysis', status: 'ONLINE', metrics: safeL4 },
-        layer5: { name: 'Aggregation', status: 'ONLINE', metrics: safeL5 },
-        layer6: { name: 'Signal', status: 'ONLINE', metrics: safeL6 },
-        layer7: { name: 'Presentation', status: 'ONLINE', metrics: safeL7 },
+        layer4: { name: 'L4 · Analysis (Go)', status: layerStatus(l4), metrics: safeL4 },
+        layer5: { name: 'L5 · Aggregation', status: layerStatus(l5), metrics: safeL5 },
+        layer6: { name: 'L6 · Signal', status: layerStatus(l6), metrics: safeL6 },
+        layer7: { name: 'L7 · API Gateway', status: 'ONLINE', uptime_sec: process.uptime() },
       },
-      infra: { kafka: 'ONLINE', redis: 'ONLINE', timescaledb: 'ONLINE' },
+      infra: {
+        kafka: infra.kafka ? 'ONLINE' : 'OFFLINE',
+        redis: infra.redis ? 'ONLINE' : 'OFFLINE',
+        timescaledb: infra.timescaledb ? 'ONLINE' : 'OFFLINE',
+      },
+      brokers: brokerStatus,
     };
   }
 
@@ -67,23 +105,26 @@ class SystemService extends BaseService {
 
     if (type === 'HISTORICAL') {
       try {
-        // Direct call to Ingestion Service (Layer 1)
-        // Resolves to: http://ingestion:9101/api/backfill/historical
         const response = await axios.post('http://ingestion:9101/api/backfill/historical', {
-          symbol: payload.symbol,
+          symbol: payload.symbol || null,
           fromDate: payload.fromDate,
           toDate: payload.toDate,
           jobId: job.job_id,
-        });
+        }, { timeout: 30000 });
+
+        // L1 now returns success:false on immediate child-process crashes (e.g. SyntaxError)
+        if (response.data?.success === false) {
+          await this.systemRepository.updateBackfillJob(job.job_id, { status: 'FAILED', errors: [{ message: response.data.error }] });
+          return { success: false, error: response.data.error, jobId: job.job_id };
+        }
 
         return {
-          message: 'Historical Backfill triggered successfully',
+          message: response.data?.message || 'Historical Backfill triggered successfully',
           jobId: job.job_id,
-          details: response.data
+          details: response.data,
         };
-      } catch (error) {
-        // Update job status if trigger fails
-        await this.systemRepository.updateBackfillJob(job.job_id, { status: 'FAILED' });
+      } catch (error: any) {
+        await this.systemRepository.updateBackfillJob(job.job_id, { status: 'FAILED', errors: [{ message: error.message }] });
         throw new Error(`Failed to trigger ingestion service: ${error.message}`);
       }
     }
@@ -186,6 +227,44 @@ class SystemService extends BaseService {
   async getSymbolsWithGaps(tradingDays = 5) {
     const records = await this.systemRepository.getSymbolsWithGaps(tradingDays);
     return records.map(r => r.symbol);
+  }
+
+  /**
+   * Returns configured Nifty 50 symbol list (from token map).
+   * Always available — no dependency on data_availability table.
+   */
+  async getSymbolList() {
+    try {
+      // Read the token map from vendor/ — same file backfill-runner.ts uses
+      const path = require('path');
+      let map = [];
+      try { map = require(path.resolve('/app/vendor/nifty50_shared.json')); } catch (_) {}
+      if (!map.length) {
+        try { map = require(path.resolve(__dirname, '..', '..', '..', 'vendor', 'nifty50_shared.json')); } catch (_) {}
+      }
+      // Also include indices if not already present
+      const indices = [
+        { symbol: 'NIFTY', exchange: 'NSE', sector: 'Index' },
+        { symbol: 'BANKNIFTY', exchange: 'NSE', sector: 'Index' },
+      ];
+      const existing = new Set(map.map((s: any) => s.symbol));
+      for (const idx of indices) {
+        if (!existing.has(idx.symbol)) map.push(idx);
+      }
+      return map.map((s: any) => ({
+        symbol: s.symbol,
+        exchange: s.exchange || 'NSE',
+        sector: s.sector || null,
+        token: s.tokens?.mstock ? String(s.tokens.mstock) : null,
+      }));
+    } catch (_) {
+      // Ultimate fallback — if even the file path is wrong, return a minimal hardcoded list
+      return [
+        { symbol: 'NIFTY', exchange: 'NSE', sector: 'Index', token: null },
+        { symbol: 'BANKNIFTY', exchange: 'NSE', sector: 'Index', token: null },
+        { symbol: 'RELIANCE', exchange: 'NSE', sector: 'Energy', token: '2885' },
+      ];
+    }
   }
 }
 

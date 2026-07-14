@@ -1,5 +1,5 @@
 import { useRouter } from 'next/router';
-import AppLayout from '@/components/layout/AppLayout/AppLayout';
+import AppShell from '@/components/layout/AppShell/AppShell';
 import OptionChainGrid from '@/components/organisms/OptionChainGrid';
 
 export default function OptionsPage() {
@@ -7,26 +7,19 @@ export default function OptionsPage() {
   const underlying = (router.query.u as string) || 'NIFTY';
 
   return (
-    <AppLayout>
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-text-primary">Options Analytics</h1>
-          <div className="flex gap-2">
-            {['NIFTY', 'BANKNIFTY'].map((u) => (
-              <button
-                key={u}
-                onClick={() => router.push(`/options?u=${u}`)}
-                className={`px-4 py-1.5 rounded-lg text-sm font-medium transition ${
-                  underlying === u ? 'bg-primary text-white' : 'bg-surface border border-border text-text-secondary hover:text-text-primary'
-                }`}
-              >
-                {u}
-              </button>
-            ))}
-          </div>
+    <AppShell>
+      <div className="flex items-baseline gap-3 mb-4 flex-wrap">
+        <h1 className="text-[22px] font-extrabold tracking-tight">Options Analytics</h1>
+        <div className="flex gap-2 ml-auto">
+          {['NIFTY', 'BANKNIFTY'].map((u) => (
+            <button key={u} onClick={() => router.push(`/options?u=${u}`)}
+              className={`px-3 py-1 rounded-lg text-xs font-medium transition ${underlying === u ? 'bg-primary text-white' : 'bg-surface border border-border text-text-secondary hover:text-text-primary'}`}>
+              {u}
+            </button>
+          ))}
         </div>
-        <OptionChainGrid underlying={underlying} />
       </div>
-    </AppLayout>
+      <OptionChainGrid underlying={underlying} />
+    </AppShell>
   );
 }

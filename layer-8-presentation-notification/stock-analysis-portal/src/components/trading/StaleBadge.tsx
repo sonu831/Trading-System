@@ -1,30 +1,46 @@
 // @ts-nocheck
 import React from 'react';
 import PropTypes from 'prop-types';
-import { useStaleness } from '@/hooks/useStaleness';
-import { timeAgo } from '@/utils/format';
+import { secondsSince, timeAgo } from '@/utils/format';
 
-/**
- * Dashboard rule U4: stale data must announce itself.
- *
- * fresh (<30s) quiet · warn (>=30s) amber · stale (>=2min) red + explicit warning.
- * The words carry the meaning; the colour reinforces it.
- */
+const DEFAULT_WARN_AFTER = 30;  // seconds → amber
+const DEFAULT_STALE_AFTER = 120; // seconds → red
+
 export default function StaleBadge({ timestamp, warnAfter, staleAfter, className = '' }) {
-  const { level } = useStaleness(timestamp, { warnAfter, staleAfter });
+  if (!timestamp) {
+    return (
+      <span className={`inline-flex items-center gap-1.5 text-xs text-text-tertiary ${className}`}>
+        <span aria-hidden="true" className="w-1.5 h-1.5 rounded-full bg-text-tertiary" />
+        no data
+      </span>
+    );
+  }
+
+  const seconds = secondsSince(timestamp);
+  if (seconds === null) {
+    return (
+      <span className={`inline-flex items-center gap-1.5 text-xs text-text-tertiary ${className}`}>
+        <span aria-hidden="true" className="w-1.5 h-1.5 rounded-full bg-text-tertiary" />
+        unknown
+      </span>
+    );
+  }
+
+  const warnThreshold = warnAfter ?? DEFAULT_WARN_AFTER;
+  const staleThreshold = staleAfter ?? DEFAULT_STALE_AFTER;
+
+  const level = seconds >= staleThreshold ? 'stale' : seconds >= warnThreshold ? 'warn' : 'fresh';
 
   const styles = {
     fresh: 'text-text-tertiary',
     warn: 'text-warning',
     stale: 'text-error font-semibold',
-    unknown: 'text-text-tertiary',
   };
 
   const text = {
     fresh: `updated ${timeAgo(timestamp)}`,
     warn: `updated ${timeAgo(timestamp)}`,
     stale: `STALE — ${timeAgo(timestamp)} · do not trade on this`,
-    unknown: 'no data',
   };
 
   return (
@@ -36,9 +52,7 @@ export default function StaleBadge({ timestamp, warnAfter, staleAfter, className
             ? 'bg-error animate-pulse'
             : level === 'warn'
               ? 'bg-warning'
-              : level === 'fresh'
-                ? 'bg-success'
-                : 'bg-text-tertiary'
+              : 'bg-success'
         }`}
       />
       {text[level]}

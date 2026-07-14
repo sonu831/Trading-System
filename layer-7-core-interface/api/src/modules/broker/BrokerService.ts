@@ -12,9 +12,26 @@ class BrokerService extends BaseService {
     return p.map((r: any) => ({ id: r.id, provider: r.provider, enabled: r.enabled, role: r.role, priority: r.priority, status: r.status, credentials: (r.credentials || []).map((c: any) => ({ field_name: c.field_name, is_active: c.is_active })), created_at: r.created_at, updated_at: r.updated_at }));
   }
 
-  async getProvider(id: number): Promise<any> {
-    const p = await this.brokerRepository.findProviderById(id);
-    if (!p) { const e: any = new Error('Provider not found'); e.statusCode = 404; throw e; }
+  /**
+   * Look a provider up by numeric id OR by name ("mstock").
+   *
+   * The routes are split: some key on `:id`, some on `:provider`, and the dashboard sends
+   * whichever it happens to hold. Sending a name to the `:id` route used to run
+   * `parseInt("mstock")` → NaN → straight into Prisma, which threw — surfacing as a **500**,
+   * i.e. "the server is broken", when the truth was "that isn't an id". `provider` is UNIQUE in
+   * the schema, so resolving either form is exact, not a guess.
+   */
+  async resolveProvider(idOrName: string | number): Promise<any> {
+    const raw = String(idOrName);
+    const p = /^\d+$/.test(raw)
+      ? await this.brokerRepository.findProviderById(Number(raw))
+      : await this.brokerRepository.findProviderByName(raw);
+    if (!p) { const e: any = new Error(`Provider not found: ${raw}`); e.statusCode = 404; throw e; }
+    return p;
+  }
+
+  async getProvider(idOrName: string | number): Promise<any> {
+    const p = await this.resolveProvider(idOrName);
     return { ...p, credentials: p.credentials.map((c: any) => ({ field_name: c.field_name, value: maskValue(decrypt(c.ciphertext, c.iv, c.tag)) })) };
   }
 
@@ -77,11 +94,16 @@ class BrokerService extends BaseService {
     return s?.token && s?.expiresAt > Date.now() ? s.token : null;
   }
 
-  async saveSessionToken(provider: string, token: string, ttlSeconds: number): Promise<void> {
+  async saveSessionToken(provider: string, token: string, tokenTtlSeconds: number, cacheTtlSeconds?: number): Promise<void> {
     const key = `broker:session:${provider}`;
-    await this.brokerRepository.redis.publisher.set(key, JSON.stringify({ token, expiresAt: Date.now() + ttlSeconds * 1000 }), { EX: ttlSeconds });
+    const now = Date.now();
+    const expiresAt = now + tokenTtlSeconds * 1000;
+    const redisTtl = cacheTtlSeconds ?? tokenTtlSeconds;
+    await this.brokerRepository.redis.publisher.set(key, JSON.stringify({ token, expiresAt, createdAt: now }), { EX: redisTtl });
     const crypto = require('crypto');
-    await this.brokerRepository.saveSession(provider, crypto.createHash('sha256').update(token).digest('hex'), 'CONNECTED', new Date(Date.now() + ttlSeconds * 1000));
+    await this.brokerRepository.saveSession(provider, crypto.createHash('sha256').update(token).digest('hex'), 'CONNECTED', new Date(expiresAt));
+    // Publish session change so L1 VendorManager can hot-reload the token (GAP-I1)
+    try { await this.brokerRepository.redis.publisher.publish('broker-session-changed', JSON.stringify({ provider, expiresAt })); } catch (_) {}
   }
 
   async getProviderStatus(providerName: string): Promise<Record<string, unknown>> {
@@ -89,7 +111,28 @@ class BrokerService extends BaseService {
     if (!p) return { status: 'NOT_CONFIGURED' };
     if (!p.enabled) return { status: 'DISABLED' };
     const s = await this.brokerRepository.findSession(providerName);
-    return { status: s?.status || p.status || 'DISCONNECTED', last_tested_at: p.last_tested_at, expires_at: s?.expires_at, last_error: s?.last_error };
+
+    // GAP-E3: run liveness probe when a token exists — presence ≠ liveness
+    let liveness = null;
+    if (s?.status === 'CONNECTED' && this.brokerSessionService) {
+      try {
+        liveness = await this.brokerSessionService.probeLiveness(providerName);
+      } catch (_) { /* probe best-effort */ }
+    }
+
+    const status = liveness?.ok === false
+      ? 'EXPIRED'
+      : liveness?.ok === true
+        ? 'CONNECTED'
+        : (s?.status || p.status || 'DISCONNECTED');
+
+    return {
+      status,
+      last_tested_at: p.last_tested_at,
+      last_validated_at: liveness?.lastValidatedAt || null,
+      expires_at: s?.expires_at,
+      last_error: liveness?.error || s?.last_error,
+    };
   }
 
   async deleteProvider(id: number): Promise<any> {

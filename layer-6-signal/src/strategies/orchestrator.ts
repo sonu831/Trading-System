@@ -6,6 +6,11 @@ const { MomentumBurstStrategy } = require('./plugins/momentum-burst');
 const { TrendPullbackStrategy } = require('./plugins/trend-pullback');
 const logger = require('../utils/logger');
 
+let REDIS_CHANNELS: any;
+try { REDIS_CHANNELS = require('/app/shared/constants').REDIS_CHANNELS; } catch (_) {
+  try { REDIS_CHANNELS = require('../../../shared/constants').REDIS_CHANNELS; } catch (_) {}
+}
+
 class StrategyOrchestrator {
   constructor(options = {}) {
     this.redis = options.redis;
@@ -144,7 +149,7 @@ class StrategyOrchestrator {
 
     // Publish to Redis for dashboard/bot
     if (this.redis) {
-      await this.redis.publish('signals:trade', signal);
+      await this.redis.publish(REDIS_CHANNELS?.SIGNALS || 'signals:trade', signal);
       await this.redis.pushToList('signals:history', signal);
     }
 

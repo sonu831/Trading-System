@@ -33,6 +33,14 @@ async function executionRoutes(fastify, options) {
     handler: executionController.squareOff,
   });
 
+  fastify.get('/api/v1/execution/orders', {
+    schema: {
+      description: 'Order book — placed, filled, rejected, cancelled orders from L10 journal',
+      tags: ['Execution'],
+    },
+    handler: executionController.getOrders,
+  });
+
   // ─────────────────────────────────────────────────────────────
   // STRIKE PREVIEW — what the engine would do right now
   // ─────────────────────────────────────────────────────────────

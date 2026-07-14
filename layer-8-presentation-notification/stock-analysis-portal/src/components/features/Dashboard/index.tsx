@@ -1,15 +1,13 @@
 // @ts-nocheck
 import React, { useState } from 'react';
 import PropTypes from 'prop-types';
-import MarketOverview from './components/MarketOverview';
-import TopMovers from './components/TopMovers';
-import NiftyGrid from './components/NiftyGrid';
-import SignalsFeed from './components/SignalsFeed';
-import DashboardSkeleton from './components/DashboardSkeleton';
-import { Button } from '@/components/ui';
+import MarketOverview from '@/components/features/Dashboard/components/MarketOverview';
+import TopMovers from '@/components/features/Dashboard/components/TopMovers';
+import NiftyGrid from '@/components/features/Dashboard/components/NiftyGrid';
+import SignalsFeed from '@/components/features/Dashboard/components/SignalsFeed';
+import DashboardSkeleton from '@/components/features/Dashboard/components/DashboardSkeleton';
+import TopPicksWidget from '@/components/features/Dashboard/components/TopPicksWidget';
 import { BackfillModal } from '@/components/features/Backfill';
-
-import TopPicksWidget from './components/TopPicksWidget';
 
 const DashboardView = ({ marketView, signals, loading }) => {
   const [activeTab, setActiveTab] = useState('GRID'); // GRID | SIGNALS

@@ -1,0 +1,606 @@
+<title>Stock Analysis By Gurus — Cockpit</title>
+<style>
+  :root{
+    --slate-50:#F8FAFC;--slate-100:#F1F5F9;--slate-200:#E2E8F0;--slate-400:#94A3B8;--slate-500:#64748B;
+    --slate-600:#475569;--slate-700:#334155;--slate-800:#1E293B;--slate-900:#0F172A;
+    --blue-400:#60A5FA;--blue-500:#3B82F6;--blue-600:#2563EB;--emerald-400:#34D399;--emerald-500:#10B981;
+    --violet-400:#A78BFA;--violet-500:#8B5CF6;--red-400:#F87171;--red-500:#EF4444;--amber-400:#FBBF24;--amber-500:#F59E0B;
+    /* semantic — light */
+    --color-background:var(--slate-50);--color-surface:#fff;--color-surface-hover:var(--slate-100);
+    --color-border:var(--slate-200);--color-text-primary:var(--slate-900);--color-text-secondary:var(--slate-600);
+    --color-text-tertiary:var(--slate-400);--color-primary:var(--blue-500);--color-primary-hover:var(--blue-600);
+    --color-secondary:var(--emerald-500);--color-accent:var(--violet-500);--color-success:var(--emerald-500);
+    --color-error:var(--red-500);--color-warning:var(--amber-500);--color-info:var(--blue-500);
+    --radius-lg:8px;--radius-xl:12px;--radius-full:9999px;
+    --shadow-lg:0 10px 15px -3px rgb(0 0 0/.1),0 4px 6px -4px rgb(0 0 0/.1);
+    --font-sans:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    --font-mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+  }
+  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+    --color-background:var(--slate-900);--color-surface:var(--slate-800);--color-surface-hover:var(--slate-700);
+    --color-border:var(--slate-700);--color-text-primary:var(--slate-100);--color-text-secondary:var(--slate-400);
+    --color-text-tertiary:var(--slate-500);--color-primary:var(--blue-400);--color-primary-hover:var(--blue-500);
+    --color-secondary:var(--emerald-400);--color-accent:var(--violet-400);--color-success:var(--emerald-400);
+    --color-error:var(--red-400);--color-warning:var(--amber-400);--color-info:var(--blue-400);
+  }}
+  :root[data-theme="dark"]{
+    --color-background:var(--slate-900);--color-surface:var(--slate-800);--color-surface-hover:var(--slate-700);
+    --color-border:var(--slate-700);--color-text-primary:var(--slate-100);--color-text-secondary:var(--slate-400);
+    --color-text-tertiary:var(--slate-500);--color-primary:var(--blue-400);--color-primary-hover:var(--blue-500);
+    --color-secondary:var(--emerald-400);--color-accent:var(--violet-400);--color-success:var(--emerald-400);
+    --color-error:var(--red-400);--color-warning:var(--amber-400);--color-info:var(--blue-400);
+  }
+
+  *{box-sizing:border-box}
+  body{margin:0}
+  .app{font-family:var(--font-sans);background:var(--color-background);color:var(--color-text-primary);
+    min-height:100vh;font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased;transition:background .2s,color .2s}
+  .mono{font-family:var(--font-mono);font-variant-numeric:tabular-nums}
+  .pos{color:var(--color-success)}.neg{color:var(--color-error)}
+  .muted{color:var(--color-text-secondary)}.faint{color:var(--color-text-tertiary)}
+  .em{color:var(--color-text-tertiary)}
+
+  /* ---- SafetyBar ---- */
+  .safetybar{position:sticky;top:0;z-index:40;display:flex;align-items:center;gap:18px;
+    background:var(--color-surface);border-bottom:1px solid var(--color-border);box-shadow:var(--shadow-lg);
+    padding:10px 18px}
+  .wordmark{font-weight:800;letter-spacing:-.02em;font-size:16px;white-space:nowrap;
+    background:linear-gradient(90deg,var(--color-primary),var(--color-accent));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .sb-spot{display:flex;align-items:center;gap:14px;padding-left:6px}
+  .spot{display:flex;flex-direction:column;line-height:1.15}
+  .spot .k{font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--color-text-tertiary)}
+  .spot .v{font-size:15px;font-weight:700}
+  .sb-right{margin-left:auto;display:flex;align-items:center;gap:12px}
+  .status-dot{width:8px;height:8px;border-radius:50%;background:var(--color-success);box-shadow:0 0 0 3px color-mix(in srgb,var(--color-success) 25%,transparent)}
+  .pulse{animation:pulse 2s infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.45}}
+
+  /* pills / badges */
+  .badge{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;padding:3px 9px;border-radius:var(--radius-full);border:1px solid transparent;letter-spacing:.02em}
+  .b-live{color:var(--color-success);background:color-mix(in srgb,var(--color-success) 16%,transparent);border-color:color-mix(in srgb,var(--color-success) 34%,transparent)}
+  .b-paper{color:var(--color-info);background:color-mix(in srgb,var(--color-info) 16%,transparent);border-color:color-mix(in srgb,var(--color-info) 34%,transparent)}
+  .b-warn{color:var(--color-warning);background:color-mix(in srgb,var(--color-warning) 16%,transparent);border-color:color-mix(in srgb,var(--color-warning) 34%,transparent)}
+  .b-err{color:var(--color-error);background:color-mix(in srgb,var(--color-error) 16%,transparent);border-color:color-mix(in srgb,var(--color-error) 34%,transparent)}
+  .b-ok{color:var(--color-success);background:color-mix(in srgb,var(--color-success) 16%,transparent);border-color:color-mix(in srgb,var(--color-success) 34%,transparent)}
+  .b-neutral{color:var(--color-text-secondary);background:var(--color-surface-hover);border-color:var(--color-border)}
+  .b-accent{color:var(--color-accent);background:color-mix(in srgb,var(--color-accent) 16%,transparent);border-color:color-mix(in srgb,var(--color-accent) 34%,transparent)}
+
+  .btn{font:inherit;font-weight:600;font-size:13px;cursor:pointer;border-radius:var(--radius-lg);padding:7px 13px;
+    border:1px solid var(--color-border);background:var(--color-surface);color:var(--color-text-primary);transition:.15s;display:inline-flex;align-items:center;gap:6px}
+  .btn:hover{border-color:var(--color-primary)}
+  .btn-primary{background:linear-gradient(135deg,var(--color-primary),var(--color-accent));color:#fff;border:none}
+  .btn-primary:hover{transform:translateY(-1px)}
+  .btn-kill{background:var(--color-error);color:#fff;border:none;font-weight:800;letter-spacing:.04em}
+  .btn:focus-visible,.nav a:focus-visible{outline:2px solid var(--color-primary);outline-offset:2px}
+
+  /* ---- layout ---- */
+  .shell{display:grid;grid-template-columns:236px 1fr;min-height:calc(100vh - 53px)}
+  .sidebar{border-right:1px solid var(--color-border);background:var(--color-surface);padding:14px 10px;overflow-y:auto}
+  .nav-group{margin-bottom:16px}
+  .nav-group h4{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--color-text-tertiary);margin:0 0 6px 10px;font-weight:700}
+  .nav a{display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:var(--radius-lg);color:var(--color-text-secondary);text-decoration:none;font-weight:500;cursor:pointer;font-size:13.5px}
+  .nav a .ic{width:16px;text-align:center;opacity:.8}
+  .nav a:hover{background:var(--color-surface-hover);color:var(--color-text-primary)}
+  .nav a.active{background:color-mix(in srgb,var(--color-primary) 12%,transparent);color:var(--color-primary);font-weight:700}
+  .nav a .tag{margin-left:auto;font-size:9px;font-weight:800;color:var(--color-accent);letter-spacing:.05em}
+
+  .main{padding:22px 26px;overflow-x:hidden}
+  .screen{display:none;animation:fade .2s ease}
+  .screen.active{display:block}
+  @keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+  .page-head{display:flex;align-items:baseline;gap:12px;margin-bottom:16px;flex-wrap:wrap}
+  h1{font-size:22px;letter-spacing:-.02em;margin:0;font-weight:800}
+  h1+.muted{font-size:13px}
+  h2{font-size:14px;font-weight:700;margin:0 0 12px;letter-spacing:-.01em}
+
+  /* ---- cards / grid ---- */
+  .card{background:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--radius-xl);padding:16px}
+  .card.hoverable{transition:.2s;cursor:pointer}
+  .card.hoverable:hover{transform:translateY(-2px);box-shadow:var(--shadow-lg);border-color:var(--color-primary)}
+  .grid{display:grid;gap:14px}
+  .g2{grid-template-columns:repeat(2,1fr)}.g3{grid-template-columns:repeat(3,1fr)}.g4{grid-template-columns:repeat(4,1fr)}
+  .row{display:flex;gap:14px;flex-wrap:wrap}
+  .card-h{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+  .card-h h2{margin:0}
+
+  /* StatTile */
+  .stat .k{font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--color-text-tertiary)}
+  .stat .v{font-size:24px;font-weight:800;letter-spacing:-.02em;margin-top:2px}
+  .stat .d{font-size:12px;font-weight:600;margin-top:3px;display:flex;align-items:center;gap:5px}
+
+  /* meters */
+  .meter{height:8px;border-radius:var(--radius-full);background:var(--color-surface-hover);overflow:hidden}
+  .meter>span{display:block;height:100%;border-radius:var(--radius-full)}
+  .adbar{height:26px;border-radius:var(--radius-lg);overflow:hidden;display:flex;font-size:11px;font-weight:700;color:#fff}
+  .adbar .up{background:var(--color-success);display:flex;align-items:center;padding:0 8px}
+  .adbar .dn{background:var(--color-error);display:flex;align-items:center;justify-content:flex-end;padding:0 8px}
+
+  table{border-collapse:collapse;width:100%}
+  .table-wrap{overflow-x:auto;border:1px solid var(--color-border);border-radius:var(--radius-xl)}
+  .table-wrap table{min-width:640px}
+  th,td{text-align:left;padding:10px 13px;border-bottom:1px solid var(--color-border);font-size:13px;white-space:nowrap}
+  th{font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--color-text-tertiary);font-weight:700;background:var(--color-surface-hover)}
+  tr:last-child td{border-bottom:none}
+  td.num,th.num{text-align:right;font-family:var(--font-mono);font-variant-numeric:tabular-nums}
+
+  .kv{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--color-border);font-size:13px}
+  .kv:last-child{border-bottom:none}
+  .kv .k{color:var(--color-text-secondary)}
+  .kv .v{font-weight:600;font-family:var(--font-mono)}
+
+  .spark{width:100%;height:38px;display:block}
+  .contrib{display:flex;align-items:center;gap:10px;margin:9px 0;font-size:12.5px}
+  .contrib .lbl{width:120px;color:var(--color-text-secondary);flex:none}
+  .contrib .track{flex:1;height:16px;background:var(--color-surface-hover);border-radius:var(--radius-lg);position:relative;overflow:hidden}
+  .contrib .fill{position:absolute;top:0;height:100%;border-radius:var(--radius-lg)}
+  .contrib .val{width:42px;text-align:right;font-family:var(--font-mono);flex:none;font-weight:600}
+
+  .tf{display:flex;gap:8px;flex-wrap:wrap}
+  .tf .cell{flex:1;min-width:70px;text-align:center;border:1px solid var(--color-border);border-radius:var(--radius-lg);padding:10px 6px}
+  .tf .cell .t{font-size:11px;color:var(--color-text-tertiary);text-transform:uppercase;letter-spacing:.05em}
+  .tf .cell .a{font-size:18px;font-weight:800;margin-top:3px}
+
+  .toggle{display:inline-flex;border:1px solid var(--color-border);border-radius:var(--radius-lg);padding:3px;gap:3px;background:var(--color-surface)}
+  .toggle button{font:inherit;font-size:12px;font-weight:600;border:none;background:none;color:var(--color-text-secondary);padding:5px 12px;border-radius:6px;cursor:pointer}
+  .toggle button.on{background:var(--color-primary);color:#fff}
+
+  .signal{display:flex;gap:12px;align-items:flex-start;padding:13px;border:1px solid var(--color-border);border-radius:var(--radius-xl);background:var(--color-surface)}
+  .signal .dir{font-weight:800;font-size:13px;padding:6px 10px;border-radius:var(--radius-lg)}
+  .reasons{display:flex;gap:6px;flex-wrap:wrap;margin-top:7px}
+  .reasons span{font-size:11px;color:var(--color-text-secondary);background:var(--color-surface-hover);border-radius:var(--radius-full);padding:2px 8px}
+
+  .gauge-wrap{display:flex;align-items:center;gap:22px;flex-wrap:wrap}
+  .gauge{position:relative;width:150px;height:150px;flex:none}
+  .gauge .lab{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+  .gauge .big{font-size:30px;font-weight:800;letter-spacing:-.02em}
+  .gauge .small{font-size:11px;color:var(--color-text-tertiary);text-transform:uppercase;letter-spacing:.06em}
+
+  .list-item{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--color-border)}
+  .list-item:last-child{border-bottom:none}
+  .sector{display:flex;align-items:center;justify-content:space-between;padding:9px 11px;border:1px solid var(--color-border);border-radius:var(--radius-lg);font-size:13px;font-weight:600}
+  .alert{display:flex;gap:11px;align-items:flex-start;padding:12px 0;border-bottom:1px solid var(--color-border)}
+  .alert:last-child{border-bottom:none}
+  .alert .sev{width:8px;height:8px;border-radius:50%;margin-top:6px;flex:none}
+  .note{font-size:12px;color:var(--color-text-tertiary);margin-top:10px}
+  .banner{border:1px solid color-mix(in srgb,var(--color-warning) 40%,transparent);background:color-mix(in srgb,var(--color-warning) 12%,transparent);border-radius:var(--radius-xl);padding:12px 14px;font-size:13px;display:flex;gap:9px;align-items:center;color:var(--color-text-primary)}
+  .empty{text-align:center;color:var(--color-text-tertiary);padding:34px 0;font-size:13px}
+  .footer-sig{margin-top:26px;padding-top:14px;border-top:1px solid var(--color-border);font-size:11px;color:var(--color-text-tertiary)}
+  @media (max-width:900px){.shell{grid-template-columns:1fr}.sidebar{display:none}.g4{grid-template-columns:repeat(2,1fr)}.g3{grid-template-columns:1fr}}
+  @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+
+<div class="app" id="app">
+  <!-- SAFETY BAR -->
+  <div class="safetybar">
+    <span class="wordmark">Stock Analysis By Gurus</span>
+    <div class="sb-spot">
+      <div class="spot"><span class="k">NIFTY</span><span class="v mono">24,850.30 <span class="pos" style="font-size:12px">+112.45</span></span></div>
+      <div class="spot"><span class="k">BANKNIFTY</span><span class="v mono">54,210.80 <span class="neg" style="font-size:12px">−85.20</span></span></div>
+      <div class="spot"><span class="k">India VIX</span><span class="v mono">13.24</span></div>
+    </div>
+    <div class="sb-right">
+      <span class="badge b-paper" title="Execution mode">🧪 PAPER</span>
+      <span class="mono faint" style="font-size:12px" id="clock">09:41:07 IST</span>
+      <span class="status-dot pulse" title="System online"></span>
+      <span class="faint" style="font-size:12px">ONLINE</span>
+      <button class="btn" id="themeBtn" title="Toggle theme">◐</button>
+      <button class="btn btn-kill" id="killBtn">KILL</button>
+    </div>
+  </div>
+
+  <div class="shell">
+    <!-- SIDEBAR -->
+    <nav class="sidebar nav">
+      <div class="nav-group"><h4>Trade</h4>
+        <a data-s="scalp"><span class="ic">⚡</span>Scalp Cockpit</a>
+        <a data-s="positions"><span class="ic">📈</span>Positions & P&amp;L</a>
+      </div>
+      <div class="nav-group"><h4>Analyze</h4>
+        <a data-s="overview" class="active"><span class="ic">🏠</span>Overview</a>
+        <a data-s="internals"><span class="ic">📊</span>Market Internals<span class="tag">NEW</span></a>
+        <a data-s="regime"><span class="ic">🌡️</span>Regime<span class="tag">NEW</span></a>
+        <a data-s="ai"><span class="ic">🧠</span>Predictions<span class="tag">NEW</span></a>
+        <a data-s="signals"><span class="ic">🎯</span>Signals<span class="tag">NEW</span></a>
+        <a data-s="backtest"><span class="ic">🧪</span>Backtest Lab</a>
+      </div>
+      <div class="nav-group"><h4>Configure</h4>
+        <a data-s="strategies"><span class="ic">🧩</span>Strategies</a>
+        <a data-s="risk"><span class="ic">🛡️</span>Risk</a>
+        <a data-s="brokers"><span class="ic">🔑</span>Brokers</a>
+        <a data-s="settings"><span class="ic">⚙️</span>Settings</a>
+      </div>
+      <div class="nav-group"><h4>Operate</h4>
+        <a data-s="alerts"><span class="ic">🔔</span>Alerts<span class="tag">NEW</span></a>
+        <a data-s="operate"><span class="ic">🩺</span>Backfill · Swarm · System</a>
+      </div>
+    </nav>
+
+    <!-- MAIN -->
+    <main class="main">
+
+      <!-- OVERVIEW -->
+      <section class="screen active" data-screen="overview">
+        <div class="page-head"><h1>Overview</h1><span class="muted">Morning glance · pre-market internals confirming</span></div>
+        <div class="grid g4" style="margin-bottom:14px">
+          <div class="card stat"><div class="k">NIFTY spot</div><div class="v mono">24,850.30</div><div class="d pos">▲ +0.45% · +112.45</div></div>
+          <div class="card stat"><div class="k">BANKNIFTY spot</div><div class="v mono">54,210.80</div><div class="d neg">▼ −0.16% · −85.20</div></div>
+          <div class="card stat"><div class="k">India VIX</div><div class="v mono">13.24</div><div class="d muted">Normal band · scalp-friendly</div></div>
+          <div class="card stat"><div class="k">Day P&amp;L</div><div class="v mono pos">+₹8,450</div><div class="d muted">of −₹2,500 loss limit · 3 trades</div></div>
+        </div>
+        <div class="grid g3">
+          <div class="card" style="grid-column:span 2">
+            <div class="card-h"><h2>Market breadth — advance / decline</h2><span class="badge b-ok">CONFIRMING</span></div>
+            <div class="adbar"><div class="up" style="width:76%">38 advancing · 76%</div><div class="dn" style="width:24%">12</div></div>
+            <div class="row" style="margin-top:12px;gap:22px">
+              <div><div class="faint" style="font-size:11px">% above VWAP</div><div class="mono" style="font-size:17px;font-weight:700">74%</div></div>
+              <div><div class="faint" style="font-size:11px">% above EMA20</div><div class="mono" style="font-size:17px;font-weight:700">68%</div></div>
+              <div><div class="faint" style="font-size:11px">A/D ratio</div><div class="mono" style="font-size:17px;font-weight:700">3.17</div></div>
+              <div><div class="faint" style="font-size:11px">Thrust</div><div class="mono pos" style="font-size:17px;font-weight:700">▲ rising</div></div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-h"><h2>Regime</h2><span class="badge b-ok">TREND_UP</span></div>
+            <div class="kv"><span class="k">Strength</span><span class="v">0.72</span></div>
+            <div class="kv"><span class="k">Volatility</span><span class="v">NORMAL</span></div>
+            <div class="kv"><span class="k">Phase</span><span class="v">TRENDING</span></div>
+            <div class="kv"><span class="k">Tradeable</span><span class="v pos">T1 · T2 · T3</span></div>
+          </div>
+        </div>
+        <div class="grid g2" style="margin-top:14px">
+          <div class="card">
+            <div class="card-h"><h2>Top movers</h2><span class="faint" style="font-size:11px">by index-points contribution</span></div>
+            <div class="list-item"><span>HDFC Bank</span><span class="mono pos">+18.2 pts</span></div>
+            <div class="list-item"><span>ICICI Bank</span><span class="mono pos">+12.4 pts</span></div>
+            <div class="list-item"><span>Reliance</span><span class="mono pos">+9.1 pts</span></div>
+            <div class="list-item"><span>Infosys</span><span class="mono neg">−4.6 pts</span></div>
+          </div>
+          <div class="card">
+            <div class="card-h"><h2>Latest signals</h2><a class="badge b-neutral" data-s="signals" style="cursor:pointer;text-decoration:none">View all →</a></div>
+            <div class="list-item"><span><span class="badge b-ok">CE</span> momentum-burst · <span class="faint">T1</span></span><span class="faint mono">09:38</span></div>
+            <div class="list-item"><span><span class="badge b-err">PE</span> trend-pullback · <span class="faint">T2</span></span><span class="faint mono">09:22</span></div>
+            <div class="list-item"><span><span class="badge b-neutral">—</span> no-trade · chop window</span><span class="faint mono">09:15</span></div>
+          </div>
+        </div>
+        <div class="footer-sig">Designed by Yogendra and Utkarsh. Unauthorized reproduction of these ideas will lead to legal action.</div>
+      </section>
+
+      <!-- SCALP -->
+      <section class="screen" data-screen="scalp">
+        <div class="page-head"><h1>Scalp Cockpit</h1><span class="muted">NIFTY · current weekly · ITM-1 default</span><span class="badge b-ok" style="margin-left:auto">ENGINE ONLINE</span></div>
+        <div class="grid" style="grid-template-columns:1.6fr 1.3fr 1fr">
+          <div class="card">
+            <div class="card-h"><h2>NIFTY · 5m</h2><span class="faint mono" style="font-size:12px">VWAP 24,812 · EMA21 24,790</span></div>
+            <svg class="spark" viewBox="0 0 320 120" preserveAspectRatio="none" style="height:200px" aria-hidden="true">
+              <defs><linearGradient id="pg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--color-success)" stop-opacity=".28"/><stop offset="1" stop-color="var(--color-success)" stop-opacity="0"/></linearGradient></defs>
+              <polyline fill="none" stroke="var(--color-border)" stroke-width="1" points="0,80 320,80"/>
+              <polygon fill="url(#pg)" points="0,96 30,90 60,92 90,78 120,82 150,66 180,70 210,52 240,58 270,40 300,44 320,34 320,120 0,120"/>
+              <polyline fill="none" stroke="var(--color-success)" stroke-width="2" points="0,96 30,90 60,92 90,78 120,82 150,66 180,70 210,52 240,58 270,40 300,44 320,34"/>
+              <circle cx="320" cy="34" r="3.5" fill="var(--color-success)"/>
+            </svg>
+            <div class="banner" style="margin-top:12px;border-color:color-mix(in srgb,var(--color-success) 40%,transparent);background:color-mix(in srgb,var(--color-success) 10%,transparent)">🚀 Momentum-burst trigger armed — breadth confirming, not extended.</div>
+          </div>
+          <div class="card">
+            <div class="card-h"><h2>Option chain — ATM ±3</h2><span class="faint" style="font-size:11px">24,850 CE / PE</span></div>
+            <div class="table-wrap" style="border:none">
+              <table style="min-width:auto">
+                <thead><tr><th class="num">CE LTP</th><th class="num">OI</th><th>Strike</th><th class="num">OI</th><th class="num">PE LTP</th></tr></thead>
+                <tbody>
+                  <tr><td class="num">210.4</td><td class="num">1.2L</td><td class="mono">24,750</td><td class="num">0.9L</td><td class="num">64.2</td></tr>
+                  <tr style="background:color-mix(in srgb,var(--color-primary) 8%,transparent)"><td class="num pos">168.3</td><td class="num">2.4L</td><td class="mono" style="font-weight:800">24,850</td><td class="num">2.1L</td><td class="num">92.8</td></tr>
+                  <tr><td class="num">96.7</td><td class="num">3.1L</td><td class="mono">24,950</td><td class="num">1.4L</td><td class="num">148.5</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-h"><h2>Engine Intent</h2><span class="badge b-accent">PREVIEW</span></div>
+            <div class="kv"><span class="k">Buy</span><span class="v">24,850 CE</span></div>
+            <div class="kv"><span class="k">Premium</span><span class="v">₹168.30</span></div>
+            <div class="kv"><span class="k">Delta</span><span class="v">0.58</span></div>
+            <div class="kv"><span class="k">Stop</span><span class="v neg">−18% · ₹138</span></div>
+            <div class="kv"><span class="k">Target</span><span class="v pos">+30% · ₹219</span></div>
+            <button class="btn btn-primary" style="width:100%;justify-content:center;margin-top:12px">Arm entry (PAPER)</button>
+            <div class="row" style="margin-top:12px;gap:8px">
+              <span class="badge b-ok">UP 64%</span><span class="badge b-ok">Breadth ✓</span><span class="badge b-ok">T1 open</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- PREDICTIONS / AI -->
+      <section class="screen" data-screen="ai">
+        <div class="page-head"><h1>Predictions</h1><span class="muted">Breadth-based predictive model · confluence input, not a trigger</span>
+          <div class="toggle" style="margin-left:auto"><button class="on" id="hz-scalp">Scalp 1–5m</button><button id="hz-pos">Positional</button></div></div>
+        <div class="grid" style="grid-template-columns:1fr 1.3fr">
+          <div class="card">
+            <div class="card-h"><h2>Next NIFTY move</h2><span class="badge b-paper" id="hzlabel">SCALP · 1–5m</span></div>
+            <div class="gauge-wrap">
+              <div class="gauge">
+                <svg viewBox="0 0 120 120" width="150" height="150">
+                  <circle cx="60" cy="60" r="50" fill="none" stroke="var(--color-surface-hover)" stroke-width="12"/>
+                  <circle id="gaugeArc" cx="60" cy="60" r="50" fill="none" stroke="var(--color-success)" stroke-width="12" stroke-linecap="round"
+                    stroke-dasharray="314" stroke-dashoffset="113" transform="rotate(-90 60 60)"/>
+                </svg>
+                <div class="lab"><span class="big pos" id="gaugePct">64%</span><span class="small">prob. UP</span></div>
+              </div>
+              <div>
+                <div class="kv"><span class="k">Direction</span><span class="v pos">UP</span></div>
+                <div class="kv"><span class="k">Expected move</span><span class="v">+0.4% · ~28 pts</span></div>
+                <div class="kv"><span class="k">Confidence</span><span class="v">0.70</span></div>
+                <div class="kv"><span class="k">Model</span><span class="v faint" style="font-size:11px">lstm-breadth v0.3</span></div>
+                <div class="kv"><span class="k">Updated</span><span class="v faint" style="font-size:11px">4s ago</span></div>
+              </div>
+            </div>
+            <div class="note">A model score never fires a trade alone — it raises or lowers conviction &amp; sizing on top of the breadth-confirmed momentum trigger.</div>
+          </div>
+          <div class="card">
+            <div class="card-h"><h2>Why — top feature contributions</h2><span class="faint" style="font-size:11px">signed push toward the call</span></div>
+            <div class="contrib"><span class="lbl">Breadth (A/D, %VWAP)</span><div class="track"><span class="fill" style="left:50%;width:32%;background:var(--color-success)"></span></div><span class="val pos">+0.8</span></div>
+            <div class="contrib"><span class="lbl">Sector momentum</span><div class="track"><span class="fill" style="left:50%;width:24%;background:var(--color-success)"></span></div><span class="val pos">+0.6</span></div>
+            <div class="contrib"><span class="lbl">Heavyweight push</span><div class="track"><span class="fill" style="left:50%;width:20%;background:var(--color-success)"></span></div><span class="val pos">+0.5</span></div>
+            <div class="contrib"><span class="lbl">PCR / ΔOI</span><div class="track"><span class="fill" style="right:50%;width:8%;background:var(--color-error)"></span></div><span class="val neg">−0.2</span></div>
+            <div class="contrib"><span class="lbl">India VIX</span><div class="track"><span class="fill" style="left:50%;width:4%;background:var(--color-success)"></span></div><span class="val pos">+0.1</span></div>
+            <div class="banner" style="margin-top:14px">ℹ️ On stale or missing features the model <b>abstains</b> — it shows <span class="em">—</span>, never a fabricated 0.</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- MARKET INTERNALS -->
+      <section class="screen" data-screen="internals">
+        <div class="page-head"><h1>Market Internals</h1><span class="muted">Derive the index from its 50 constituents — is this move real or fake?</span></div>
+        <div class="grid g2">
+          <div class="card">
+            <div class="card-h"><h2>Advance / decline</h2><span class="badge b-ok">BROAD-BASED</span></div>
+            <div class="adbar"><div class="up" style="width:76%">38 up</div><div class="dn" style="width:24%">12 dn</div></div>
+            <div class="row" style="margin-top:14px;gap:26px">
+              <div><div class="faint" style="font-size:11px">% above VWAP</div><div class="mono" style="font-size:20px;font-weight:800">74%</div></div>
+              <div><div class="faint" style="font-size:11px">% above EMA20</div><div class="mono" style="font-size:20px;font-weight:800">68%</div></div>
+              <div><div class="faint" style="font-size:11px">Breadth thrust</div>
+                <svg class="spark" viewBox="0 0 120 34" preserveAspectRatio="none" style="width:120px"><polyline fill="none" stroke="var(--color-success)" stroke-width="2" points="0,28 20,26 40,22 60,24 80,16 100,12 120,6"/></svg>
+              </div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-h"><h2>Sector rotation</h2><span class="faint" style="font-size:11px">top-weighted first</span></div>
+            <div class="grid" style="gap:8px">
+              <div class="sector"><span>Financials</span><span class="badge b-ok">STRONG_UP</span></div>
+              <div class="sector"><span>IT</span><span class="badge b-ok">UP</span></div>
+              <div class="sector"><span>Energy</span><span class="badge b-ok">UP</span></div>
+              <div class="sector"><span>FMCG</span><span class="badge b-neutral">FLAT</span></div>
+              <div class="sector"><span>Auto</span><span class="badge b-ok">UP</span></div>
+              <div class="sector"><span>Metal</span><span class="badge b-err">DOWN</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="card" style="margin-top:14px">
+          <div class="card-h"><h2>Heavyweight contribution</h2><span class="faint" style="font-size:11px">weight × %move → NIFTY points</span></div>
+          <div class="table-wrap" style="border:none">
+            <table style="min-width:auto"><thead><tr><th>Stock</th><th class="num">Weight</th><th class="num">%move</th><th class="num">Points</th><th>Direction</th></tr></thead>
+              <tbody>
+                <tr><td>HDFC Bank</td><td class="num">13.1%</td><td class="num pos">+1.42%</td><td class="num pos">+18.2</td><td><span class="badge b-ok">↑ leading</span></td></tr>
+                <tr><td>ICICI Bank</td><td class="num">8.4%</td><td class="num pos">+1.10%</td><td class="num pos">+12.4</td><td><span class="badge b-ok">↑</span></td></tr>
+                <tr><td>Reliance</td><td class="num">9.7%</td><td class="num pos">+0.62%</td><td class="num pos">+9.1</td><td><span class="badge b-ok">↑</span></td></tr>
+                <tr><td>Infosys</td><td class="num">5.6%</td><td class="num neg">−0.58%</td><td class="num neg">−4.6</td><td><span class="badge b-err">↓ lagging</span></td></tr>
+                <tr><td>TCS</td><td class="num">4.1%</td><td class="num">—</td><td class="num em">—</td><td><span class="badge b-neutral">stale feed</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- REGIME -->
+      <section class="screen" data-screen="regime">
+        <div class="page-head"><h1>Regime</h1><span class="muted">Multi-timeframe market state — gates which tiers may trade</span></div>
+        <div class="grid g4" style="margin-bottom:14px">
+          <div class="card stat"><div class="k">Trend</div><div class="v pos" style="font-size:20px">TREND_UP</div><div class="d muted">strength 0.72</div></div>
+          <div class="card stat"><div class="k">Volatility</div><div class="v" style="font-size:20px">NORMAL</div><div class="d muted">VIX 13.2 · ATR 55th pct</div></div>
+          <div class="card stat"><div class="k">Phase</div><div class="v" style="font-size:20px">TRENDING</div><div class="d muted">post-breakout</div></div>
+          <div class="card stat"><div class="k">Confidence</div><div class="v mono" style="font-size:20px">0.78</div><div class="d muted">breadth-confirmed</div></div>
+        </div>
+        <div class="grid g2">
+          <div class="card">
+            <div class="card-h"><h2>Timeframe alignment</h2><span class="badge b-ok">ALIGNED</span></div>
+            <div class="tf">
+              <div class="cell"><div class="t">5m</div><div class="a pos">↑</div></div>
+              <div class="cell"><div class="t">15m</div><div class="a pos">↑</div></div>
+              <div class="cell"><div class="t">1h</div><div class="a pos">↑</div></div>
+              <div class="cell"><div class="t">Daily</div><div class="a pos">↑</div></div>
+            </div>
+            <div class="note">All four timeframes agree → the positional window (T3) is open.</div>
+          </div>
+          <div class="card">
+            <div class="card-h"><h2>Tradeable tiers now</h2></div>
+            <div class="list-item"><span><b>T1 · Scalp</b> — 1–5 min bursts</span><span class="badge b-ok">ENABLED</span></div>
+            <div class="list-item"><span><b>T2 · Intraday</b> — 10–30 min swings</span><span class="badge b-ok">ENABLED</span></div>
+            <div class="list-item"><span><b>T3 · Positional</b> — hours–days</span><span class="badge b-ok">ENABLED</span></div>
+            <div class="note">In an ambiguous / high-VIX chop regime, T3 and T2 would read <span class="badge b-err" style="font-size:10px">STAND ASIDE</span>.</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SIGNALS -->
+      <section class="screen" data-screen="signals">
+        <div class="page-head"><h1>Signals</h1><span class="muted">trade-signals feed — tagged tier, strategy &amp; reasons</span>
+          <div class="toggle" style="margin-left:auto"><button class="on">All</button><button>Scalp</button><button>Positional</button></div></div>
+        <div class="grid" style="gap:12px">
+          <div class="signal"><span class="dir" style="background:color-mix(in srgb,var(--color-success) 16%,transparent);color:var(--color-success)">BUY CE</span>
+            <div style="flex:1"><b>momentum-burst</b> · <span class="faint">T1 scalp</span> · strike hint <span class="mono">24,850 CE</span>
+              <div class="reasons"><span>regime TREND_UP</span><span>A/D 3.17</span><span>burst 1.6× ATR</span><span>pred UP 64%</span><span>not extended</span></div></div>
+            <span class="faint mono" style="font-size:12px">09:38:14</span></div>
+          <div class="signal"><span class="dir" style="background:color-mix(in srgb,var(--color-error) 16%,transparent);color:var(--color-error)">BUY PE</span>
+            <div style="flex:1"><b>trend-pullback</b> · <span class="faint">T2 intraday</span> · strike hint <span class="mono">54,000 PE</span>
+              <div class="reasons"><span>BANKNIFTY lagging</span><span>pullback to VWAP</span><span>pred DOWN 58%</span></div></div>
+            <span class="faint mono" style="font-size:12px">09:22:41</span></div>
+          <div class="signal" style="opacity:.7"><span class="dir b-neutral" style="background:var(--color-surface-hover);color:var(--color-text-secondary)">NO TRADE</span>
+            <div style="flex:1"><b>chop guard</b> · <span class="faint">regime RANGE at open</span>
+              <div class="reasons"><span>A/D 1.1</span><span>VIX spike</span><span>first 5 min skip</span></div></div>
+            <span class="faint mono" style="font-size:12px">09:15:02</span></div>
+        </div>
+      </section>
+
+      <!-- POSITIONS -->
+      <section class="screen" data-screen="positions">
+        <div class="page-head"><h1>Positions &amp; P&amp;L</h1><span class="muted">2 open · long premium only</span></div>
+        <div class="grid" style="grid-template-columns:1.5fr 1fr">
+          <div class="table-wrap">
+            <table><thead><tr><th>Instrument</th><th>Tier</th><th class="num">Entry</th><th class="num">LTP</th><th class="num">P&amp;L</th><th>Stop</th></tr></thead>
+              <tbody>
+                <tr><td class="mono">NIFTY 24850 CE</td><td><span class="badge b-paper">T1</span></td><td class="num">142.50</td><td class="num">168.30</td><td class="num pos">+18.1%</td><td><span class="badge b-ok">SL ₹138</span></td></tr>
+                <tr><td class="mono">BANKNIFTY 54000 PE</td><td><span class="badge b-accent">T3</span></td><td class="num">210.00</td><td class="num">232.40</td><td class="num pos">+10.7%</td><td><span class="badge b-err">NO STOP</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="card">
+            <div class="card-h"><h2>Daily risk envelope</h2><span class="badge b-warn">70% · APPROACHING</span></div>
+            <div class="faint" style="font-size:11px;margin-bottom:5px">Loss used · −₹1,750 of −₹2,500</div>
+            <div class="meter"><span style="width:70%;background:var(--color-warning)"></span></div>
+            <div class="faint" style="font-size:11px;margin:14px 0 5px">Trades · 3 of 5</div>
+            <div class="meter"><span style="width:60%;background:var(--color-primary)"></span></div>
+            <div class="kv" style="margin-top:14px"><span class="k">Realized</span><span class="v pos">+₹10,200</span></div>
+            <div class="kv"><span class="k">Unrealized</span><span class="v pos">+₹1,750</span></div>
+            <div class="kv"><span class="k">Net day</span><span class="v pos">+₹8,450</span></div>
+          </div>
+        </div>
+        <div class="banner" style="margin-top:14px;border-color:color-mix(in srgb,var(--color-error) 40%,transparent);background:color-mix(in srgb,var(--color-error) 10%,transparent)">⚠️ <b>NO STOP</b> on BANKNIFTY 54000 PE — a resting SL-M failed to place. Fix before it runs unprotected.</div>
+      </section>
+
+      <!-- STRATEGIES -->
+      <section class="screen" data-screen="strategies">
+        <div class="page-head"><h1>Strategies</h1><span class="muted">Pluggable · enable / disable / tune without redeploy</span></div>
+        <div class="grid g2">
+          <div class="card hoverable"><div class="card-h"><h2>momentum-burst</h2><span class="badge b-ok">LIVE</span></div>
+            <div class="faint" style="font-size:12px">T1 · affinity TREND_UP, TREND_DOWN</div>
+            <div class="row" style="margin:10px 0;gap:18px"><div><div class="faint" style="font-size:11px">Win rate</div><div class="mono" style="font-weight:700">47%</div></div><div><div class="faint" style="font-size:11px">Expectancy</div><div class="mono pos" style="font-weight:700">+0.34R</div></div><div><div class="faint" style="font-size:11px">Profit factor</div><div class="mono" style="font-weight:700">1.42</div></div></div>
+            <svg class="spark" viewBox="0 0 300 40" preserveAspectRatio="none"><polyline fill="none" stroke="var(--color-success)" stroke-width="2" points="0,34 40,30 80,32 120,24 160,20 200,22 240,12 300,6"/></svg>
+          </div>
+          <div class="card hoverable"><div class="card-h"><h2>trend-pullback</h2><span class="badge b-warn">SHADOW</span></div>
+            <div class="faint" style="font-size:12px">T2 · affinity TREND_UP, TREND_DOWN</div>
+            <div class="row" style="margin:10px 0;gap:18px"><div><div class="faint" style="font-size:11px">Win rate</div><div class="mono" style="font-weight:700">51%</div></div><div><div class="faint" style="font-size:11px">Expectancy</div><div class="mono pos" style="font-weight:700">+0.21R</div></div><div><div class="faint" style="font-size:11px">Profit factor</div><div class="mono" style="font-weight:700">1.28</div></div></div>
+            <svg class="spark" viewBox="0 0 300 40" preserveAspectRatio="none"><polyline fill="none" stroke="var(--color-warning)" stroke-width="2" points="0,30 40,28 80,30 120,26 160,28 200,20 240,22 300,16"/></svg>
+          </div>
+        </div>
+      </section>
+
+      <!-- BACKTEST -->
+      <section class="screen" data-screen="backtest">
+        <div class="page-head"><h1>Backtest Lab</h1><span class="muted">Validate the edge before it touches live sizing</span></div>
+        <div class="grid" style="grid-template-columns:1fr 1.6fr">
+          <div class="card"><h2>Run</h2>
+            <div class="kv"><span class="k">Strategy</span><span class="v">momentum-burst</span></div>
+            <div class="kv"><span class="k">Range</span><span class="v">2026-04 → 07</span></div>
+            <div class="kv"><span class="k">Capital</span><span class="v">₹1,00,000</span></div>
+            <div class="kv"><span class="k">Regime bucket</span><span class="v">TREND_UP</span></div>
+            <button class="btn btn-primary" style="width:100%;justify-content:center;margin-top:12px">Run backtest</button>
+          </div>
+          <div class="card"><div class="card-h"><h2>Result</h2><span class="badge b-ok">PASS · pf 1.42</span></div>
+            <svg class="spark" viewBox="0 0 320 90" preserveAspectRatio="none" style="height:120px"><defs><linearGradient id="eq" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--color-primary)" stop-opacity=".25"/><stop offset="1" stop-color="var(--color-primary)" stop-opacity="0"/></linearGradient></defs><polygon fill="url(#eq)" points="0,80 60,72 120,74 180,54 240,44 300,26 320,20 320,90 0,90"/><polyline fill="none" stroke="var(--color-primary)" stroke-width="2" points="0,80 60,72 120,74 180,54 240,44 300,26 320,20"/></svg>
+            <div class="row" style="margin-top:10px;gap:22px"><div><div class="faint" style="font-size:11px">Expectancy</div><div class="mono pos" style="font-weight:700">+0.34R</div></div><div><div class="faint" style="font-size:11px">Trades</div><div class="mono" style="font-weight:700">142</div></div><div><div class="faint" style="font-size:11px">Max DD</div><div class="mono neg" style="font-weight:700">−8.2%</div></div><div><div class="faint" style="font-size:11px">Promotion</div><span class="badge b-warn">HUMAN-GATED</span></div></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- RISK -->
+      <section class="screen" data-screen="risk">
+        <div class="page-head"><h1>Risk</h1><span class="muted">Envelope · circuit breakers · sizing</span></div>
+        <div class="grid g3">
+          <div class="card"><h2>Daily loss limit</h2><div class="mono" style="font-size:22px;font-weight:800">−₹2,500</div><div class="meter" style="margin-top:8px"><span style="width:70%;background:var(--color-warning)"></span></div><div class="note">Trips the kill switch on breach.</div></div>
+          <div class="card"><h2>Max concurrent</h2><div class="mono" style="font-size:22px;font-weight:800">1</div><div class="note">Trades/day cap: <b>5</b> · after 15:00 no new entries.</div></div>
+          <div class="card"><h2>Sizing</h2><div class="mono" style="font-size:22px;font-weight:800">2–3 lots</div><div class="note">Capped by capital-at-risk ÷ stop distance.</div></div>
+        </div>
+        <div class="grid g2" style="margin-top:14px">
+          <div class="card"><h2>Scalp loss budget</h2><div class="meter"><span style="width:55%;background:var(--color-primary)"></span></div><div class="note">−₹1,375 of −₹2,500</div></div>
+          <div class="card"><h2>Positional loss budget</h2><div class="meter"><span style="width:20%;background:var(--color-secondary)"></span></div><div class="note">Separate budget · one can't drain the other.</div></div>
+        </div>
+      </section>
+
+      <!-- BROKERS -->
+      <section class="screen" data-screen="brokers">
+        <div class="page-head"><h1>Brokers</h1><span class="muted">Provider registry · FlatTrade-first execution</span></div>
+        <div class="grid g3">
+          <div class="card"><div class="card-h"><h2>FlatTrade</h2><span class="badge b-ok">CONNECTED</span></div><div class="kv"><span class="k">Role</span><span class="v">Primary exec</span></div><div class="kv"><span class="k">Mode</span><span class="v">PAPER</span></div><button class="btn" style="width:100%;justify-content:center;margin-top:10px">Test connection</button></div>
+          <div class="card"><div class="card-h"><h2>Zerodha (Kite)</h2><span class="badge b-ok">CONNECTED</span></div><div class="kv"><span class="k">Role</span><span class="v">Tick feed</span></div><div class="kv"><span class="k">Latency</span><span class="v mono">42 ms</span></div><button class="btn" style="width:100%;justify-content:center;margin-top:10px">Test connection</button></div>
+          <div class="card"><div class="card-h"><h2>MStock</h2><span class="badge b-warn">TOKEN EXPIRED</span></div><div class="kv"><span class="k">Role</span><span class="v">Secondary</span></div><div class="kv"><span class="k">Session</span><span class="v em">—</span></div><button class="btn btn-primary" style="width:100%;justify-content:center;margin-top:10px">Re-authenticate</button></div>
+        </div>
+      </section>
+
+      <!-- ALERTS -->
+      <section class="screen" data-screen="alerts">
+        <div class="page-head"><h1>Alerts</h1><span class="muted">Telegram &amp; system notifications</span></div>
+        <div class="card">
+          <div class="alert"><span class="sev" style="background:var(--color-error)"></span><div style="flex:1"><b>NO STOP</b> — resting SL-M failed on BANKNIFTY 54000 PE.<div class="faint" style="font-size:11px">Position unprotected · action required</div></div><span class="faint mono" style="font-size:12px">09:40 IST</span></div>
+          <div class="alert"><span class="sev" style="background:var(--color-warning)"></span><div style="flex:1"><b>Feed switch</b> — Kite feed stale &gt;1.5s, failed over to FlatTrade.<div class="faint" style="font-size:11px">Divergence guard OK</div></div><span class="faint mono" style="font-size:12px">09:31 IST</span></div>
+          <div class="alert"><span class="sev" style="background:var(--color-success)"></span><div style="flex:1"><b>Fill</b> — bought NIFTY 24850 CE @ ₹142.50 (2 lots).<div class="faint" style="font-size:11px">momentum-burst · T1</div></div><span class="faint mono" style="font-size:12px">09:24 IST</span></div>
+          <div class="alert"><span class="sev" style="background:var(--color-info)"></span><div style="flex:1"><b>Breadth-reversal exit</b> — A/D flipped, closed intraday runner in profit.<div class="faint" style="font-size:11px">+22% premium</div></div><span class="faint mono" style="font-size:12px">09:19 IST</span></div>
+        </div>
+      </section>
+
+      <!-- SETTINGS -->
+      <section class="screen" data-screen="settings">
+        <div class="page-head"><h1>Settings</h1><span class="muted">Theme · display · notifications</span></div>
+        <div class="grid g2">
+          <div class="card"><h2>Theme</h2>
+            <div class="row" style="gap:10px"><button class="btn" data-theme-set="dark">🌙 Midnight</button><button class="btn" data-theme-set="light">☀️ Daylight</button><button class="btn" disabled title="planned">◼ High-contrast</button></div>
+            <div class="note">The token system can support more than two themes — new palettes swap CSS variables only.</div>
+          </div>
+          <div class="card"><h2>Display</h2>
+            <div class="kv"><span class="k">Currency</span><span class="v">₹ · en-IN (₹12,45,000)</span></div>
+            <div class="kv"><span class="k">P&amp;L palette</span><span class="v">Colorblind-safe <span class="badge b-neutral" style="font-size:10px">planned</span></span></div>
+            <div class="kv"><span class="k">Times</span><span class="v">IST</span></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- OPERATE -->
+      <section class="screen" data-screen="operate">
+        <div class="page-head"><h1>Operate</h1><span class="muted">Backfill · Swarm · System health</span></div>
+        <div class="grid g3">
+          <div class="card"><div class="card-h"><h2>Backfill</h2><span class="badge b-ok">RUNNING</span></div><div class="faint" style="font-size:11px;margin-bottom:5px">NIFTY 50 · 1m candles · 62%</div><div class="meter"><span style="width:62%;background:var(--color-primary)"></span></div><div class="note">31 of 50 symbols · ETA 4m</div></div>
+          <div class="card"><div class="card-h"><h2>Swarm</h2><span class="badge b-ok">6 WORKERS</span></div><div class="kv"><span class="k">Queue</span><span class="v mono">128</span></div><div class="kv"><span class="k">Throughput</span><span class="v mono">340/s</span></div><div class="kv"><span class="k">Errors</span><span class="v mono">0</span></div></div>
+          <div class="card"><div class="card-h"><h2>System health</h2><span class="badge b-warn">1 LAGGING</span></div>
+            <div class="list-item"><span>L1 Ingestion</span><span class="badge b-ok">UP</span></div>
+            <div class="list-item"><span>L5 Aggregation</span><span class="badge b-ok">UP</span></div>
+            <div class="list-item"><span>L6 Signal</span><span class="badge b-warn">LAG 2.1s</span></div>
+            <div class="list-item"><span>L10 Execution</span><span class="badge b-ok">UP</span></div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+</div>
+
+<script>
+(function(){
+  var root=document.documentElement, app=document.getElementById('app');
+  // nav routing
+  function go(s){
+    document.querySelectorAll('.screen').forEach(function(el){el.classList.toggle('active',el.dataset.screen===s);});
+    document.querySelectorAll('.nav a').forEach(function(a){a.classList.toggle('active',a.dataset.s===s);});
+    document.querySelector('.main').scrollTop=0;
+  }
+  document.querySelectorAll('[data-s]').forEach(function(a){a.addEventListener('click',function(){go(a.dataset.s);});});
+  // theme
+  function cur(){var a=root.getAttribute('data-theme');return a?a:(window.matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light');}
+  document.getElementById('themeBtn').addEventListener('click',function(){root.setAttribute('data-theme',cur()==='dark'?'light':'dark');});
+  document.querySelectorAll('[data-theme-set]').forEach(function(b){b.addEventListener('click',function(){root.setAttribute('data-theme',b.dataset.themeSet);});});
+  // kill switch demo
+  var killed=false;
+  document.getElementById('killBtn').addEventListener('click',function(){
+    killed=!killed;this.textContent=killed?'HALTED — Resume':'KILL';
+    this.style.background=killed?'var(--color-warning)':'var(--color-error)';
+  });
+  // horizon toggle on predictions
+  var hs=document.getElementById('hz-scalp'),hp=document.getElementById('hz-pos');
+  function setHz(scalp){
+    hs.classList.toggle('on',scalp);hp.classList.toggle('on',!scalp);
+    document.getElementById('hzlabel').textContent=scalp?'SCALP · 1–5m':'POSITIONAL · hrs–days';
+    var pct=scalp?64:71;document.getElementById('gaugePct').textContent=pct+'%';
+    document.getElementById('gaugeArc').setAttribute('stroke-dashoffset',314-(314*pct/100));
+  }
+  hs&&hs.addEventListener('click',function(){setHz(true);});
+  hp&&hp.addEventListener('click',function(){setHz(false);});
+  // ticking clock (cosmetic)
+  var t=document.getElementById('clock');
+  setInterval(function(){var d=new Date();t.textContent=d.toLocaleTimeString('en-GB')+' IST';},1000);
+})();
+</script>

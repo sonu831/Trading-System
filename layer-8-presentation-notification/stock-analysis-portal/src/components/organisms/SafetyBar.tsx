@@ -1,6 +1,6 @@
 // @ts-nocheck
-import { useState, useEffect } from 'react';
-import { useSelector, useDispatch } from 'react-redux';
+import { useEffect, useState } from 'react';
+import { useSelector } from 'react-redux';
 import KillSwitchButton from '@/components/trading/KillSwitchButton';
 import TradeModeBadge from '@/components/trading/TradeModeBadge';
 import StaleBadge from '@/components/trading/StaleBadge';
@@ -31,11 +31,9 @@ function useSessionClock() {
 }
 
 export default function SafetyBar({ underlying = 'NIFTY', spot, regimeUpdatedAt }) {
-  const dispatch = useDispatch();
   const execState = useSelector((s) => s.execution || {});
   const clock = useSessionClock();
   const mode = execState?.mode || 'paper';
-  const killSwitch = execState?.killSwitch;
 
   const formatTime = (c) => c.expired ? '--:--' : `${String(c.hh).padStart(2, '0')}:${String(c.mm).padStart(2, '0')}`;
 
@@ -58,7 +56,7 @@ export default function SafetyBar({ underlying = 'NIFTY', spot, regimeUpdatedAt 
       <TradeModeBadge mode={mode} />
 
       {/* Regime staleness */}
-      <StaleBadge updatedAt={regimeUpdatedAt} label="regime" />
+      <StaleBadge timestamp={regimeUpdatedAt} />
 
       {/* Session clock */}
       {clock.marketOpen ? (
@@ -70,7 +68,7 @@ export default function SafetyBar({ underlying = 'NIFTY', spot, regimeUpdatedAt 
       )}
 
       {/* Kill switch */}
-      <KillSwitchButton active={killSwitch} onToggle={() => {}} />
+      <KillSwitchButton />
     </div>
   );
 }

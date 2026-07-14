@@ -6,6 +6,10 @@ const { RegimeEngine } = require('./regime/engine');
 const { StrategyOrchestrator } = require('./strategies/orchestrator');
 const logger = require('./utils/logger');
 const { waitForAll } = require('/app/shared/health-check');
+let REDIS_CHANNELS;
+try { REDIS_CHANNELS = require('/app/shared/constants').REDIS_CHANNELS; } catch (_) {
+  try { REDIS_CHANNELS = require('../../../shared/constants').REDIS_CHANNELS; } catch (_) {}
+}
 
 const app = express();
 const PORT = process.env.PORT || 8082;
@@ -177,7 +181,7 @@ async function handleAnalysisUpdate(analysis) {
       signal.tradeableTiers = regimeState.tradeableTiers;
     }
 
-    await redis.publish('signals:trade', signal);
+    await redis.publish(REDIS_CHANNELS?.SIGNALS || 'signals:trade', signal);
     await redis.pushToList('signals:history', signal);
 
     signalsGenerated.inc({ action: signal.action, strategy: signal.strategy, symbol: signal.symbol });

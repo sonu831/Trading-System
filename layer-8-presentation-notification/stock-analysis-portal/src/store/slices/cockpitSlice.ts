@@ -26,11 +26,17 @@ interface CockpitState {
   chain: ChainData;
   regime: RegimeData;
   positions: unknown[];
+  execution: { mode?: string; killSwitch?: boolean; lastOrder?: unknown };
+  alerts: Array<{ severity: string; message: string; timestamp: string }>;
+  breadth: Record<string, unknown>;
   staleness: {
     tick: number | null;
     chain: number | null;
     regime: number | null;
     positions: number | null;
+    execution: number | null;
+    alerts: number | null;
+    breadth: number | null;
   };
 }
 
@@ -39,11 +45,12 @@ const initialState: CockpitState = {
   chain: {},
   regime: {},
   positions: [],
+  execution: {},
+  alerts: [],
+  breadth: {},
   staleness: {
-    tick: null,
-    chain: null,
-    regime: null,
-    positions: null,
+    tick: null, chain: null, regime: null, positions: null,
+    execution: null, alerts: null, breadth: null,
   },
 };
 
@@ -68,6 +75,18 @@ const cockpitSlice = createSlice({
       state.positions = action.payload || [];
       state.staleness.positions = Date.now();
     },
+    cockpitExecutionPushed: (state, action: PayloadAction<Record<string, unknown>>) => {
+      state.execution = action.payload;
+      state.staleness.execution = Date.now();
+    },
+    cockpitAlertPushed: (state, action: PayloadAction<{ severity: string; message: string; timestamp: string }>) => {
+      state.alerts = [action.payload, ...state.alerts].slice(0, 100);
+      state.staleness.alerts = Date.now();
+    },
+    cockpitBreadthPushed: (state, action: PayloadAction<Record<string, unknown>>) => {
+      state.breadth = action.payload;
+      state.staleness.breadth = Date.now();
+    },
     setStaleness: (state, action: PayloadAction<{ stream: keyof CockpitState['staleness']; timestamp: number }>) => {
       const { stream, timestamp } = action.payload;
       state.staleness[stream] = timestamp;
@@ -77,7 +96,8 @@ const cockpitSlice = createSlice({
 
 export const {
   cockpitTickPushed, cockpitChainPushed, cockpitRegimePushed,
-  cockpitPositionPushed, setStaleness,
+  cockpitPositionPushed, cockpitExecutionPushed, cockpitAlertPushed,
+  cockpitBreadthPushed, setStaleness,
 } = cockpitSlice.actions;
 
 interface RootState {
@@ -88,6 +108,9 @@ export const selectCockpitTick = (s: RootState) => s.cockpit?.tick || {};
 export const selectCockpitChain = (s: RootState) => s.cockpit?.chain || {};
 export const selectCockpitRegime = (s: RootState) => s.cockpit?.regime || {};
 export const selectCockpitPositions = (s: RootState) => s.cockpit?.positions || [];
+export const selectCockpitExecution = (s: RootState) => s.cockpit?.execution || {};
+export const selectCockpitAlerts = (s: RootState) => s.cockpit?.alerts || [];
+export const selectCockpitBreadth = (s: RootState) => s.cockpit?.breadth || {};
 export const selectStaleness = (s: RootState) => s.cockpit?.staleness || {};
 
 export default cockpitSlice.reducer;

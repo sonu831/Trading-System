@@ -13,6 +13,10 @@
 ## Quick Start
 
 ```bash
+cp .env.example .env
+# REQUIRED — the API refuses to start without it (see Secrets & API Auth below):
+node -e "console.log('INTERNAL_API_KEY=' + require('crypto').randomBytes(32).toString('hex'))" >> .env
+
 make setup    # Install all dependencies (Node.js + Go + Python)
 make up       # Purge cache → infra → build → start (L1+L2+L7+Dashboard)
 make up-all   # Everything (+ observer, notify, AI, execution)
@@ -22,9 +26,52 @@ make up-all   # Everything (+ observer, notify, AI, execution)
 |-----|---------|
 | `http://localhost:3000/scalp` | ⚡ Options Scalping Cockpit |
 | `http://localhost:3000/brokers` | 🔑 Broker Credentials |
-| `http://localhost:4000` | Backend API |
+| `http://localhost:4000` | Backend API (**bound to `127.0.0.1`** — not on your LAN) |
 | `http://localhost:8090` | Kafka UI |
 | `http://localhost:5051` | PgAdmin |
+
+---
+
+## 🔐 Secrets & API Auth
+
+**Credentials live in the database, not in `.env`.** Broker api-keys/secrets/TOTP secrets are stored
+encrypted (AES-256-GCM) in `broker_credentials` and managed from the dashboard's Brokers page. L1 and L10
+never read broker env vars — they fetch from Layer 7 (`CredentialStore` / `CredentialProvider`) and hot-reload
+on `providers-changed`.
+
+**Exactly three secrets must stay in `.env`** — the root of trust. They cannot come from the DB, because each
+one is required *to reach or decrypt the DB*:
+
+| Secret | Why it can't live in the DB |
+|---|---|
+| `DATABASE_URL` / `POSTGRES_PASSWORD` | It's the password that **opens** the database |
+| `CREDENTIAL_MASTER_KEY` | It **decrypts** `broker_credentials` — storing it inside would encrypt it with itself |
+| `INTERNAL_API_KEY` | It authenticates callers **to Layer 7**, which is what fronts the DB |
+
+### The Layer 7 API is default-deny
+
+Every route except `/health`, `/metrics`, `/documentation`, `/swagger` and `/` requires a valid
+`x-api-key`. A request that simply omits the header is **401** — it is not "unauthenticated but allowed".
+This matters because the API can return decrypted broker credentials and halt live trading.
+
+`INTERNAL_API_KEY` is the shared service key presented by the three trusted callers:
+
+- **Dashboard** — injected server-side by `stock-analysis-portal/src/middleware.ts` into proxied `/api/*`
+  calls. It is **never** `NEXT_PUBLIC_*`; the browser never sees it.
+- **L1 ingestion** — a *scoped* axios interceptor (scoped on purpose: a blanket header would leak the key to
+  MStock/FlatTrade on every broker call).
+- **L10 execution** — explicit headers on its L7 calls.
+
+**Local dev gotcha:** Next.js reads env from its **own** directory, not the repo root. For `next dev`, put the
+same key in `layer-8-presentation-notification/stock-analysis-portal/.env.local`. In Docker, compose supplies
+it — but if you add/change the middleware you must rebuild the image:
+`docker compose --project-name trading-system --env-file .env -f infrastructure/compose/docker-compose.app.yml up -d --build dashboard`
+
+Rotate the key any time with the `node -e ...` command in Quick Start (update `.env`, then recreate the services).
+
+> ⚠️ **Before exposing the API publicly** (e.g. a broker postback URL): terminate TLS at a reverse proxy and
+> expose *only* the callback paths. Never re-publish port 4000 on `0.0.0.0`.
+> See [`docs/WIRING_GAPS_AND_FIXES.md`](docs/WIRING_GAPS_AND_FIXES.md) §13.
 
 ---
 

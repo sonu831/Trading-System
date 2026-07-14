@@ -137,51 +137,34 @@ async function systemRoutes(fastify, options) {
         // ── REST fallback: fetch from MStock historical API when no WebSocket data ──
         if (!ltp) {
           try {
+            const { getAdapter } = require('../broker/adapters');
             const brokerService = container.resolve('brokerService');
-            const token = await brokerService.getSessionToken('mstock');
             const creds = await brokerService.getDecryptedCredentials('mstock');
-            if (token && creds?.api_key) {
-              // Get the MStock instrument token for this index from the vendor map
-              const path = require('path');
-              let tokenMap: any[] = [];
-              try { tokenMap = require('/app/vendor/nifty50_shared.json'); } catch (_) {}
-              if (!tokenMap.length) {
-                try { tokenMap = require(path.resolve(__dirname, '..', '..', '..', 'vendor', 'nifty50_shared.json')); } catch (_) {}
-              }
-              const entry = tokenMap.find((s: any) => s.symbol === sym);
-              const symboltoken = entry?.tokens?.mstock;
-              if (symboltoken && symboltoken !== 'TODO_VERIFY_FROM_MSTOCK_UI') {
-                const axios = require('axios');
-                const today = new Date();
-                const todate = today.toISOString().split('T')[0] + ' 15:30';
-                const fromdate = today.toISOString().split('T')[0] + ' 09:15';
-                const resp = await axios.post(
-                  'https://api.mstock.trade/openapi/typeb/instruments/historical',
-                  { exchange: 'NSE', symboltoken: String(symboltoken), interval: 'ONE_MINUTE', fromdate, todate },
-                  {
-                    headers: {
-                      'X-PrivateKey': creds.api_key,
-                      Authorization: `Bearer ${token}`,
-                      'X-Mirae-Version': '1',
-                      'Content-Type': 'application/json',
-                    },
-                    timeout: 5000,
-                  },
-                );
-                const candles: any[] = resp.data?.data?.candles || [];
-                if (candles.length > 0) {
-                  const latest = candles[candles.length - 1];
-                  if (Array.isArray(latest)) {
-                    ltp = latest[4]; // OHLCV array: [time, open, high, low, close, volume]
-                  } else {
-                    ltp = latest.close || latest.ltp;
+            if (creds?.api_key) {
+              const adapter = getAdapter('mstock', creds.api_key);
+              const { createClient } = require('redis');
+              const r2 = createClient({ url: process.env.REDIS_URL || 'redis://redis:6379' });
+              await r2.connect();
+              const raw = await r2.get('broker:session:mstock');
+              await r2.disconnect();
+              const jwt = raw ? JSON.parse(raw)?.token : null;
+              if (jwt) {
+                const TOKENS: Record<string, string> = { NIFTY: '26000', BANKNIFTY: '26009', FINNIFTY: '26037' };
+                const token = TOKENS[sym];
+                if (token) {
+                  adapter.setAccessToken(jwt);
+                  const result = await adapter.getQuote({ mode: 'LTP', exchangeTokens: { NSE: [token] } });
+                  const fetched = result?.fetched?.[0] || {};
+                  if (fetched.ltp) {
+                    ltp = Number(fetched.ltp);
+                    // Also capture high/low for the response
+                    if (fetched.high) candle = candle || {}; 
+                    redis.set(`ltp:${sym}`, JSON.stringify({ price: ltp, timestamp: new Date().toISOString() }), { EX: 60 }).catch(() => {});
                   }
-                  // Cache in Redis so next poll hits the fast path
-                  redis.set(`ltp:${sym}`, JSON.stringify({ price: ltp, timestamp: new Date().toISOString() }), { EX: 60 }).catch(() => {});
                 }
               }
             }
-          } catch (_) { /* REST fallback best-effort — return null if fails */ }
+          } catch (e: any) { console.error(`[index-quote] REST fallback for ${sym}:`, e.message); }
         }
 
         const change = ltp && prevClose ? ltp - prevClose : null;

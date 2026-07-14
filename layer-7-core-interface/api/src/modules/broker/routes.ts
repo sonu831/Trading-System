@@ -355,10 +355,13 @@ async function brokerRoutes(fastify, options) {
         if (!token) return { success: false, error: `Unknown index. Use: ${Object.keys(INDEX_TOKENS).join(', ')}` };
         const adapter = await getAuthAdapter();
         const result = await adapter.getQuote({ mode: 'LTP', exchangeTokens: { NSE: [token] } });
-        return { success: true, data: result.data || result };
+        const fetched = result?.fetched?.[0] || result?.data?.fetched?.[0] || {};
+        return { success: true, data: { ltp: fetched.ltp, change: fetched.change, changePct: fetched.change_pct } };
       } catch (e: any) { return { success: false, error: e.message }; }
     },
   });
+
+  /** Dashboard expects path param: /market/index/NIFTY/quote — handled in system/routes.ts */
 
   fastify.get('/api/v1/market/option-chain', {
     schema: {

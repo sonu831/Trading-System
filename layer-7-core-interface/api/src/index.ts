@@ -287,6 +287,13 @@ const start = async () => {
       const brokerSessionService = container.resolve('brokerSessionService');
       brokerSessionService.startSessionMonitor();
     } catch (e) { fastify.log.warn(`Session monitor failed to start: ${e.message}`); }
+
+    // Start candle buffer — polls MStock LTP every 15s, builds 1m candles in TimescaleDB + Redis
+    try {
+      const candleBuffer = container.resolve('candleBuffer');
+      candleBuffer.start();
+      fastify.log.info('[CandleBuffer] Live candle polling started');
+    } catch (e) { fastify.log.warn(`CandleBuffer failed to start: ${e.message}`); }
   } catch (err) {
     fastify.log.error(err);
     process.exit(1);

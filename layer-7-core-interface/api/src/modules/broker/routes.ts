@@ -433,6 +433,76 @@ async function brokerRoutes(fastify, options) {
       } catch (e: any) { return { success: false, error: e.message }; }
     },
   });
+
+  fastify.get('/api/v1/market/funds', {
+    schema: { description: 'Account balance, margin, available cash', tags: ['Market Data'] },
+    handler: async (req, reply) => {
+      try {
+        const adapter = await getAuthAdapter();
+        const result = await adapter.getFundSummary();
+        return { success: true, data: result.data || result };
+      } catch (e: any) { return { success: false, error: e.message }; }
+    },
+  });
+
+  fastify.get('/api/v1/market/orders', {
+    schema: { description: 'Open orders', tags: ['Market Data'] },
+    handler: async (req, reply) => {
+      try {
+        const adapter = await getAuthAdapter();
+        const result = await adapter.getOrderBook();
+        return { success: true, data: result.data || result };
+      } catch (e: any) { return { success: false, error: e.message }; }
+    },
+  });
+
+  fastify.get('/api/v1/market/trades', {
+    schema: { description: 'Completed trades', tags: ['Market Data'] },
+    handler: async (req, reply) => {
+      try {
+        const adapter = await getAuthAdapter();
+        const result = await adapter.getTradeBook();
+        return { success: true, data: result.data || result };
+      } catch (e: any) { return { success: false, error: e.message }; }
+    },
+  });
+
+  fastify.get('/api/v1/market/losers-gainers', {
+    schema: { description: 'Top gainers and losers', tags: ['Market Data'] },
+    handler: async (req, reply) => {
+      try {
+        const adapter = await getAuthAdapter();
+        const result = await adapter.getLoserGainer({ exchange: 'NSE' });
+        return { success: true, data: result.data || result };
+      } catch (e: any) { return { success: false, error: e.message }; }
+    },
+  });
+
+  fastify.post('/api/v1/execution/order', {
+    schema: {
+      description: 'Place an order via MStock',
+      tags: ['Execution'],
+      body: { type: 'object', additionalProperties: true },
+    },
+    handler: async (req, reply) => {
+      try {
+        const adapter = await getAuthAdapter();
+        const result = await adapter.placeOrder(req.body as Record<string, unknown>);
+        return { success: true, data: result.data || result };
+      } catch (e: any) { return { success: false, error: e.message }; }
+    },
+  });
+
+  fastify.delete('/api/v1/execution/order/:orderId', {
+    schema: { description: 'Cancel an order', tags: ['Execution'] },
+    handler: async (req, reply) => {
+      try {
+        const adapter = await getAuthAdapter();
+        const result = await adapter.cancelOrder((req.params as any).orderId);
+        return { success: true, data: result };
+      } catch (e: any) { return { success: false, error: e.message }; }
+    },
+  });
 }
 
 module.exports = brokerRoutes;

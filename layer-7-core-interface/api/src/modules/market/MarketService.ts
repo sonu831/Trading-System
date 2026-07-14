@@ -57,6 +57,13 @@ class MarketService extends BaseService {
     const result = await adapter.getQuote({ mode: 'LTP', exchangeTokens: { NSE: allTokens } });
     const fetched: any[] = result?.data?.fetched || result?.fetched || [];
 
+    // Also fetch OHLC for indices to get previous close (needed for change%)
+    let indexOhlc: any[] = [];
+    try {
+      const ohlcResult = await adapter.getQuote({ mode: 'OHLC', exchangeTokens: { NSE: ['26000', '26009'] } });
+      indexOhlc = ohlcResult?.data?.fetched || ohlcResult?.fetched || [];
+    } catch (_) {}
+
     const allStocks: any[] = [];
     const indices: Record<string, any> = {};
     let advances = 0, declines = 0;
@@ -66,7 +73,16 @@ class MarketService extends BaseService {
       const symbol = tokenMap[t] || f.tradingSymbol || t;
       const ltp = Number(f.ltp) || 0;
       const change = Number(f.change) || 0;
-      const changePct = Number(f.change_pct) || 0;
+      let changePct = Number(f.change_pct) || 0;
+
+      // If change missing, try OHLC data for indices
+      if (!change && !changePct) {
+        const ohlcEntry = indexOhlc.find((o: any) => o.symbolToken === t);
+        if (ohlcEntry?.prev_close || ohlcEntry?.open) {
+          const prev = Number(ohlcEntry.prev_close || ohlcEntry.open);
+          if (prev && ltp) { changePct = ((ltp - prev) / prev) * 100; }
+        }
+      }
 
       if (symbol === 'NIFTY' || symbol === 'BANKNIFTY') {
         indices[symbol] = { ltp, change, changePct };
@@ -83,10 +99,17 @@ class MarketService extends BaseService {
       });
     }
 
+    // Top gainers + losers (sorted by change_pct)
+    const sorted = [...allStocks].sort((a, b) => b.change_pct - a.change_pct);
+    const topGainers = sorted.filter(s => s.change_pct > 0).slice(0, 5);
+    const topLosers = sorted.filter(s => s.change_pct < 0).reverse().slice(0, 5);
+
     const snapshot = {
       indices,
       all_stocks: allStocks,
       smartPicks: [],
+      topGainers,
+      topLosers,
       marketSummary: '',
       marketStatus: 'OPEN',
       marketSentiment: advances > declines ? 'Bullish' : declines > advances ? 'Bearish' : 'Neutral',

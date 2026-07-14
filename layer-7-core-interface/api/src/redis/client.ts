@@ -40,6 +40,12 @@ class RedisClient {
     return val ? JSON.parse(val) : null;
   }
 
+  async set(key, value, options) {
+    if (!this.isConnected) await this.connect();
+    const str = typeof value === 'string' ? value : JSON.stringify(value);
+    return this.publisher.set(key, str, options || {});
+  }
+
   async getList(key, start = 0, stop = -1) {
     if (!this.isConnected) await this.connect();
     const list = await this.publisher.lRange(key, start, stop);

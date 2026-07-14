@@ -109,5 +109,30 @@ export function createMStockAdapter(apiKey: string): BrokerAdapter {
       const resp = await axios.post(`${BASE}/orders/regular`, params, { headers: hdrs(true), timeout: 15000 });
       return resp.data;
     },
+
+    async cancelOrder(orderId: string): Promise<any> {
+      const resp = await axios.delete(`${BASE}/orders/regular/${orderId}`, { headers: hdrs(true), timeout: 15000 });
+      return resp.data;
+    },
+
+    async getFundSummary(): Promise<any> {
+      const resp = await axios.get(`${BASE}/user/fundsummary`, { headers: hdrs(true), timeout: 15000 });
+      return resp.data;
+    },
+
+    async getOrderBook(): Promise<any> {
+      const resp = await axios.get(`${BASE}/orders`, { headers: hdrs(true), timeout: 15000 });
+      return resp.data;
+    },
+
+    async getTradeBook(): Promise<any> {
+      const resp = await axios.get(`${BASE}/tradebook`, { headers: hdrs(true), timeout: 15000 });
+      return resp.data;
+    },
+
+    async getLoserGainer(params: { exchange: string }): Promise<any> {
+      const resp = await axios.post(`${BASE}/losergainer`, params, { headers: hdrs(true), timeout: 15000 });
+      return resp.data;
+    },
   };
 }

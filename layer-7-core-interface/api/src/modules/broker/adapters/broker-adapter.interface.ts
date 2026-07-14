@@ -83,6 +83,21 @@ export interface BrokerAdapter {
   /** Get holdings. */
   getHoldings(): Promise<any>;
 
+  /** Get fund summary (balance, margin). */
+  getFundSummary(): Promise<any>;
+
+  /** Get open orders. */
+  getOrderBook(): Promise<any>;
+
+  /** Get completed trades. */
+  getTradeBook(): Promise<any>;
+
+  /** Get top gainers and losers. */
+  getLoserGainer(params: { exchange: string }): Promise<any>;
+
   /** Place an order. */
   placeOrder(params: Record<string, unknown>): Promise<any>;
+
+  /** Cancel an order. */
+  cancelOrder(orderId: string): Promise<any>;
 }

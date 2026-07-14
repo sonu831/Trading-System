@@ -284,7 +284,7 @@ const API_KEY_HEADER = 'x-api-key';
 
 // Unauthenticated by design: liveness/metrics/docs. Everything else requires a key.
 // Matched as exact path or path prefix (`/documentation/...`).
-const PUBLIC_API_ROUTES = ['/', '/health', '/metrics', '/documentation', '/swagger'];
+const PUBLIC_API_ROUTES = ['/', '/health', '/metrics', '/documentation', '/swagger', '/api/v1/tv']; 
 
 module.exports = {
   REGIME_TREND, REGIME_SENTIMENT, REGIME_VOLATILITY, REGIME_PHASE,

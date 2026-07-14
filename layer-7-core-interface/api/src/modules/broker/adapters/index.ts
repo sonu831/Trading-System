@@ -14,7 +14,9 @@ const factory: Record<string, (apiKey: string) => BrokerAdapter> = {
 const instance: Record<string, BrokerAdapter> = {};
 
 export function getAdapter(provider: string, apiKey?: string): BrokerAdapter | null {
-  if (!instance[provider] && apiKey && factory[provider]) {
+  // Always recreate when apiKey is provided — adapter captures key in closure,
+  // and stale instances produce 401s when credentials change.
+  if (apiKey && factory[provider]) {
     instance[provider] = factory[provider](apiKey);
   }
   return instance[provider] || null;

@@ -1,107 +1,138 @@
 /**
- * MStock adapter — wraps @mstock-mirae-asset/nodetradingapi-typeb SDK.
+ * MStock adapter — raw HTTP wrapper following official API docs.
+ * https://tradingapi.mstock.com/docs/v1/typeB/
  *
  * The strategy owns auth FLOW. This adapter owns TRANSPORT.
- * One wrapper per external system. Adding MStock = register this adapter + done.
+ * One wrapper per external system.
  */
 import type { BrokerAdapter, LoginParams, LoginResult, VerifyResult, QuoteParams, HistoricalParams, OptionChainParams } from './broker-adapter.interface';
 
-let MConnect: any;
-
-function isOk(body: any): boolean {
-  return body?.status === true || body?.status === 'true';
-}
-
-function fail(body: any, fb: string): string {
-  return body?.message || body?.data?.message || body?.errorcode || fb;
-}
+const BASE = 'https://api.mstock.trade/openapi/typeb';
+const axios = require('axios');
 
 export function createMStockAdapter(apiKey: string): BrokerAdapter {
-  if (!MConnect) {
-    const sdk = require('@mstock-mirae-asset/nodetradingapi-typeb');
-    MConnect = sdk.MConnect;
-  }
+  let jwtToken = '';
+  let feedToken = '';
+  let refreshToken = '';
 
-  const client = new MConnect('https://api.mstock.trade', apiKey);
-  let accessToken = '';
+  const hdrs = (includeKey = true): Record<string, string> => {
+    const h: Record<string, string> = { 'X-Mirae-Version': '1', 'Content-Type': 'application/json' };
+    if (includeKey && apiKey) h['X-PrivateKey'] = apiKey;
+    if (jwtToken) h['Authorization'] = `Bearer ${jwtToken}`;
+    return h;
+  };
 
-  function mstockHeaders(): Record<string, string> {
-    return { 'X-PrivateKey': apiKey, 'Authorization': `Bearer ${accessToken}`, 'X-Mirae-Version': '1', 'Content-Type': 'application/json' };
-  }
+  const ok = (body: any) => body?.status === true || body?.status === 'true';
+  const err = (body: any, fb: string): string => body?.message || body?.data?.message || body?.errorcode || fb;
 
   return {
     id: 'mstock',
-    client,
+
+    get client() { return { setAccessToken: (t: string) => { jwtToken = t; } }; },
 
     // ── Auth ──
 
     async login(params: LoginParams): Promise<LoginResult> {
-      let body: any;
-      try { body = await client.login(params); }
-      catch (err: any) { throw new Error(err.message || 'MStock login request failed'); }
-      console.log('[mstock-sdk] login OK — token received:', !!body?.data?.jwtToken);
-      if (!isOk(body)) throw new Error(fail(body, 'MStock login failed'));
+      const resp = await axios.post(`${BASE}/connect/login`, params, { headers: hdrs(false), timeout: 15000 });
+      const body = resp.data;
+      if (!ok(body)) throw new Error(err(body, 'MStock login failed'));
       const token = body?.data?.jwtToken;
       if (!token) throw new Error('MStock login returned no token');
+      if (body?.data?.feedToken) feedToken = body.data.feedToken;
+      if (body?.data?.refreshToken) refreshToken = body.data.refreshToken;
       return { jwtToken: token };
     },
 
-    async verifyTOTP(refreshToken: string, totp: string): Promise<VerifyResult> {
-      let body: any;
-      try { body = await client.verifyTOTP(refreshToken, totp); }
-      catch (err: any) { throw new Error(err.message || 'MStock TOTP verification failed'); }
-      if (!isOk(body)) throw new Error(fail(body, 'MStock TOTP verification failed'));
+    async verifyTOTP(requestToken: string, totp: string): Promise<VerifyResult> {
+      const resp = await axios.post(`${BASE}/session/verifytotp`,
+        { refreshToken: requestToken, totp },
+        { headers: hdrs(true), timeout: 15000 });
+      const body = resp.data;
+      if (!ok(body)) throw new Error(err(body, 'TOTP verification failed'));
       const token = body?.data?.jwtToken;
-      if (!token) throw new Error('MStock TOTP verification returned no trading token');
+      if (!token) throw new Error('TOTP verification returned no trading token');
+      jwtToken = token;
+      if (body?.data?.feedToken) feedToken = body.data.feedToken;
+      if (body?.data?.refreshToken) refreshToken = body.data.refreshToken;
       return { jwtToken: token };
     },
 
-    async verifyOTP(refreshToken: string, otp: string): Promise<VerifyResult> {
-      let body: any;
-      try { body = await client.verifyOTP(refreshToken, otp); }
-      catch (err: any) { throw new Error(err.message || 'MStock OTP verification failed'); }
-      if (!isOk(body)) throw new Error(fail(body, 'MStock OTP verification failed'));
-      const token = body?.data?.jwtToken;
-      if (!token) throw new Error('MStock OTP verification returned no trading token');
-      return { jwtToken: token };
+    async verifyOTP(requestToken: string, otp: string): Promise<VerifyResult> {
+      const resp = await axios.post(`${BASE}/session/token`,
+        { refreshToken: requestToken, otp },
+        { headers: hdrs(true), timeout: 15000 });
+      const body = resp.data;
+      if (!ok(body)) throw new Error(err(body, 'OTP verification failed'));
+      jwtToken = body?.data?.jwtToken || '';
+      if (body?.data?.feedToken) feedToken = body.data.feedToken;
+      if (body?.data?.refreshToken) refreshToken = body.data.refreshToken;
+      return { jwtToken: jwtToken };
     },
 
-    async logout(token: string): Promise<void> {
-      client.setAccessToken(token);
-      try { await client.logout(); } catch { /* best effort */ }
+    async logout(): Promise<void> {
+      try { await axios.get(`${BASE}/logout`, { headers: hdrs(true), timeout: 5000 }); } catch { /* best effort */ }
     },
 
-    setAccessToken(token: string): void {
-      accessToken = token;
-      client.setAccessToken(token);
-    },
+    setAccessToken(token: string): void { jwtToken = token; },
 
     // ── Market Data ──
 
     async getQuote(params: QuoteParams): Promise<any> {
-      return client.getQuote(params);
+      const resp = await axios.post(`${BASE}/instruments/quote`, params, { headers: hdrs(true), timeout: 15000 });
+      return resp.data;
     },
 
     async getHistoricalData(params: HistoricalParams): Promise<any> {
-      return client.getHistoricalData(params);
+      const resp = await axios.post(`${BASE}/instruments/historical`, params, { headers: hdrs(true), timeout: 30000 });
+      return resp.data;
     },
 
     async getOptionChain(params: OptionChainParams): Promise<any> {
-      return client.getOptionChain(params);
+      const resp = await axios.get(`${BASE}/GetOptionChain/${params.underlying}/${params.expiry}/${params.strike || ''}`,
+        { headers: hdrs(true), timeout: 15000 });
+      return resp.data;
     },
 
     // ── Portfolio ──
 
     async getPositions(): Promise<any> {
-      return client.getPositions();
+      const resp = await axios.get(`${BASE}/portfolio/positions`, { headers: hdrs(true), timeout: 15000 });
+      return resp.data;
     },
 
     async getHoldings(): Promise<any> {
-      return client.getHoldings();
+      const resp = await axios.get(`${BASE}/portfolio/holdings`, { headers: hdrs(true), timeout: 15000 });
+      return resp.data;
     },
 
     async placeOrder(params: Record<string, unknown>): Promise<any> {
-      return client.placeOrder(params);
+      const resp = await axios.post(`${BASE}/orders/regular`, params, { headers: hdrs(true), timeout: 15000 });
+      return resp.data;
+    },
+
+    async cancelOrder(orderId: string): Promise<any> {
+      const resp = await axios.delete(`${BASE}/orders/regular/${orderId}`, { headers: hdrs(true), timeout: 15000 });
+      return resp.data;
+    },
+
+    async getFundSummary(): Promise<any> {
+      const resp = await axios.get(`${BASE}/user/fundsummary`, { headers: hdrs(true), timeout: 15000 });
+      return resp.data;
+    },
+
+    async getOrderBook(): Promise<any> {
+      const resp = await axios.get(`${BASE}/orders`, { headers: hdrs(true), timeout: 15000 });
+      return resp.data;
+    },
+
+    async getTradeBook(): Promise<any> {
+      const resp = await axios.get(`${BASE}/tradebook`, { headers: hdrs(true), timeout: 15000 });
+      return resp.data;
+    },
+
+    async getLoserGainer(params: { exchange: string }): Promise<any> {
+      const resp = await axios.post(`${BASE}/losergainer`, params, { headers: hdrs(true), timeout: 15000 });
+      return resp.data;
     },
   };
 }

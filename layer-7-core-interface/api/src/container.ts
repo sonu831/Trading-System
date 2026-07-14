@@ -75,6 +75,9 @@ container.register({
   regimeController: asClass(require('./modules/regime/RegimeController')).singleton(),
 
   // MStock Specific Endpoints
+
+  // CandleBuffer — polls MStock LTP → builds 1m candles → TimescaleDB + Redis
+  candleBuffer: asClass(require('./services/CandleBuffer')).singleton(),
 });
 
 module.exports = container;

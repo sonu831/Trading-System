@@ -1,93 +1,67 @@
 // @ts-nocheck
-import { useEffect, useRef, useId } from 'react';
-
-const TV_SCRIPT_URL = 'https://s3.tradingview.com/tv.js';
-
-const symbolMap: Record<string, string> = {
-  NIFTY: 'NSE:NIFTY',
-  BANKNIFTY: 'NSE:BANKNIFTY',
-  FINNIFTY: 'NSE:FINNIFTY',
-};
-
-function toTvSymbol(underlying: string): string {
-  return symbolMap[underlying] || `NSE:${underlying}`;
-}
-
-function toTvInterval(tf: string): string {
-  const map: Record<string, string> = {
-    '1m': '1', '5m': '5', '15m': '15', '30m': '30',
-    '1h': '60', '2h': '120', '4h': '240',
-    '1d': 'D', '1w': 'W', '1M': 'M',
-  };
-  return map[tf] || tf;
-}
+import { useEffect, useRef } from 'react';
+import { createChart, CandlestickSeries, ColorType } from 'lightweight-charts';
 
 export default function TradingViewChart({ symbol = 'NIFTY', timeframe = '1m', height = 420 }) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const widgetRef = useRef<any>(null);
-  const id = useId().replace(/:/g, '');
+  const containerRef = useRef(null);
+  const chartRef = useRef(null);
+  const seriesRef = useRef(null);
 
   useEffect(() => {
-    const tvSymbol = toTvSymbol(symbol);
-    const tvInterval = toTvInterval(timeframe);
-    const containerId = `tv-chart-${id}`;
+    if (!containerRef.current) return;
 
-    const createWidget = () => {
-      if (!containerRef.current || !(window as any).TradingView) return;
+    const chart = createChart(containerRef.current, {
+      height,
+      layout: { background: { type: ColorType.Solid, color: '#1e1e2e' }, textColor: '#a0a0b0' },
+      grid: { vertLines: { color: '#2a2a3a' }, horzLines: { color: '#2a2a3a' } },
+      crosshair: { mode: 0 },
+      rightPriceScale: { borderColor: '#3a3a4a', autoScale: true },
+      timeScale: { borderColor: '#3a3a4a', timeVisible: true },
+      width: containerRef.current.clientWidth,
+    });
 
-      widgetRef.current = new (window as any).TradingView.widget({
-        container_id: containerId,
-        symbol: tvSymbol,
-        interval: tvInterval,
-        theme: 'dark',
-        style: '1',
-        locale: 'in',
-        timezone: 'Asia/Kolkata',
-        toolbar_bg: '#1e1e2e',
-        enable_publishing: false,
-        hide_side_toolbar: true,
-        allow_symbol_change: true,
-        details: false,
-        hotlist: false,
-        calendar: false,
-        studies: ['MASimple@tv-basicstudies', 'VWAP@tv-basicstudies'],
-        show_popup_button: false,
-        width: '100%',
-        height,
-        disabled_features: ['header_compare', 'header_saveload', 'header_symbol_search'],
-        enabled_features: [],
-      });
-    };
+    const series = chart.addSeries(CandlestickSeries, {
+      upColor: '#26a69a', downColor: '#ef5350',
+      borderUpColor: '#26a69a', borderDownColor: '#ef5350',
+      wickUpColor: '#26a69a', wickDownColor: '#ef5350',
+    });
 
-    if (!document.querySelector(`script[src="${TV_SCRIPT_URL}"]`)) {
-      const script = document.createElement('script');
-      script.src = TV_SCRIPT_URL;
-      script.async = true;
-      script.onload = createWidget;
-      document.head.appendChild(script);
-    } else if ((window as any).TradingView) {
-      createWidget();
-    } else {
-      const script = document.querySelector(`script[src="${TV_SCRIPT_URL}"]`);
-      if (script) script.addEventListener('load', createWidget);
-    }
+    chartRef.current = chart;
+    seriesRef.current = series;
 
-    return () => {
-      if (widgetRef.current) {
-        try { widgetRef.current.remove(); } catch (_) {}
-        widgetRef.current = null;
-      }
-    };
+    const h = () => { if (containerRef.current) chart.applyOptions({ width: containerRef.current.clientWidth }); };
+    window.addEventListener('resize', h);
+    return () => { window.removeEventListener('resize', h); chart.remove(); };
   }, []);
 
   useEffect(() => {
-    if (!widgetRef.current) return;
-    widgetRef.current.setSymbol(toTvSymbol(symbol), toTvInterval(timeframe), () => {});
+    const s = seriesRef.current;
+    if (!s) return;
+    const tvSymbol = `NSE:${symbol}`;
+    const rMap = { '1m': '1', '5m': '5', '15m': '15', '1h': '60', '1d': 'D' };
+    const resolution = rMap[timeframe] || '1';
+    let active = true;
+
+    const fetch = async () => {
+      try {
+        const from = Math.floor(Date.now() / 1000) - 86400;
+        const to = Math.floor(Date.now() / 1000) + 3600;
+        const r = await globalThis.fetch(`/api/v1/tv/history?symbol=${tvSymbol}&resolution=${resolution}&from=${from}&to=${to}`);
+        const d = await r.json();
+        if (!active || d.s !== 'ok') return;
+        const bars = d.t.map((t, i) => ({ time: t, open: d.o[i], high: d.h[i], low: d.l[i], close: d.c[i] }));
+        s.setData(bars);
+      } catch (_) {}
+    };
+
+    fetch();
+    const timer = setInterval(fetch, 5000);
+    return () => { active = false; clearInterval(timer); };
   }, [symbol, timeframe]);
 
   return (
-    <div className="tradingview-chart-container w-full" style={{ height }}>
-      <div id={`tv-chart-${id}`} ref={containerRef} className="w-full h-full" />
+    <div className="w-full rounded-xl overflow-hidden border border-border">
+      <div ref={containerRef} />
     </div>
   );
 }

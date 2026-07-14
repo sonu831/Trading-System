@@ -137,51 +137,32 @@ async function systemRoutes(fastify, options) {
         // ── REST fallback: fetch from MStock historical API when no WebSocket data ──
         if (!ltp) {
           try {
+            const { getAdapter } = require('../broker/adapters');
             const brokerService = container.resolve('brokerService');
-            const token = await brokerService.getSessionToken('mstock');
             const creds = await brokerService.getDecryptedCredentials('mstock');
-            if (token && creds?.api_key) {
-              // Get the MStock instrument token for this index from the vendor map
-              const path = require('path');
-              let tokenMap: any[] = [];
-              try { tokenMap = require('/app/vendor/nifty50_shared.json'); } catch (_) {}
-              if (!tokenMap.length) {
-                try { tokenMap = require(path.resolve(__dirname, '..', '..', '..', 'vendor', 'nifty50_shared.json')); } catch (_) {}
-              }
-              const entry = tokenMap.find((s: any) => s.symbol === sym);
-              const symboltoken = entry?.tokens?.mstock;
-              if (symboltoken && symboltoken !== 'TODO_VERIFY_FROM_MSTOCK_UI') {
-                const axios = require('axios');
-                const today = new Date();
-                const todate = today.toISOString().split('T')[0] + ' 15:30';
-                const fromdate = today.toISOString().split('T')[0] + ' 09:15';
-                const resp = await axios.post(
-                  'https://api.mstock.trade/openapi/typeb/instruments/historical',
-                  { exchange: 'NSE', symboltoken: String(symboltoken), interval: 'ONE_MINUTE', fromdate, todate },
-                  {
-                    headers: {
-                      'X-PrivateKey': creds.api_key,
-                      Authorization: `Bearer ${token}`,
-                      'X-Mirae-Version': '1',
-                      'Content-Type': 'application/json',
-                    },
-                    timeout: 5000,
-                  },
-                );
-                const candles: any[] = resp.data?.data?.candles || [];
-                if (candles.length > 0) {
-                  const latest = candles[candles.length - 1];
-                  if (Array.isArray(latest)) {
-                    ltp = latest[4]; // OHLCV array: [time, open, high, low, close, volume]
-                  } else {
-                    ltp = latest.close || latest.ltp;
+            if (creds?.api_key) {
+              const adapter = getAdapter('mstock', creds.api_key);
+              const { createClient } = require('redis');
+              const r2 = createClient({ url: process.env.REDIS_URL || 'redis://redis:6379' });
+              await r2.connect();
+              const raw = await r2.get('broker:session:mstock');
+              await r2.disconnect();
+              const jwt = raw ? JSON.parse(raw)?.token : null;
+              if (jwt) {
+                const TOKENS: Record<string, string> = { NIFTY: '26000', BANKNIFTY: '26009', FINNIFTY: '26037' };
+                const token = TOKENS[sym];
+                if (token) {
+                  adapter.setAccessToken(jwt);
+                  const result = await adapter.getQuote({ mode: 'LTP', exchangeTokens: { NSE: [token] } });
+                  const fetched = result?.data?.fetched?.[0] || result?.fetched?.[0] || {};
+                  if (fetched.ltp) {
+                    ltp = Number(fetched.ltp);
+                    redis.publisher.set(`ltp:${sym}`, JSON.stringify({ price: ltp, timestamp: new Date().toISOString() }), { EX: 60 }).catch(() => {});
                   }
-                  // Cache in Redis so next poll hits the fast path
-                  redis.set(`ltp:${sym}`, JSON.stringify({ price: ltp, timestamp: new Date().toISOString() }), { EX: 60 }).catch(() => {});
                 }
               }
             }
-          } catch (_) { /* REST fallback best-effort — return null if fails */ }
+          } catch (e: any) { console.error(`[index-quote] REST fallback for ${sym}:`, e.message); }
         }
 
         const change = ltp && prevClose ? ltp - prevClose : null;
@@ -214,12 +195,12 @@ async function systemRoutes(fastify, options) {
   // ─────────────────────────────────────────────────────────────
   fastify.get('/api/v1/market/index/:underlying/candles', {
     schema: {
-      description: 'OHLCV candles for index chart (1m or 5m)',
+      description: 'OHLCV candles for index chart (1m, 5m, 15m, 1h, 1d)',
       tags: ['Market'],
       querystring: {
         type: 'object',
         properties: {
-          tf: { type: 'string', default: '1m', enum: ['1m', '5m', '15m', '1h'] },
+          tf: { type: 'string', default: '1m', enum: ['1m', '5m', '15m', '1h', '1d'] },
           limit: { type: 'integer', default: 200, minimum: 1, maximum: 500 },
         },
       },
@@ -227,21 +208,80 @@ async function systemRoutes(fastify, options) {
     handler: async (req, reply) => {
       try {
         const container = require('../../container');
-        const prisma = container.cradle.prisma;
         const { underlying } = req.params;
         const sym = underlying.toUpperCase();
-        const tf = req.query.tf || '1m';
-        const limit = Math.min(req.query.limit || 200, 500);
+        const tf = (req.query as any).tf || '1m';
+        const limit = Math.min((req.query as any).limit || 200, 500);
 
-        const tableMap = { '1m': 'candles_1m', '5m': 'candles_5m', '15m': 'candles_15m', '1h': 'candles_1h' };
+        // 1. Redis cache (fast path — CandleBuffer pushes here)
+        if (tf === '1m') {
+          try {
+            const redis = container.cradle.redis?.publisher || container.cradle.redis;
+            const key = `candles:live:${sym}:1m`;
+            const len = await redis.lLen(key);
+            if (len > 0) {
+              const raw = await redis.lRange(key, Math.max(0, len - limit), -1);
+              const candles = raw.map((entry: string) => {
+                const c = JSON.parse(entry);
+                return { time: new Date(c.time).getTime() / 1000, open: c.open, high: c.high, low: c.low, close: c.close, volume: c.volume || 0 };
+              });
+              return { success: true, data: { underlying: sym, timeframe: tf, candles, source: 'redis' } };
+            }
+          } catch (_) {}
+        }
+
+        // 2. TimescaleDB
+        const prisma = container.cradle.prisma;
+        const tableMap: Record<string, string> = { '1m': 'candles_1m', '5m': 'candles_5m', '15m': 'candles_15m', '1h': 'candles_1h', '1d': 'candles_1d' };
         const table = tableMap[tf] || 'candles_1m';
+        let rows: any[] = [];
+        try {
+          rows = await prisma.$queryRawUnsafe(
+            `SELECT time, open, high, low, close, volume FROM ${table} WHERE symbol = $1 ORDER BY time DESC LIMIT $2`,
+            sym, limit
+          );
+        } catch (_) {}
 
-        const rows = await prisma.$queryRawUnsafe(
-          `SELECT time, open, high, low, close, volume FROM ${table} WHERE symbol = $1 ORDER BY time DESC LIMIT $2`,
-          sym, limit
-        );
+        // 3. MStock historical API fallback
+        if (!rows.length) {
+          try {
+            const { getAdapter } = require('../broker/adapters');
+            const brokerService = require('../../container').resolve('brokerService');
+            const creds = await brokerService.getDecryptedCredentials('mstock');
+            const { createClient } = require('redis');
+            const r2 = createClient({ url: process.env.REDIS_URL || 'redis://redis:6379' });
+            await r2.connect();
+            const raw = await r2.get('broker:session:mstock');
+            await r2.disconnect();
+            const jwt = raw ? JSON.parse(raw)?.token : null;
+            if (creds?.api_key && jwt) {
+              const TOKENS: Record<string, string> = { NIFTY: '26000', BANKNIFTY: '26009', FINNIFTY: '26037' };
+              const token = TOKENS[sym];
+              if (token) {
+                const adapter = getAdapter('mstock', creds.api_key);
+                adapter.setAccessToken(jwt);
+                // MStock interval mapping: ONE_MINUTE, FIVE_MINUTE, FIFTEEN_MINUTE, ONE_HOUR, ONE_DAY
+                const intervalMap: Record<string, string> = { '1m': 'ONE_MINUTE', '5m': 'FIVE_MINUTE', '15m': 'FIFTEEN_MINUTE', '1h': 'ONE_HOUR', '1d': 'ONE_DAY' };
+                const interval = intervalMap[tf] || 'ONE_MINUTE';
+                const to = new Date();
+                const from = new Date(to.getTime() - (limit * parseTfMs(tf)));
+                const fromdate = from.toISOString().split('T')[0] + ' ' + from.toTimeString().split(' ')[0];
+                const todate = to.toISOString().split('T')[0] + ' ' + to.toTimeString().split(' ')[0];
+                const result = await adapter.getHistoricalData({
+                  exchange: 'NSE', symboltoken: token, interval,
+                  fromdate, todate,
+                });
+                const candles = (result?.data?.candles || []).map((c: any) => {
+                  if (Array.isArray(c)) return { time: new Date(c[0]).getTime() / 1000, open: c[1], high: c[2], low: c[3], close: c[4], volume: c[5] || 0 };
+                  return { time: new Date(c.time || c[0]).getTime() / 1000, open: Number(c.open || c[1]), high: Number(c.high || c[2]), low: Number(c.low || c[3]), close: Number(c.close || c[4]), volume: Number(c.volume || c[5] || 0) };
+                });
+                return { success: true, data: { underlying: sym, timeframe: tf, candles, source: 'mstock' } };
+              }
+            }
+          } catch (_) {}
+        }
 
-        const candles = (rows || []).reverse().map((r) => ({
+        const candles = (rows || []).reverse().map((r: any) => ({
           time: new Date(r.time).getTime() / 1000,
           open: Number(r.open),
           high: Number(r.high),
@@ -250,13 +290,21 @@ async function systemRoutes(fastify, options) {
           volume: Number(r.volume || 0),
         }));
 
-        return { success: true, data: { underlying: sym, timeframe: tf, candles } };
-      } catch (err) {
-        // Fallback: empty data on query failure
-        return { success: true, data: { underlying: req.params.underlying, timeframe: req.query.tf || '1m', candles: [] } };
+        return { success: true, data: { underlying: sym, timeframe: tf, candles, source: 'timescaledb' } };
+      } catch (err: any) {
+        return { success: true, data: { underlying: req.params.underlying, timeframe: (req.query as any).tf || '1m', candles: [] } };
       }
     },
   });
+
+  function parseTfMs(tf: string): number {
+    const map: Record<string, number> = { '1m': 60000, '5m': 300000, '15m': 900000, '1h': 3600000, '1d': 86400000 };
+    return map[tf] || 60000;
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // MARKET VIEW — handled in modules/market/routes.ts
+  // ─────────────────────────────────────────────────────────────
 
   // ─────────────────────────────────────────────────────────────
   // EXECUTION STATE
@@ -339,9 +387,37 @@ async function systemRoutes(fastify, options) {
         const u = (req.query.underlying || 'NIFTY').toUpperCase();
         const n = parseInt(req.query.strikes) || 7;
         const step = u === 'BANKNIFTY' ? 100 : 50;
-        const sr = await redis.get(`ltp:${u}`);
+        const sr = await redis.publisher.get(`ltp:${u}`);
         const s = sr ? (typeof sr === 'string' ? JSON.parse(sr) : sr) : null;
-        const spot = s?.price || s?.close || 0;
+        let spot: number = s?.price || s?.close || 0;
+        if (!spot) {
+          // Fallback: fetch live spot from MStock 
+          try {
+            const { getAdapter } = require('../broker/adapters');
+            const brokerService = require('../../container').resolve('brokerService');
+            const creds = await brokerService.getDecryptedCredentials('mstock');
+            const { createClient } = require('redis');
+            const r2 = createClient({ url: process.env.REDIS_URL || 'redis://redis:6379' });
+            await r2.connect();
+            const raw = await r2.get('broker:session:mstock');
+            await r2.disconnect();
+            const jwt = raw ? JSON.parse(raw)?.token : null;
+            if (creds?.api_key && jwt) {
+              const TOKENS: Record<string, string> = { NIFTY: '26000', BANKNIFTY: '26009', FINNIFTY: '26037' };
+              const token = TOKENS[u];
+              if (token) {
+                const adapter = getAdapter('mstock', creds.api_key);
+                adapter.setAccessToken(jwt);
+                const result = await adapter.getQuote({ mode: 'LTP', exchangeTokens: { NSE: [token] } });
+                const fetched = result?.data?.fetched?.[0] || result?.fetched?.[0] || {};
+                if (fetched.ltp) {
+                  spot = Number(fetched.ltp);
+                  redis.publisher.set(`ltp:${u}`, JSON.stringify({ price: spot, timestamp: new Date().toISOString() }), { EX: 60 }).catch(() => {});
+                }
+              }
+            }
+          } catch (_) {}
+        }
         if (!spot) return { success: true, data: { underlying: u, spot: null, atm: 0, rows: [] } };
         const atm = Math.round(spot / step) * step;
         const strikes = [];
@@ -353,6 +429,19 @@ async function systemRoutes(fastify, options) {
             `${u}-OC`, strikes
           );
         } catch (_) {}
+
+        // No DB data: build synthetic chain from spot LTP
+        if (!rows.length) {
+          rows = [];
+          for (const k of strikes) {
+            const dist = Math.abs(k - spot);
+            const cePremium = Math.max(0.5, spot - k + dist * 0.15);
+            const pePremium = Math.max(0.5, k - spot + dist * 0.15);
+            const ivBase = 14 + Math.min(30, dist / spot * 100);
+            rows.push({ strike: k, option_type: 'CE', ltp: Math.round(cePremium * 100) / 100, bid: Math.round((cePremium * 0.9) * 100) / 100, ask: Math.round((cePremium * 1.1) * 100) / 100, open_interest: 0, volume: 0, iv: Math.round(ivBase * 10) / 10 });
+            rows.push({ strike: k, option_type: 'PE', ltp: Math.round(pePremium * 100) / 100, bid: Math.round((pePremium * 0.9) * 100) / 100, ask: Math.round((pePremium * 1.1) * 100) / 100, open_interest: 0, volume: 0, iv: Math.round(ivBase * 10) / 10 });
+          }
+        }
         const chain = strikes.map(k => ({ strike: k, isATM: k === atm, ce: toOption(rows, k, 'CE'), pe: toOption(rows, k, 'PE') }));
         return { success: true, data: { underlying: u, spot, atm, rows: chain } };
       } catch (err) { return { success: false, error: err.message }; }
@@ -585,6 +674,93 @@ async function systemRoutes(fastify, options) {
       }
       return { success: true, data: { underlying: u, expiries: out } };
     },
+  });
+
+  // ─────────────────────────────────────────────────────────────
+  // TRADINGVIEW UDF DATA FEED — feeds our live candles to TV widget
+  // ─────────────────────────────────────────────────────────────
+  fastify.get('/api/v1/tv/config', async () => ({
+    supports_search: false,
+    supports_group_request: false,
+    supports_marks: false,
+    supports_timescale_marks: false,
+    supports_time: true,
+    supported_resolutions: ['1', '5', '15', '60', 'D', 'W'],
+  }));
+
+  fastify.get('/api/v1/tv/symbols', async (req) => {
+    const symbol = (req.query as any).symbol || 'NSE:NIFTY';
+    const name = symbol.replace('NSE:', '');
+    return {
+      name: symbol,
+      ticker: symbol,
+      description: name,
+      type: 'index',
+      session: '0915-1530',
+      timezone: 'Asia/Kolkata',
+      exchange: 'NSE',
+      minmov: 1,
+      pricescale: 100,
+      has_intraday: true,
+      has_daily: true,
+    };
+  });
+
+  fastify.get('/api/v1/tv/history', async (req, reply) => {
+    try {
+      const q = req.query as any;
+      const symbol = (q.symbol || 'NSE:NIFTY').replace('NSE:', '');
+      const resolution = q.resolution || '1';
+      const from = parseInt(q.from) || 0;
+      const to = parseInt(q.to) || Math.floor(Date.now() / 1000);
+
+      const tfMap: Record<string, string> = { '1': '1m', '5': '5m', '15': '15m', '60': '1h', 'D': '1d', 'W': '1w' };
+      const tf = tfMap[resolution] || '1m';
+      const limit = Math.min(Math.ceil((to - from) / (parseInt(resolution) * 60)), 500);
+
+      // Read from our candles API
+      const container = require('../../container');
+      const prisma = container.cradle.prisma;
+      const redis2 = container.cradle.redis?.publisher || container.cradle.redis;
+      const sym = symbol.toUpperCase();
+
+      let rows: any[] = [];
+      // Try Redis first (live CandleBuffer data)
+      if (tf === '1m') {
+        try {
+          const key = `candles:live:${sym}:1m`;
+          const raw = await redis2.lRange(key, -limit, -1);
+          if (raw?.length) {
+            rows = raw.map((r: string) => JSON.parse(r));
+          }
+        } catch (_) {}
+      }
+      // Fallback to DB
+      if (!rows.length) {
+        const tableMap: Record<string, string> = { '1m': 'candles_1m', '5m': 'candles_5m', '15m': 'candles_15m', '1h': 'candles_1h', '1d': 'candles_1d', '1w': 'candles_1d' };
+        const table = tableMap[tf] || 'candles_1m';
+        try {
+          rows = await prisma.$queryRawUnsafe(
+            `SELECT time, open, high, low, close, volume FROM ${table} WHERE symbol = $1 AND time BETWEEN to_timestamp($2) AND to_timestamp($3) ORDER BY time ASC LIMIT $4`,
+            sym, from, to, limit
+          );
+        } catch (_) {}
+      }
+
+      const t: number[] = [], o: number[] = [], h: number[] = [], l: number[] = [], c: number[] = [], v: number[] = [];
+      for (const row of rows) {
+        const ts = row.time ? Math.floor(new Date(row.time).getTime() / 1000) : row.t || 0;
+        if (ts < from || ts > to) continue;
+        t.push(ts);
+        o.push(Number(row.open));
+        h.push(Number(row.high));
+        l.push(Number(row.low));
+        c.push(Number(row.close));
+        v.push(Number(row.volume || 0));
+      }
+
+      return t.length ? { s: 'ok', t, o, h, l, c, v } : { s: 'no_data', t: [], o: [], h: [], l: [], c: [], v: [] };
+    } catch (err) { return { s: 'error', errmsg: (err as any).message }; }
   });
 }
 

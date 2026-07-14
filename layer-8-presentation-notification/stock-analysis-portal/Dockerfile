@@ -9,6 +9,8 @@ RUN pnpm install --no-frozen-lockfile
 
 FROM base AS builder
 WORKDIR /app
+ENV NEXT_PUBLIC_API_URL=/api/v1
+ENV NEXT_PUBLIC_WS_URL=http://localhost:4000
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN pnpm run build

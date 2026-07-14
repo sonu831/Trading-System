@@ -52,14 +52,17 @@ const strategy: BrokerAuthStrategy = {
       return verifyOTPStep(adapter, parkedRequestToken, otp, TTL);
     }
 
-    // Direct login: user provided a 6-digit TOTP code — pass to SDK login in one shot.
-    // This is the standard SDK pattern: client.login({ totp: "776395" }) → JWT directly.
+    // totp_secret present → two-step flow (trading JWT, 1199 chars, valid for REST)
+    // Only fall back to directTOTP when no secret is stored
+    if (totp_secret) {
+      return loginAndVerify(adapter, { clientcode: client_code, password }, totp_secret, TTL, deps);
+    }
+
+    // Direct login: user provided a 6-digit TOTP code manually (no stored secret).
+    // Produces 203-char SESSION token — valid for WebSocket, NOT for REST API.
     if (directTOTP && /^\d{6}$/.test(directTOTP)) {
       return directLogin(adapter, { clientcode: client_code, password }, directTOTP, TTL);
     }
-
-    // Standard two-step flow (with or without Base32 secret for unattended auth)
-    return loginAndVerify(adapter, { clientcode: client_code, password }, totp_secret, TTL, deps);
   },
 };
 

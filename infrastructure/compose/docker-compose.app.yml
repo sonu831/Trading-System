@@ -211,6 +211,7 @@ services:
     volumes:
       - ../../layer-7-core-interface/api/src:/app/src
       - ../../shared:/app/shared:ro
+      - ../../vendor:/app/vendor:ro
     networks:
       - trading-network
     restart: unless-stopped
@@ -334,7 +335,7 @@ services:
       - '3000:3000'
     environment:
       - NEXT_PUBLIC_API_URL=/api/v1
-      - NEXT_PUBLIC_WS_URL=/
+      - NEXT_PUBLIC_WS_URL=http://localhost:4000
       # Server-side only (NOT NEXT_PUBLIC_*): src/middleware.ts injects this into the
       # proxied /api/* requests. Exposing it to the browser would hand over the control plane.
       - INTERNAL_API_KEY=${INTERNAL_API_KEY}
